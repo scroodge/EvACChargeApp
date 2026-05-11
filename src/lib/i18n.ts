@@ -269,6 +269,15 @@ export const dictionaries = {
         "Anon JWT only accesses your rows · service role absent on device",
         "Realtime publication limited to charging_sessions inserts/updates · no cross-driver leakage",
       ],
+      about: "About",
+      aboutBody:
+        "VoltFlow is a small planning cockpit for EV charging sessions, costs, and history.",
+      telegram: "Telegram",
+      github: "GitHub",
+      license:
+        "Project code is copyright protected. All rights reserved unless the repository later publishes a separate license.",
+      copyright:
+        "© 2026 VoltFlow. Third-party packages and services remain under their respective licenses.",
     },
   },
   be: {
@@ -483,6 +492,15 @@ export const dictionaries = {
         "Anon JWT бачыць толькі вашы радкі · service role няма на прыладзе",
         "Realtime-публікацыя абмежавана inserts/updates у charging_sessions · без уцечак паміж кіроўцамі",
       ],
+      about: "Пра дадатак",
+      aboutBody:
+        "VoltFlow — невялікая панэль для планавання EV-зарадкі, коштаў і гісторыі сесій.",
+      telegram: "Telegram",
+      github: "GitHub",
+      license:
+        "Код праекта абаронены аўтарскім правам. Усе правы захаваныя, калі ў рэпазіторыі пазней не з'явіцца асобная ліцэнзія.",
+      copyright:
+        "© 2026 VoltFlow. Пакеты і сэрвісы трэціх бакоў застаюцца пад сваімі ліцэнзіямі.",
     },
   },
   ru: {
@@ -696,6 +714,15 @@ export const dictionaries = {
         "Anon JWT видит только ваши строки · service role отсутствует на устройстве",
         "Realtime-публикация ограничена inserts/updates в charging_sessions · без утечек между пользователями",
       ],
+      about: "О приложении",
+      aboutBody:
+        "VoltFlow — небольшая панель для планирования EV-зарядки, стоимости и истории сессий.",
+      telegram: "Telegram",
+      github: "GitHub",
+      license:
+        "Код проекта защищен авторским правом. Все права защищены, если в репозитории позже не опубликована отдельная лицензия.",
+      copyright:
+        "© 2026 VoltFlow. Пакеты и сервисы третьих сторон остаются под своими лицензиями.",
     },
   },
 } as const;
