@@ -1,6 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
+import { be, ru } from "date-fns/locale";
 
 import Link from "next/link";
 
@@ -9,10 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { deriveChargingState, formatDuration, type ChargingParams } from "@/lib/charging-math";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useSessionsQuery } from "@/hooks/use-sessions-query";
+import { useTranslation } from "@/hooks/use-translation";
 import type { ChargingSessionRow } from "@/types/database";
 
 export function HistoryView() {
   const { data, isLoading } = useSessionsQuery();
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
@@ -38,11 +41,11 @@ export function HistoryView() {
     <div className="flex flex-col gap-5 p-6">
       <div>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.35em]">
-          Sessions
+          {t("history.eyebrow")}
         </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">History lane</h1>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight">{t("history.title")}</h1>
         <p className="text-muted-foreground mt-3 max-w-xl text-lg">
-          Every stop writes the final SOC, AC kWh tally, and indicative tariff spend.
+          {t("history.subtitle")}
         </p>
       </div>
 
@@ -57,6 +60,7 @@ export function HistoryView() {
 
 function HistoryCard({ session }: { session: ChargingSessionRow }) {
   const nowMs = useTickingClock(session.status === "charging");
+  const { locale, t } = useTranslation();
   const started = session.started_at ? new Date(session.started_at) : null;
   const ended = session.stopped_at ? new Date(session.stopped_at) : null;
 
@@ -91,6 +95,15 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
       : session.status === "charging"
         ? "text-primary"
       : "text-muted-foreground";
+  const dateLocale = locale === "be" ? be : locale === "ru" ? ru : undefined;
+  const statusLabel =
+    session.status === "completed"
+      ? t("history.status.completed")
+      : session.status === "stopped"
+        ? t("history.status.stopped")
+        : session.status === "charging"
+          ? t("history.status.charging")
+          : session.status;
 
   return (
     <Card className="border-white/[0.08] bg-gradient-to-br from-background via-card to-primary/13">
@@ -98,7 +111,11 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
         <div className="flex items-start justify-between gap-6">
           <div>
             <p className="text-muted-foreground text-xs uppercase tracking-[0.32em]">
-              {started ? format(started, "EEEE · HH:mm · MMM d") : "Queued"}
+              {started
+                ? format(started, "EEEE · HH:mm · MMM d", {
+                    locale: dateLocale,
+                  })
+                : t("history.queued")}
             </p>
             <p className="mt-6 text-[40px] font-semibold tracking-tighter tabular-nums">
               {pct}
@@ -108,26 +125,26 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
           <span
             className={`rounded-full px-6 py-2 text-xs font-semibold uppercase tracking-[0.32em] ${statusTone}`}
           >
-            {session.status.toUpperCase()}
+            {statusLabel}
           </span>
         </div>
         <dl className="border-white/[0.05] divide-y divide-white/5 text-lg">
-          <Row label="Target" value={`${session.target_percent}%`} />
+          <Row label={t("history.target") as string} value={`${session.target_percent}%`} />
           <Row
-            label="Energy"
+            label={t("history.energy") as string}
             value={`${(derived?.chargedEnergyKwh ?? session.charged_energy_kwh).toFixed(
               2,
             )} kWh`}
           />
           <Row
-            label="Cost"
+            label={t("history.cost") as string}
             value={
               session.price_per_kwh > 0
                 ? `€${(derived?.estimatedCost ?? session.estimated_cost).toFixed(2)}`
                 : "—"
             }
           />
-          <Row label="Duration" value={elapsed} />
+          <Row label={t("history.duration") as string} value={elapsed} />
         </dl>
 
         <div className="mt-10 flex gap-5">
@@ -135,13 +152,13 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
             className="text-primary text-lg font-semibold underline-offset-4 hover:underline"
             href={`/charging/${session.id}`}
           >
-            Session detail
+            {t("history.detail")}
           </Link>
           <Link
             className="text-muted-foreground text-lg underline-offset-4 hover:text-foreground hover:underline"
             href="/dashboard"
           >
-            Start another
+            {t("history.startAnother")}
           </Link>
         </div>
       </CardContent>
@@ -159,24 +176,26 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-1 flex-col items-center gap-12 px-6 py-28 text-center">
       <div className="space-y-8">
         <p className="text-muted-foreground text-xs uppercase tracking-[0.4em]">
-          Still quiet
+          {t("history.emptyEyebrow")}
         </p>
         <h1 className="text-balance text-4xl font-semibold tracking-tight">
-          Plug in · we memorialize every stint
+          {t("history.emptyTitle")}
         </h1>
         <p className="text-muted-foreground mx-auto max-w-md text-lg">
-          Charging sessions accumulate here automatically. Drive home, START on the cockpit, STOP when unplugged — we clamp all math to timestamps.
+          {t("history.emptyBody")}
         </p>
       </div>
       <Link
         className="text-primary underline-offset-[8px] text-lg hover:underline"
         href="/dashboard"
       >
-        Head to cockpit
+        {t("history.headCockpit")}
       </Link>
     </div>
   );

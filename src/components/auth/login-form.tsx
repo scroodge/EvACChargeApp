@@ -6,11 +6,13 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "@/hooks/use-translation";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -18,6 +20,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleGoogle = async () => {
     const supabase = createClient();
@@ -46,7 +49,7 @@ export function LoginForm() {
       return;
     }
 
-    toast.message("Redirecting to Google…");
+    toast.message(t("auth.redirecting") as string);
   };
 
   const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
@@ -55,7 +58,7 @@ export function LoginForm() {
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
     if (!email || password.length < 8) {
-      toast.error("Use a password with at least 8 characters.");
+      toast.error(t("auth.weakPassword") as string);
       return;
     }
     const supabase = createClient();
@@ -66,7 +69,7 @@ export function LoginForm() {
       toast.error(error.message);
       return;
     }
-    toast.success("Confirm your email · then come back here to sign in.");
+    toast.success(t("auth.confirmEmail") as string);
   };
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
@@ -85,28 +88,31 @@ export function LoginForm() {
       return;
     }
 
-    toast.success("Welcome back.");
+    toast.success(t("auth.welcome") as string);
     router.replace(next);
     router.refresh();
   };
 
   return (
     <Card className="w-full border-white/[0.1] pt-10 shadow-xl shadow-teal-500/25 backdrop-blur">
+      <div className="flex justify-center px-6 pb-8">
+        <LocaleSwitcher />
+      </div>
       <CardHeader className="space-y-2 text-center">
         <CardTitle className="text-3xl font-semibold tracking-tight">
-          Charge Pulse identity
+          {t("auth.title")}
         </CardTitle>
         <CardDescription className="text-base">
-          Minimal auth · Supabase session cookies + row-level guards.
+          {t("auth.description")}
         </CardDescription>
       </CardHeader>
       <Tabs defaultValue="signin" className="w-full px-6">
         <TabsList className="mx-auto mb-10 flex w-full rounded-full border border-white/[0.1] bg-white/[0.03] p-1 group-data-horizontal/tabs:h-auto">
           <TabsTrigger className="h-11 rounded-full text-base" value="signin">
-            Login
+            {t("auth.login")}
           </TabsTrigger>
           <TabsTrigger className="h-11 rounded-full text-base" value="signup">
-            Register
+            {t("auth.register")}
           </TabsTrigger>
         </TabsList>
 
@@ -118,7 +124,7 @@ export function LoginForm() {
               disabled={loading}
               type="submit"
             >
-              Continue
+              {t("auth.continue")}
             </Button>
           </form>
         </TabsContent>
@@ -132,7 +138,7 @@ export function LoginForm() {
               disabled={loading}
               type="submit"
             >
-              Create account
+              {t("auth.createAccount")}
             </Button>
           </form>
         </TabsContent>
@@ -142,7 +148,7 @@ export function LoginForm() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-muted-foreground">
             <span className="h-px flex-1 bg-white/10" />
-            Or
+            {t("auth.or")}
             <span className="h-px flex-1 bg-white/10" />
           </div>
           <Button
@@ -152,34 +158,36 @@ export function LoginForm() {
             disabled={loading}
             onClick={() => void handleGoogle()}
           >
-            Continue with Google
+            {t("auth.google")}
           </Button>
         </div>
 
         <p className="text-muted-foreground text-center">
-          Offline install hint: Safari share sheet → {" "}
-          <span className="text-foreground font-semibold">Add to Home Screen</span>.
+          {t("auth.installHint")}{" "}
+          <span className="text-foreground font-semibold">{t("auth.addToHome")}</span>.
         </p>
         <Link
           href="/"
           className="text-muted-foreground text-center underline underline-offset-4 hover:text-primary"
         >
-          Back to splash
+          {t("auth.back")}
         </Link>
       </CardFooter>
 
       <CardContent className="pb-10 text-muted-foreground text-center text-[11px] tracking-wide">
-        Hosted on Vercel · deterministic charging math survives refresh via timestamps.
+        {t("auth.hosted")}
       </CardContent>
     </Card>
   );
 }
 
 function AuthFields() {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-5">
       <div className="space-y-2 text-left">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("auth.email")}</Label>
         <Input
           id="email"
           name="email"
@@ -191,7 +199,7 @@ function AuthFields() {
         />
       </div>
       <div className="space-y-2 text-left">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{t("auth.password")}</Label>
         <Input
           id="password"
           name="password"

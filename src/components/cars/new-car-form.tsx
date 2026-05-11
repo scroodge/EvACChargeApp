@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreateCarMutation } from "@/hooks/use-cars-query";
+import { useTranslation } from "@/hooks/use-translation";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 
 export function NewCarForm() {
   const router = useRouter();
   const mutation = useCreateCarMutation();
   const setCar = useAppPreferences((s) => s.setSelectedCarId);
+  const { t } = useTranslation();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,27 +33,27 @@ export function NewCarForm() {
   return (
     <Card className="border-white/[0.1] shadow-[inset_0_1px_0_rgb(255_255_255/0.04)]">
       <CardHeader>
-        <CardTitle className="text-2xl tracking-tight">New vehicle profile</CardTitle>
+        <CardTitle className="text-2xl tracking-tight">{t("cars.title")}</CardTitle>
         <p className="text-muted-foreground text-base">
-          Used for realtime kWh ramps and ETA math — everything stays scoped to your account.
+          {t("cars.description")}
         </p>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="flex flex-col gap-5">
           <div className="space-y-2">
-            <Label htmlFor="name">Nickname</Label>
+            <Label htmlFor="name">{t("cars.nickname")}</Label>
             <Input
               id="name"
               name="name"
               required
-              placeholder="Urban Runner"
+              placeholder={t("cars.nicknamePlaceholder") as string}
               className="min-h-[52px] rounded-2xl text-lg"
               autoComplete="off"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="battery_capacity_kwh">Useable battery (kWh)</Label>
+            <Label htmlFor="battery_capacity_kwh">{t("cars.battery")}</Label>
             <Input
               id="battery_capacity_kwh"
               name="battery_capacity_kwh"
@@ -68,7 +70,7 @@ export function NewCarForm() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="default_charger_power_kw">Wallbox kW</Label>
+              <Label htmlFor="default_charger_power_kw">{t("cars.wallbox")}</Label>
               <Input
                 id="default_charger_power_kw"
                 name="default_charger_power_kw"
@@ -81,11 +83,11 @@ export function NewCarForm() {
                 className="min-h-[52px] rounded-2xl text-lg"
               />
               <p className="text-muted-foreground text-xs">
-                Matches your AC pedestal limit.
+                {t("cars.wallboxHelp")}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="default_efficiency_percent">AC efficiency</Label>
+              <Label htmlFor="default_efficiency_percent">{t("cars.efficiency")}</Label>
               <Input
                 id="default_efficiency_percent"
                 name="default_efficiency_percent"
@@ -98,7 +100,7 @@ export function NewCarForm() {
                 className="min-h-[52px] rounded-2xl text-lg"
               />
               <p className="text-muted-foreground text-xs">
-                Grid-to-pack factor for tariff math.
+                {t("cars.efficiencyHelp")}
               </p>
             </div>
           </div>
@@ -111,14 +113,14 @@ export function NewCarForm() {
             type="button"
             asChild
           >
-            <Link href="/dashboard">Cancel</Link>
+            <Link href="/dashboard">{t("common.cancel")}</Link>
           </Button>
           <Button
             className="hover:brightness-110 min-h-[52px] w-full rounded-full text-base font-semibold sm:flex-1"
             type="submit"
             disabled={mutation.isPending}
           >
-            {mutation.isPending ? "Saving..." : "Save vehicle"}
+            {mutation.isPending ? t("common.saving") : t("cars.save")}
           </Button>
           {mutation.isPending ? (
             <Skeleton className="h-[18px] w-full rounded-full" />

@@ -32,6 +32,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { useCarsQuery } from "@/hooks/use-cars-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { fetchSessions } from "@/hooks/use-sessions-query";
+import { useTranslation } from "@/hooks/use-translation";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { ChargingSessionRow } from "@/types/database";
 import type { Car } from "@/types/database";
@@ -42,6 +43,7 @@ export function DashboardView() {
   const selectedCarId = useAppPreferences((s) => s.selectedCarId);
   const setSelectedCarId = useAppPreferences((s) => s.setSelectedCarId);
   const defaultPrice = useAppPreferences((s) => s.defaultPricePerKwh);
+  const { t } = useTranslation();
 
   const { data: sessions, isLoading: loadingSessions } = useQuery({
     queryKey: queryKeys.sessions,
@@ -105,8 +107,9 @@ export function DashboardView() {
     const start = Number(startPct);
     const target = Number(targetPct);
     if (!(start < target))
-      return toast.error("Target must exceed current battery level");
-    if (start < 0 || target > 100) return toast.error("Percent must stay 0–100");
+      return toast.error(t("dashboard.targetError") as string);
+    if (start < 0 || target > 100)
+      return toast.error(t("dashboard.percentError") as string);
 
     setSubmitting(true);
     const overrides =
@@ -121,10 +124,10 @@ export function DashboardView() {
       });
       if (!res.ok) throw new Error(res.error);
       setDialogOpen(false);
-      toast.success("Charging started");
+      toast.success(t("dashboard.started") as string);
       router.push(`/charging/${res.sessionId}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start");
+      toast.error(e instanceof Error ? e.message : (t("dashboard.couldNotStart") as string));
     } finally {
       setSubmitting(false);
     }
@@ -134,27 +137,27 @@ export function DashboardView() {
     <div className="flex flex-col gap-5 p-4">
       <header className="space-y-1">
         <p className="text-muted-foreground text-xs uppercase tracking-[0.3em]">
-          EV dashboard
+          {t("dashboard.eyebrow")}
         </p>
         <h1 className="text-balance text-3xl font-semibold tracking-tight">
-          Charge Pulse
+          {t("dashboard.title")}
         </h1>
         <p className="text-muted-foreground text-base">
-          Big controls, realtime math, synced to Supabase.
+          {t("dashboard.subtitle")}
         </p>
       </header>
 
       {!isLoading && cars && cars.length === 0 ? (
         <Card className="border-white/12 bg-card/80 shadow-[0_20px_60px_-30px_rgb(34_211_238/0.65)] backdrop-blur">
           <CardHeader>
-            <CardTitle className="text-xl tracking-tight">Add your EV</CardTitle>
+            <CardTitle className="text-xl tracking-tight">{t("dashboard.addEvTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground text-base">
-            We need a battery size and onboard charger preset to simulate energy and time.
+            {t("dashboard.addEvBody")}
           </CardContent>
           <CardFooter>
             <Button asChild size="lg" className="h-[52px] w-full rounded-full text-base font-semibold">
-              <Link href="/cars/new">Add vehicle</Link>
+              <Link href="/cars/new">{t("dashboard.addVehicle")}</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -164,7 +167,7 @@ export function DashboardView() {
         <>
           <div className="space-y-2">
             <Label className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
-              Vehicle
+              {t("dashboard.vehicle")}
             </Label>
             {isLoading ? (
               <Skeleton className="h-14 w-full rounded-2xl" />
@@ -178,7 +181,7 @@ export function DashboardView() {
                 onValueChange={(value) => setSelectedCarId(value)}
               >
                 <SelectTrigger className="h-14 rounded-2xl text-base md:text-lg">
-                  <SelectValue placeholder="Choose a car" />
+                  <SelectValue placeholder={t("dashboard.chooseCar") as string} />
                 </SelectTrigger>
                 <SelectContent>
                   {cars.map((car) => (
@@ -186,8 +189,10 @@ export function DashboardView() {
                       <div className="flex flex-col text-left leading-tight">
                         <span className="font-medium">{car.name}</span>
                         <span className="text-muted-foreground text-xs">
-                          {car.battery_capacity_kwh} kWh pack ·{" "}
-                          {car.default_charger_power_kw} kW onboard
+                          {t("dashboard.pack", {
+                            battery: car.battery_capacity_kwh,
+                            power: car.default_charger_power_kw,
+                          })}
                         </span>
                       </div>
                     </SelectItem>
@@ -207,16 +212,16 @@ export function DashboardView() {
 
           <div className="grid gap-3 md:grid-cols-2">
             <UtilityLink
-              headline="Fleet"
-              subtitle="Tune capacity & charger defaults"
+              headline={t("dashboard.fleet") as string}
+              subtitle={t("dashboard.fleetSubtitle") as string}
               href="/cars/new"
-              cta="Add another EV"
+              cta={t("dashboard.addAnother") as string}
             />
             <UtilityLink
-              headline="History"
-              subtitle="Completed & stopped cycles"
+              headline={t("nav.history") as string}
+              subtitle={t("dashboard.historySubtitle") as string}
               href="/history"
-              cta="View sessions"
+              cta={t("dashboard.viewSessions") as string}
             />
           </div>
         </>
@@ -235,19 +240,19 @@ export function DashboardView() {
               }
             }}
           >
-            {activeSession ? "Charging..." : "Start charging"}
+            {activeSession ? t("dashboard.charging") : t("dashboard.startCharging")}
           </Button>
         </div>
         <DialogContent className="gap-6 rounded-[1.75rem] border-white/15">
           <DialogHeader>
-            <DialogTitle className="text-xl">Quick session</DialogTitle>
+            <DialogTitle className="text-xl">{t("dashboard.quickSession")}</DialogTitle>
             <p className="text-muted-foreground text-base">
-              Targets are deterministic from timestamps · prices use your tariff.
+              {t("dashboard.quickSessionBody")}
             </p>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="start-pct">Current charge %</Label>
+              <Label htmlFor="start-pct">{t("dashboard.currentCharge")}</Label>
               <Input
                 id="start-pct"
                 inputMode="decimal"
@@ -261,7 +266,7 @@ export function DashboardView() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-pct">Target charge %</Label>
+              <Label htmlFor="target-pct">{t("dashboard.targetCharge")}</Label>
               <Input
                 id="target-pct"
                 inputMode="decimal"
@@ -274,10 +279,12 @@ export function DashboardView() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="charger-kw">AC power override (optional)</Label>
+              <Label htmlFor="charger-kw">{t("dashboard.powerOverride")}</Label>
               <Input
                 id="charger-kw"
-                placeholder={`Default · ${selectedCar?.default_charger_power_kw ?? "--"} kW`}
+                placeholder={t("dashboard.defaultPower", {
+                  power: selectedCar?.default_charger_power_kw ?? "--",
+                }) as string}
                 type="number"
                 inputMode="decimal"
                 step="0.1"
@@ -287,7 +294,7 @@ export function DashboardView() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="energy-price">Electricity price €/kWh</Label>
+              <Label htmlFor="energy-price">{t("dashboard.price")}</Label>
               <Input
                 id="energy-price"
                 type="number"
@@ -298,7 +305,7 @@ export function DashboardView() {
                 className="h-[52px] rounded-xl text-lg"
               />
               <p className="text-muted-foreground text-xs">
-                Mirrors your utility statement — uses AC energy from the pedestal.
+                {t("dashboard.priceHelp")}
               </p>
             </div>
           </div>
@@ -308,14 +315,14 @@ export function DashboardView() {
               className="min-h-[48px] rounded-full border-white/25"
               onClick={() => setDialogOpen(false)}
             >
-              Later
+              {t("common.later")}
             </Button>
             <Button
               className="hover:brightness-110 min-h-[52px] flex-1 rounded-full text-base font-semibold"
               disabled={submitting || !selectedCar}
               onClick={() => void handleStart()}
             >
-              {submitting ? "Starting..." : "Start session"}
+              {submitting ? t("dashboard.starting") : t("dashboard.startSession")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -337,6 +344,7 @@ function ActivePulseCard({
   live: ReturnType<typeof deriveChargingState> | null;
   nowMs: number;
 }) {
+  const { t } = useTranslation();
   const currentLive =
     live ??
     (activeSession?.started_at
@@ -358,10 +366,10 @@ function ActivePulseCard({
     <Card className="border-white/[0.1] bg-gradient-to-br from-primary/13 via-transparent to-teal-500/13 shadow-[inset_0_1px_0_rgb(255_255_255/0.04)] backdrop-blur">
       <CardHeader className="space-y-1">
         <CardTitle className="text-muted-foreground text-xs uppercase tracking-[0.25em]">
-          Live cockpit
+          {t("dashboard.liveCockpit")}
         </CardTitle>
         <p className="text-muted-foreground text-sm">
-          {loading ? "Hydrating realtime row…" : "Timestamp-based math survives refresh"}
+          {loading ? t("dashboard.hydrating") : t("dashboard.timestampMath")}
         </p>
       </CardHeader>
       <CardContent className="space-y-8">
@@ -369,7 +377,7 @@ function ActivePulseCard({
           <>
             <div className="flex flex-col items-center gap-2 text-center">
               <span className="text-muted-foreground text-sm uppercase tracking-[0.2em]">
-                Battery
+                {t("dashboard.battery")}
               </span>
               <motion.span
                 className="text-primary text-8xl leading-none font-semibold drop-shadow-[0_0_40px_oklch(0.73_0.15_173/0.4)] tracking-tighter tabular-nums"
@@ -381,8 +389,10 @@ function ActivePulseCard({
               </motion.span>
               <p className="text-muted-foreground text-base">
                 {currentLive
-                  ? `About ${formatDuration(currentLive.remainingSeconds)} remaining`
-                  : "Calculating timers…"}
+                  ? t("dashboard.remaining", {
+                      duration: formatDuration(currentLive.remainingSeconds),
+                    })
+                  : t("dashboard.calculating")}
               </p>
             </div>
             <Button
@@ -391,20 +401,20 @@ function ActivePulseCard({
               className="h-[52px] w-full rounded-full text-base font-semibold"
               variant="secondary"
             >
-              <Link href={`/charging/${activeSession.id}`}>Open realtime view</Link>
+              <Link href={`/charging/${activeSession.id}`}>{t("dashboard.openRealtime")}</Link>
             </Button>
           </>
         ) : (
           <div className="space-y-3 text-muted-foreground text-base leading-relaxed">
             <p>
               {selectedCar
-                ? `Ready with ${selectedCar.name}. Pulse math runs off wall timestamps and persists to Supabase.`
-                : "Choose a saved vehicle above to simulate time, kWh and cost precisely."}
+                ? t("dashboard.readyWith", { name: selectedCar.name })
+                : t("dashboard.chooseSaved")}
             </p>
             <div className="bg-card rounded-2xl border border-white/[0.08] px-5 py-4 text-sm text-foreground/80">
-              <p className="font-semibold text-foreground tracking-tight">Tip</p>
+              <p className="font-semibold text-foreground tracking-tight">{t("dashboard.tip")}</p>
               <p className="text-muted-foreground mt-2">
-                Larger tap targets everywhere — optimised for thumbs on the Plug & Charge walkway.
+                {t("dashboard.tipBody")}
               </p>
             </div>
           </div>

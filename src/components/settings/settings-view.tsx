@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { deleteCar } from "@/actions/cars";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCarsQuery } from "@/hooks/use-cars-query";
+import { useTranslation } from "@/hooks/use-translation";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { Car } from "@/types/database";
 
@@ -24,6 +26,7 @@ export function SettingsView() {
   const [email, setEmail] = useState<string | null>(null);
   const defaultPricePerKwh = useAppPreferences((s) => s.defaultPricePerKwh);
   const setDefaultPrice = useAppPreferences((s) => s.setDefaultPricePerKwh);
+  const { t } = useTranslation();
   useEffect(() => {
     let mounted = true;
     void createClient()
@@ -42,17 +45,17 @@ export function SettingsView() {
       String(new FormData(event.currentTarget).get("pref-price") ?? ""),
     );
     if (!Number.isFinite(numeric) || numeric < 0) {
-      toast.error("Tariff needs to stay positive.");
+      toast.error(t("settings.tariffPositive") as string);
       return;
     }
     setDefaultPrice(numeric);
-    toast.success("Default tariff synced locally");
+    toast.success(t("settings.tariffSaved") as string);
   };
 
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    toast.success("Signed out cleanly.");
+    toast.success(t("settings.signedOut") as string);
     router.replace("/login");
     router.refresh();
   };
@@ -61,29 +64,39 @@ export function SettingsView() {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <p className="text-muted-foreground text-xs uppercase tracking-[0.3em]">
-          Settings
+          {t("settings.eyebrow")}
         </p>
         <h1 className="mt-2 text-balance text-4xl font-semibold tracking-tight">
-          Drive profile
+          {t("settings.title")}
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl text-lg">
-          Local defaults pair with encrypted Supabase auth — realtime sessions always respect your tariff field.
+          {t("settings.subtitle")}
         </p>
       </div>
 
       <Card className="border-white/[0.08]">
         <CardHeader>
-          <CardTitle className="text-xl tracking-tight">Account</CardTitle>
+          <CardTitle className="text-xl tracking-tight">{t("locale.label")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <LocaleSwitcher />
+          <p className="text-muted-foreground text-sm">{t("locale.helper")}</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-white/[0.08]">
+        <CardHeader>
+          <CardTitle className="text-xl tracking-tight">{t("settings.account")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-base leading-relaxed">
           <div>
             <p className="text-muted-foreground text-sm uppercase tracking-[0.3em]">
-              Email · Supabase JWT
+              {t("settings.email")}
             </p>
             {email === null ? (
               <Skeleton className="mt-4 h-[22px] w-2/5 rounded-xl" />
             ) : (
-              <p className="mt-4 text-lg">{email ?? "Unavailable"}</p>
+              <p className="mt-4 text-lg">{email ?? t("common.unavailable")}</p>
             )}
           </div>
 
@@ -93,18 +106,18 @@ export function SettingsView() {
             type="button"
             onClick={() => void handleSignOut()}
           >
-            Sign out
+            {t("settings.signOut")}
           </Button>
         </CardContent>
       </Card>
 
       <Card className="border-white/[0.08]">
         <CardHeader>
-          <CardTitle className="text-xl tracking-tight">Economics defaults</CardTitle>
+          <CardTitle className="text-xl tracking-tight">{t("settings.economics")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-8">
           <form className="space-y-4" onSubmit={handlePriceSave}>
-            <Label htmlFor="pref-price">Electricity tariff (€/kWh)</Label>
+            <Label htmlFor="pref-price">{t("settings.tariff")}</Label>
             <Input
               key={defaultPricePerKwh}
               id="pref-price"
@@ -118,10 +131,10 @@ export function SettingsView() {
               required
             />
             <p className="text-muted-foreground text-sm">
-              Saved on-device · used as the initial value on the cockpit dialog.
+              {t("settings.tariffHelp")}
             </p>
             <Button className="h-[52px] w-full rounded-full text-base font-semibold" type="submit">
-              Store default
+              {t("settings.storeDefault")}
             </Button>
           </form>
           <Separator className="my-16 bg-white/15" />
@@ -130,14 +143,14 @@ export function SettingsView() {
             <div className="flex items-start justify-between gap-6">
               <div className="space-y-6">
                 <p className="text-xs uppercase tracking-[0.38em] text-muted-foreground">
-                  Fleet housekeeping
+                  {t("settings.housekeeping")}
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Removing a saved EV only touches your garage inventory — histories remain readable.
+                  {t("settings.housekeepingBody")}
                 </p>
               </div>
               <Button asChild variant="secondary" size="lg" className="h-[54px] rounded-full">
-                <Link href="/cars/new">Add EV</Link>
+                <Link href="/cars/new">{t("settings.addEv")}</Link>
               </Button>
             </div>
             <div className="space-y-5">
@@ -151,7 +164,7 @@ export function SettingsView() {
                 ))}
               {!isLoading && !(cars ?? []).length ? (
                 <p className="text-muted-foreground text-base leading-relaxed">
-                  No rides yet · add one anytime.
+                  {t("settings.noRides")}
                 </p>
               ) : null}
             </div>
@@ -165,23 +178,29 @@ export function SettingsView() {
 }
 
 function CarRow({ car }: { car: Car }) {
+  const { t } = useTranslation();
   const handleDelete = async () => {
-    if (!confirm(`Remove ${car.name}?`)) return;
+    if (!confirm(t("settings.removeConfirm", { name: car.name }) as string)) return;
     const res = await deleteCar(car.id);
     if (!res.ok) {
       toast.error(
-        typeof res.error === "string" ? res.error : "Something went sideways",
+        typeof res.error === "string" ? res.error : (t("settings.deleteError") as string),
       );
       return;
     }
-    toast.success(`${car.name} removed`);
+    toast.success(t("settings.removed", { name: car.name }) as string);
   };
 
   return (
     <div className="border-white/[0.08] flex flex-wrap items-start justify-between gap-6 rounded-3xl border bg-white/[0.02] px-6 py-6">
       <div>
         <p className="text-lg font-semibold tracking-tight">{car.name}</p>
-        <p className="text-muted-foreground text-base">{car.battery_capacity_kwh} kWh · {car.default_charger_power_kw} kW pedestal</p>
+        <p className="text-muted-foreground text-base">
+          {t("settings.pedestal", {
+            battery: car.battery_capacity_kwh,
+            power: car.default_charger_power_kw,
+          })}
+        </p>
       </div>
       <Button
         variant="ghost"
@@ -190,24 +209,27 @@ function CarRow({ car }: { car: Car }) {
         type="button"
         onClick={() => void handleDelete()}
       >
-        Remove
+        {t("settings.remove")}
       </Button>
     </div>
   );
 }
 
 function PrivacyNote() {
+  const { t } = useTranslation();
+  const privacyItems = t("settings.privacyItems") as readonly string[];
+
   return (
     <div className="text-muted-foreground border-white/[0.08] mx-auto rounded-3xl border bg-white/[0.02] px-8 py-16 text-lg leading-relaxed">
-      Pulse never talks to chargers directly — timers are deterministic modeling for trip planning · always confirm hardware states on the pedestal.
+      {t("settings.privacy")}
       <Separator className="my-14 bg-transparent" />
       <p className="text-muted-foreground/80 text-[13px] uppercase tracking-[0.45em]">
-        Telemetry privacy
+        {t("settings.privacyTitle")}
       </p>
       <ul className="mt-14 list-none space-y-8 text-muted-foreground/90 tracking-tight">
-        <li>Rls policies enforced with auth.uid()</li>
-        <li>Anon JWT only accesses your rows · service role absent on device</li>
-        <li>Realtime publication limited to charging_sessions inserts/updates · no cross-driver leakage</li>
+        {privacyItems.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
       </ul>
     </div>
   );

@@ -7,10 +7,12 @@ import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/hooks/use-translation";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchSessions } from "@/hooks/use-sessions-query";
 export function ChargingHubView() {
   const router = useRouter();
+  const { t } = useTranslation();
   const {
     data: sessions,
     isLoading,
@@ -38,28 +40,28 @@ export function ChargingHubView() {
       <div className="flex flex-1 flex-col gap-6 p-6 text-center">
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs uppercase tracking-[0.3em]">
-            Pulse bay
+            {t("charging.hubEyebrow")}
           </p>
           <h1 className="text-balance text-3xl font-semibold tracking-tight">
-            Idle · no live session
+            {t("charging.idle")}
           </h1>
           <p className="text-muted-foreground mx-auto max-w-md text-lg">
-            Start from home to mint a deterministic session — wall clock math keeps ETA honest even if LTE drops.
+            {t("charging.idleBody")}
           </p>
         </div>
         <div className="mx-auto mt-16 flex max-w-xl flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.02] px-6 py-8">
           <p className="text-muted-foreground text-base">
-            {isFetching ? "Refreshing history…" : "Pull to sync or jump back whenever."}
+            {isFetching ? t("charging.refreshing") : t("charging.syncHint")}
           </p>
           <Button
             className="mx-auto mt-8 h-[52px] min-w-[200px] rounded-full text-base font-semibold"
             onClick={() => void refetch()}
             variant="secondary"
           >
-            Check again
+            {t("charging.checkAgain")}
           </Button>
           <Button asChild className="h-[52px] rounded-full text-base font-semibold" size="lg">
-            <Link href="/dashboard">Back to cockpit</Link>
+            <Link href="/dashboard">{t("charging.backCockpit")}</Link>
           </Button>
         </div>
       </div>
@@ -79,9 +81,9 @@ export function ChargingHubView() {
   if (active) {
     return (
       <div className="text-muted-foreground flex flex-1 flex-col items-center gap-12 px-6 py-36 text-lg">
-        <p>Syncing realtime cockpit via Supabase heartbeat…</p>
+        <p>{t("charging.syncing")}</p>
         <Button asChild variant="outline" size="lg" className="h-[52px] rounded-full px-12">
-          <Link href={`/charging/${active.id}`}>Tap if redirect stalls</Link>
+          <Link href={`/charging/${active.id}`}>{t("charging.redirectStalls")}</Link>
         </Button>
       </div>
     );

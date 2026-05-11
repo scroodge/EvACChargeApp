@@ -7,6 +7,7 @@ import { createCar } from "@/actions/cars";
 import { createClient } from "@/lib/supabase/client";
 import { mapCar } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
+import { useTranslation } from "@/hooks/use-translation";
 import type { Car } from "@/types/database";
 
 async function fetchCars(): Promise<Car[]> {
@@ -35,6 +36,7 @@ export function useCarsQuery() {
 
 export function useCreateCarMutation() {
   const qc = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async (vals: FormData) => {
@@ -67,7 +69,7 @@ export function useCreateCarMutation() {
       toast.error(err.message);
     },
     onSuccess: () => {
-      toast.success("Vehicle saved");
+      toast.success(t("cars.saved") as string);
     },
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.cars });

@@ -1,0 +1,688 @@
+export const locales = ["en", "be", "ru"] as const;
+
+export type Locale = (typeof locales)[number];
+
+export const defaultLocale: Locale = "en";
+
+export const localeNames: Record<Locale, string> = {
+  en: "EN",
+  be: "BY",
+  ru: "RU",
+};
+
+export const localeLabels: Record<Locale, string> = {
+  en: "English",
+  be: "Беларуская",
+  ru: "Русский",
+};
+
+export const isLocale = (value: string): value is Locale =>
+  locales.includes(value as Locale);
+
+export const dictionaries = {
+  en: {
+    common: {
+      unavailable: "Unavailable",
+      later: "Later",
+      cancel: "Cancel",
+      saving: "Saving...",
+      close: "Close",
+    },
+    nav: {
+      aria: "Main",
+      home: "Home",
+      charge: "Charge",
+      history: "History",
+      settings: "Settings",
+    },
+    locale: {
+      label: "Language",
+      helper: "Saved on-device and applied across the app.",
+    },
+    landing: {
+      eyebrow: "EV cockpit · realtime",
+      title: "Charging clarity for your pocket-sized drive log.",
+      subtitle:
+        "Deterministic ETA, delivered kWh, and tariff deltas — streamed from Supabase in one calm interface with tap-friendly controls.",
+      start: "Start tracking",
+      tour: "Product tour",
+      mobileTitle: "Mobile-first ergonomics",
+      mobileBody:
+        "Sticky cockpit controls sized for thumbs, safe-area padding for iPhones, frictionless installs via manifest + standalone display.",
+      offlineTitle: "Offline-safe restores",
+      offlineBody:
+        "Charging math derives from anchored timestamps stored in Postgres — reopen the PWA anytime and timelines stay truthful.",
+      stack: "Stack · Next.js · Supabase auth · Postgres · Realtime broadcast",
+    },
+    auth: {
+      title: "Charge Pulse identity",
+      description: "Minimal auth · Supabase session cookies + row-level guards.",
+      login: "Login",
+      register: "Register",
+      continue: "Continue",
+      createAccount: "Create account",
+      or: "Or",
+      google: "Continue with Google",
+      installHint: "Offline install hint: Safari share sheet →",
+      addToHome: "Add to Home Screen",
+      back: "Back to splash",
+      hosted:
+        "Hosted on Vercel · deterministic charging math survives refresh via timestamps.",
+      email: "Email",
+      password: "Password",
+      weakPassword: "Use a password with at least 8 characters.",
+      confirmEmail: "Confirm your email · then come back here to sign in.",
+      welcome: "Welcome back.",
+      redirecting: "Redirecting to Google…",
+    },
+    dashboard: {
+      eyebrow: "EV dashboard",
+      title: "Charge Pulse",
+      subtitle: "Big controls, realtime math, synced to Supabase.",
+      addEvTitle: "Add your EV",
+      addEvBody:
+        "We need a battery size and onboard charger preset to simulate energy and time.",
+      addVehicle: "Add vehicle",
+      vehicle: "Vehicle",
+      chooseCar: "Choose a car",
+      pack: "{battery} kWh pack · {power} kW onboard",
+      fleet: "Fleet",
+      fleetSubtitle: "Tune capacity & charger defaults",
+      addAnother: "Add another EV",
+      historySubtitle: "Completed & stopped cycles",
+      viewSessions: "View sessions",
+      charging: "Charging...",
+      startCharging: "Start charging",
+      quickSession: "Quick session",
+      quickSessionBody:
+        "Targets are deterministic from timestamps · prices use your tariff.",
+      currentCharge: "Current charge %",
+      targetCharge: "Target charge %",
+      powerOverride: "AC power override (optional)",
+      defaultPower: "Default · {power} kW",
+      price: "Electricity price €/kWh",
+      priceHelp:
+        "Mirrors your utility statement — uses AC energy from the pedestal.",
+      starting: "Starting...",
+      startSession: "Start session",
+      targetError: "Target must exceed current battery level",
+      percentError: "Percent must stay 0–100",
+      started: "Charging started",
+      couldNotStart: "Could not start",
+      liveCockpit: "Live cockpit",
+      hydrating: "Hydrating realtime row…",
+      timestampMath: "Timestamp-based math survives refresh",
+      battery: "Battery",
+      remaining: "About {duration} remaining",
+      calculating: "Calculating timers…",
+      openRealtime: "Open realtime view",
+      readyWith:
+        "Ready with {name}. Pulse math runs off wall timestamps and persists to Supabase.",
+      chooseSaved:
+        "Choose a saved vehicle above to simulate time, kWh and cost precisely.",
+      tip: "Tip",
+      tipBody:
+        "Larger tap targets everywhere — optimised for thumbs on the Plug & Charge walkway.",
+    },
+    charging: {
+      targetReached: "Target reached · session completed",
+      saved: "Session saved to history",
+      unavailable: "Session not available.",
+      backHome: "Back to home",
+      live: "Live charging",
+      session: "Session",
+      updating: "Charging · estimates update every second",
+      frozen: "Frozen",
+      dashboard: "Dashboard",
+      battery: "Battery",
+      goal: "Goal {target}% · started at {start}%",
+      segment: "Segment to target · {pct}%",
+      elapsed: "Elapsed",
+      remaining: "Remaining",
+      energyDelivered: "Energy delivered",
+      estimatedCost: "Estimated cost",
+      acPower: "AC power",
+      batteryPack: "Battery pack",
+      stop: "Stop charging",
+      complete: "Marked complete · view history for details.",
+      paused: "Paused · totals saved at stop time.",
+      hubEyebrow: "Pulse bay",
+      idle: "Idle · no live session",
+      idleBody:
+        "Start from home to mint a deterministic session — wall clock math keeps ETA honest even if LTE drops.",
+      refreshing: "Refreshing history…",
+      syncHint: "Pull to sync or jump back whenever.",
+      checkAgain: "Check again",
+      backCockpit: "Back to cockpit",
+      syncing: "Syncing realtime cockpit via Supabase heartbeat…",
+      redirectStalls: "Tap if redirect stalls",
+    },
+    cars: {
+      title: "New vehicle profile",
+      description:
+        "Used for realtime kWh ramps and ETA math — everything stays scoped to your account.",
+      nickname: "Nickname",
+      nicknamePlaceholder: "Urban Runner",
+      battery: "Useable battery (kWh)",
+      wallbox: "Wallbox kW",
+      wallboxHelp: "Matches your AC pedestal limit.",
+      efficiency: "AC efficiency",
+      efficiencyHelp: "Grid-to-pack factor for tariff math.",
+      save: "Save vehicle",
+      saved: "Vehicle saved",
+    },
+    history: {
+      eyebrow: "Sessions",
+      title: "History lane",
+      subtitle:
+        "Every stop writes the final SOC, AC kWh tally, and indicative tariff spend.",
+      queued: "Queued",
+      target: "Target",
+      energy: "Energy",
+      cost: "Cost",
+      duration: "Duration",
+      detail: "Session detail",
+      startAnother: "Start another",
+      emptyEyebrow: "Still quiet",
+      emptyTitle: "Plug in · we memorialize every stint",
+      emptyBody:
+        "Charging sessions accumulate here automatically. Drive home, START on the cockpit, STOP when unplugged — we clamp all math to timestamps.",
+      headCockpit: "Head to cockpit",
+      status: {
+        completed: "COMPLETED",
+        stopped: "STOPPED",
+        charging: "CHARGING",
+      },
+    },
+    settings: {
+      eyebrow: "Settings",
+      title: "Drive profile",
+      subtitle:
+        "Local defaults pair with encrypted Supabase auth — realtime sessions always respect your tariff field.",
+      account: "Account",
+      email: "Email · Supabase JWT",
+      signOut: "Sign out",
+      signedOut: "Signed out cleanly.",
+      economics: "Economics defaults",
+      tariff: "Electricity tariff (€/kWh)",
+      tariffHelp:
+        "Saved on-device · used as the initial value on the cockpit dialog.",
+      tariffPositive: "Tariff needs to stay positive.",
+      tariffSaved: "Default tariff synced locally",
+      storeDefault: "Store default",
+      housekeeping: "Fleet housekeeping",
+      housekeepingBody:
+        "Removing a saved EV only touches your garage inventory — histories remain readable.",
+      addEv: "Add EV",
+      noRides: "No rides yet · add one anytime.",
+      remove: "Remove",
+      removeConfirm: "Remove {name}?",
+      deleteError: "Something went sideways",
+      removed: "{name} removed",
+      pedestal: "{battery} kWh · {power} kW pedestal",
+      privacy:
+        "Pulse never talks to chargers directly — timers are deterministic modeling for trip planning · always confirm hardware states on the pedestal.",
+      privacyTitle: "Telemetry privacy",
+      privacyItems: [
+        "Rls policies enforced with auth.uid()",
+        "Anon JWT only accesses your rows · service role absent on device",
+        "Realtime publication limited to charging_sessions inserts/updates · no cross-driver leakage",
+      ],
+    },
+  },
+  be: {
+    common: {
+      unavailable: "Недаступна",
+      later: "Пазней",
+      cancel: "Скасаваць",
+      saving: "Захаванне...",
+      close: "Закрыць",
+    },
+    nav: {
+      aria: "Галоўная навігацыя",
+      home: "Дом",
+      charge: "Зарад",
+      history: "Гісторыя",
+      settings: "Налады",
+    },
+    locale: {
+      label: "Мова",
+      helper: "Захоўваецца на прыладзе і працуе ва ўсім дадатку.",
+    },
+    landing: {
+      eyebrow: "EV-кабiна · рэальны час",
+      title: "Яснасць зарадкі для кішэннага журнала паездак.",
+      subtitle:
+        "Дакладны ETA, дастаўленыя кВт·г і змены тарыфу — праз Supabase у спакойным інтэрфейсе з вялікімі кнопкамі.",
+      start: "Пачаць улік",
+      tour: "Агляд прадукту",
+      mobileTitle: "Зручна для мабільнага",
+      mobileBody:
+        "Ліпкія элементы кіравання пад вялікі палец, safe-area для iPhone, простая ўстаноўка праз manifest і standalone-рэжым.",
+      offlineTitle: "Аднаўленне без сеткі",
+      offlineBody:
+        "Разлікі зарадкі ідуць ад часавых метак у Postgres — адкрыйце PWA зноў, і лінія часу застанецца дакладнай.",
+      stack: "Стэк · Next.js · Supabase auth · Postgres · Realtime broadcast",
+    },
+    auth: {
+      title: "Ідэнтыфікацыя Charge Pulse",
+      description: "Мінімальная аўтарызацыя · cookies Supabase + RLS-абарона.",
+      login: "Увайсці",
+      register: "Рэгістрацыя",
+      continue: "Працягнуць",
+      createAccount: "Стварыць акаўнт",
+      or: "Або",
+      google: "Працягнуць з Google",
+      installHint: "Падказка для offline: меню Safari →",
+      addToHome: "Дадаць на галоўны экран",
+      back: "Назад да старту",
+      hosted:
+        "Размешчана на Vercel · матэматыка зарадкі перажывае абнаўленне праз часавыя меткі.",
+      email: "Email",
+      password: "Пароль",
+      weakPassword: "Выкарыстайце пароль мінімум з 8 сімвалаў.",
+      confirmEmail:
+        "Пацвердзіце email · потым вярніцеся сюды, каб увайсці.",
+      welcome: "Вітаем зноў.",
+      redirecting: "Перанакіроўваем у Google…",
+    },
+    dashboard: {
+      eyebrow: "EV-панэль",
+      title: "Charge Pulse",
+      subtitle: "Вялікія кнопкі, жывая матэматыка, сінхранізацыя з Supabase.",
+      addEvTitle: "Дадайце свой EV",
+      addEvBody:
+        "Патрэбны памер батарэі і магутнасць бартавой зарадкі, каб мадэляваць энергію і час.",
+      addVehicle: "Дадаць аўто",
+      vehicle: "Аўто",
+      chooseCar: "Выберыце аўто",
+      pack: "Батарэя {battery} кВт·г · бартавая {power} кВт",
+      fleet: "Гараж",
+      fleetSubtitle: "Наладзьце ёмістасць і зарадныя профілі",
+      addAnother: "Дадаць яшчэ EV",
+      historySubtitle: "Завершаныя і спыненыя цыклы",
+      viewSessions: "Глядзець сесіі",
+      charging: "Зарадка...",
+      startCharging: "Пачаць зарадку",
+      quickSession: "Хуткая сесія",
+      quickSessionBody:
+        "Мэты разлічваюцца па часавых метках · кошты бяруць ваш тарыф.",
+      currentCharge: "Бягучы зарад %",
+      targetCharge: "Мэтавы зарад %",
+      powerOverride: "Іншая AC-магутнасць (неабавязкова)",
+      defaultPower: "Па змаўчанні · {power} кВт",
+      price: "Кошт электрычнасці €/кВт·г",
+      priceHelp:
+        "Як у рахунку за электрычнасць — выкарыстоўваецца AC-энергія з зарадкі.",
+      starting: "Запуск...",
+      startSession: "Пачаць сесію",
+      targetError: "Мэта павінна быць вышэй за бягучы ўзровень батарэі",
+      percentError: "Працэнты павінны быць у межах 0–100",
+      started: "Зарадка пачалася",
+      couldNotStart: "Не ўдалося пачаць",
+      liveCockpit: "Жывая кабіна",
+      hydrating: "Падцягваем радок realtime…",
+      timestampMath: "Матэматыка па часавых метках перажывае абнаўленне",
+      battery: "Батарэя",
+      remaining: "Засталося каля {duration}",
+      calculating: "Разлічваем таймеры…",
+      openRealtime: "Адкрыць жывы экран",
+      readyWith:
+        "{name} гатова. Pulse лічыць па часавых метках і захоўвае ў Supabase.",
+      chooseSaved:
+        "Выберыце захаванае аўто вышэй, каб дакладна мадэляваць час, кВт·г і кошт.",
+      tip: "Парада",
+      tipBody:
+        "Вялікія зоны націску ўсюды — зручна для вялікага пальца каля зараднай стойкі.",
+    },
+    charging: {
+      targetReached: "Мэта дасягнута · сесія завершана",
+      saved: "Сесія захавана ў гісторыю",
+      unavailable: "Сесія недаступная.",
+      backHome: "Назад дадому",
+      live: "Жывая зарадка",
+      session: "Сесія",
+      updating: "Зарадка · ацэнкі абнаўляюцца кожную секунду",
+      frozen: "Зафіксавана",
+      dashboard: "Панэль",
+      battery: "Батарэя",
+      goal: "Мэта {target}% · старт з {start}%",
+      segment: "Шлях да мэты · {pct}%",
+      elapsed: "Прайшло",
+      remaining: "Засталося",
+      energyDelivered: "Дастаўлена энергіі",
+      estimatedCost: "Ацэначны кошт",
+      acPower: "AC-магутнасць",
+      batteryPack: "Батарэя",
+      stop: "Спыніць зарадку",
+      complete: "Пазначана завершанай · падрабязнасці ў гісторыі.",
+      paused: "Прыпынена · вынікі захаваны на момант стопу.",
+      hubEyebrow: "Зарадны бокс",
+      idle: "Ціха · няма жывой сесіі",
+      idleBody:
+        "Пачніце з галоўнай, каб стварыць сесію — разлік па гадзінніку трымае ETA сумленным нават без LTE.",
+      refreshing: "Абнаўляем гісторыю…",
+      syncHint: "Сінхранізуйце або вярніцеся назад у любы момант.",
+      checkAgain: "Праверыць яшчэ",
+      backCockpit: "Назад у кабіну",
+      syncing: "Сінхранізуем realtime-кабіну праз Supabase heartbeat…",
+      redirectStalls: "Націсніце, калі пераход завіс",
+    },
+    cars: {
+      title: "Новы профіль аўто",
+      description:
+        "Для realtime росту кВт·г і разліку ETA — усё застаецца ў межах вашага акаўнта.",
+      nickname: "Назва",
+      nicknamePlaceholder: "Гарадскі бегун",
+      battery: "Карысная батарэя (кВт·г)",
+      wallbox: "Wallbox кВт",
+      wallboxHelp: "Адпавядае ліміту вашай AC-стойкі.",
+      efficiency: "AC-эфектыўнасць",
+      efficiencyHelp: "Каэфіцыент сетка-батарэя для тарыфнага разліку.",
+      save: "Захаваць аўто",
+      saved: "Аўто захавана",
+    },
+    history: {
+      eyebrow: "Сесіі",
+      title: "Гісторыя",
+      subtitle:
+        "Кожны стоп запісвае фінальны SOC, AC кВт·г і прыблізныя выдаткі.",
+      queued: "У чарзе",
+      target: "Мэта",
+      energy: "Энергія",
+      cost: "Кошт",
+      duration: "Працягласць",
+      detail: "Дэталі сесіі",
+      startAnother: "Пачаць яшчэ",
+      emptyEyebrow: "Пакуль ціха",
+      emptyTitle: "Падключыцеся · мы запомнім кожную сесію",
+      emptyBody:
+        "Зарадныя сесіі збіраюцца тут аўтаматычна. Вярнуліся дадому, START у кабіне, STOP пасля адключэння — усе разлікі прывязаны да часу.",
+      headCockpit: "У кабіну",
+      status: {
+        completed: "ЗАВЕРШАНА",
+        stopped: "СПЫНЕНА",
+        charging: "ЗАРАДКА",
+      },
+    },
+    settings: {
+      eyebrow: "Налады",
+      title: "Профіль кіроўцы",
+      subtitle:
+        "Лакальныя налады працуюць з зашыфраванай аўтарызацыяй Supabase — realtime-сесіі заўсёды ўлічваюць ваш тарыф.",
+      account: "Акаўнт",
+      email: "Email · Supabase JWT",
+      signOut: "Выйсці",
+      signedOut: "Выхад выкананы.",
+      economics: "Эканамічныя налады",
+      tariff: "Тарыф электрычнасці (€/кВт·г)",
+      tariffHelp:
+        "Захоўваецца на прыладзе · пачатковае значэнне ў дыялогу кабіны.",
+      tariffPositive: "Тарыф павінен быць неадмоўным.",
+      tariffSaved: "Тарыф па змаўчанні захаваны лакальна",
+      storeDefault: "Захаваць",
+      housekeeping: "Кіраванне гаражом",
+      housekeepingBody:
+        "Выдаленне EV закране толькі спіс аўто — гісторыя застанецца даступнай.",
+      addEv: "Дадаць EV",
+      noRides: "Пакуль няма аўто · можна дадаць у любы час.",
+      remove: "Выдаліць",
+      removeConfirm: "Выдаліць {name}?",
+      deleteError: "Нешта пайшло не так",
+      removed: "{name} выдалена",
+      pedestal: "{battery} кВт·г · стойка {power} кВт",
+      privacy:
+        "Pulse не размаўляе з зарадкамі наўпрост — таймеры толькі мадэлююць план паездкі · заўсёды правярайце стан абсталявання на стойцы.",
+      privacyTitle: "Прыватнасць тэлеметрыі",
+      privacyItems: [
+        "RLS-палітыкі працуюць праз auth.uid()",
+        "Anon JWT бачыць толькі вашы радкі · service role няма на прыладзе",
+        "Realtime-публікацыя абмежавана inserts/updates у charging_sessions · без уцечак паміж кіроўцамі",
+      ],
+    },
+  },
+  ru: {
+    common: {
+      unavailable: "Недоступно",
+      later: "Позже",
+      cancel: "Отмена",
+      saving: "Сохранение...",
+      close: "Закрыть",
+    },
+    nav: {
+      aria: "Главная навигация",
+      home: "Домой",
+      charge: "Заряд",
+      history: "История",
+      settings: "Настройки",
+    },
+    locale: {
+      label: "Язык",
+      helper: "Сохраняется на устройстве и применяется во всем приложении.",
+    },
+    landing: {
+      eyebrow: "EV-кокпит · реальное время",
+      title: "Понятная зарядка в карманном журнале поездок.",
+      subtitle:
+        "Детерминированный ETA, доставленные кВт·ч и тарифные изменения — через Supabase в спокойном интерфейсе с удобными кнопками.",
+      start: "Начать учет",
+      tour: "Обзор продукта",
+      mobileTitle: "Сначала мобильный опыт",
+      mobileBody:
+        "Закрепленные элементы управления под большой палец, safe-area для iPhone, простая установка через manifest и standalone-режим.",
+      offlineTitle: "Восстановление без сети",
+      offlineBody:
+        "Расчеты зарядки идут от временных меток в Postgres — откройте PWA снова, и таймлайн останется точным.",
+      stack: "Стек · Next.js · Supabase auth · Postgres · Realtime broadcast",
+    },
+    auth: {
+      title: "Идентификация Charge Pulse",
+      description: "Минимальная авторизация · cookies Supabase + RLS-защита.",
+      login: "Войти",
+      register: "Регистрация",
+      continue: "Продолжить",
+      createAccount: "Создать аккаунт",
+      or: "Или",
+      google: "Продолжить с Google",
+      installHint: "Подсказка для offline: меню Safari →",
+      addToHome: "Добавить на экран «Домой»",
+      back: "Назад к старту",
+      hosted:
+        "Размещено на Vercel · расчеты зарядки переживают обновление через временные метки.",
+      email: "Email",
+      password: "Пароль",
+      weakPassword: "Используйте пароль минимум из 8 символов.",
+      confirmEmail: "Подтвердите email · затем вернитесь сюда для входа.",
+      welcome: "С возвращением.",
+      redirecting: "Перенаправляем в Google…",
+    },
+    dashboard: {
+      eyebrow: "EV-панель",
+      title: "Charge Pulse",
+      subtitle: "Большие кнопки, живые расчеты, синхронизация с Supabase.",
+      addEvTitle: "Добавьте свой EV",
+      addEvBody:
+        "Нужны размер батареи и мощность бортовой зарядки, чтобы моделировать энергию и время.",
+      addVehicle: "Добавить авто",
+      vehicle: "Авто",
+      chooseCar: "Выберите авто",
+      pack: "Батарея {battery} кВт·ч · бортовая {power} кВт",
+      fleet: "Гараж",
+      fleetSubtitle: "Настройте емкость и зарядные профили",
+      addAnother: "Добавить еще EV",
+      historySubtitle: "Завершенные и остановленные циклы",
+      viewSessions: "Смотреть сессии",
+      charging: "Зарядка...",
+      startCharging: "Начать зарядку",
+      quickSession: "Быстрая сессия",
+      quickSessionBody:
+        "Цели рассчитываются по временным меткам · цены используют ваш тариф.",
+      currentCharge: "Текущий заряд %",
+      targetCharge: "Целевой заряд %",
+      powerOverride: "Другая AC-мощность (необязательно)",
+      defaultPower: "По умолчанию · {power} кВт",
+      price: "Цена электричества €/кВт·ч",
+      priceHelp:
+        "Как в счете за электричество — используется AC-энергия с зарядной стойки.",
+      starting: "Запуск...",
+      startSession: "Начать сессию",
+      targetError: "Цель должна быть выше текущего уровня батареи",
+      percentError: "Проценты должны оставаться в пределах 0–100",
+      started: "Зарядка началась",
+      couldNotStart: "Не удалось начать",
+      liveCockpit: "Живой кокпит",
+      hydrating: "Подтягиваем realtime-строку…",
+      timestampMath: "Расчеты по временным меткам переживают обновление",
+      battery: "Батарея",
+      remaining: "Осталось около {duration}",
+      calculating: "Считаем таймеры…",
+      openRealtime: "Открыть живой экран",
+      readyWith:
+        "{name} готова. Pulse считает по временным меткам и сохраняет в Supabase.",
+      chooseSaved:
+        "Выберите сохраненное авто выше, чтобы точно моделировать время, кВт·ч и стоимость.",
+      tip: "Совет",
+      tipBody:
+        "Большие зоны нажатия везде — удобно для большого пальца у зарядной стойки.",
+    },
+    charging: {
+      targetReached: "Цель достигнута · сессия завершена",
+      saved: "Сессия сохранена в историю",
+      unavailable: "Сессия недоступна.",
+      backHome: "Назад домой",
+      live: "Живая зарядка",
+      session: "Сессия",
+      updating: "Зарядка · оценки обновляются каждую секунду",
+      frozen: "Зафиксировано",
+      dashboard: "Панель",
+      battery: "Батарея",
+      goal: "Цель {target}% · старт с {start}%",
+      segment: "Путь к цели · {pct}%",
+      elapsed: "Прошло",
+      remaining: "Осталось",
+      energyDelivered: "Доставлено энергии",
+      estimatedCost: "Оценочная стоимость",
+      acPower: "AC-мощность",
+      batteryPack: "Батарея",
+      stop: "Остановить зарядку",
+      complete: "Отмечено завершенной · подробности в истории.",
+      paused: "Приостановлено · итоги сохранены на момент стопа.",
+      hubEyebrow: "Зарядный бокс",
+      idle: "Тихо · нет живой сессии",
+      idleBody:
+        "Начните с главной, чтобы создать сессию — расчет по часам держит ETA честным даже без LTE.",
+      refreshing: "Обновляем историю…",
+      syncHint: "Синхронизируйте или вернитесь назад в любой момент.",
+      checkAgain: "Проверить еще",
+      backCockpit: "Назад в кокпит",
+      syncing: "Синхронизируем realtime-кокпит через Supabase heartbeat…",
+      redirectStalls: "Нажмите, если переход завис",
+    },
+    cars: {
+      title: "Новый профиль авто",
+      description:
+        "Для realtime роста кВт·ч и расчета ETA — все остается в пределах вашего аккаунта.",
+      nickname: "Название",
+      nicknamePlaceholder: "Городской бегун",
+      battery: "Полезная батарея (кВт·ч)",
+      wallbox: "Wallbox кВт",
+      wallboxHelp: "Соответствует лимиту вашей AC-стойки.",
+      efficiency: "AC-эффективность",
+      efficiencyHelp: "Коэффициент сеть-батарея для тарифного расчета.",
+      save: "Сохранить авто",
+      saved: "Авто сохранено",
+    },
+    history: {
+      eyebrow: "Сессии",
+      title: "История",
+      subtitle:
+        "Каждая остановка записывает финальный SOC, AC кВт·ч и примерные расходы.",
+      queued: "В очереди",
+      target: "Цель",
+      energy: "Энергия",
+      cost: "Стоимость",
+      duration: "Длительность",
+      detail: "Детали сессии",
+      startAnother: "Начать еще",
+      emptyEyebrow: "Пока тихо",
+      emptyTitle: "Подключитесь · мы запомним каждую сессию",
+      emptyBody:
+        "Зарядные сессии собираются здесь автоматически. Вернулись домой, START в кокпите, STOP после отключения — все расчеты привязаны ко времени.",
+      headCockpit: "В кокпит",
+      status: {
+        completed: "ЗАВЕРШЕНО",
+        stopped: "ОСТАНОВЛЕНО",
+        charging: "ЗАРЯДКА",
+      },
+    },
+    settings: {
+      eyebrow: "Настройки",
+      title: "Профиль водителя",
+      subtitle:
+        "Локальные настройки работают с зашифрованной авторизацией Supabase — realtime-сессии всегда учитывают ваш тариф.",
+      account: "Аккаунт",
+      email: "Email · Supabase JWT",
+      signOut: "Выйти",
+      signedOut: "Выход выполнен.",
+      economics: "Экономические настройки",
+      tariff: "Тариф электричества (€/кВт·ч)",
+      tariffHelp:
+        "Сохраняется на устройстве · начальное значение в диалоге кокпита.",
+      tariffPositive: "Тариф должен быть неотрицательным.",
+      tariffSaved: "Тариф по умолчанию сохранен локально",
+      storeDefault: "Сохранить",
+      housekeeping: "Управление гаражом",
+      housekeepingBody:
+        "Удаление EV затронет только список авто — история останется доступной.",
+      addEv: "Добавить EV",
+      noRides: "Пока нет авто · можно добавить в любой момент.",
+      remove: "Удалить",
+      removeConfirm: "Удалить {name}?",
+      deleteError: "Что-то пошло не так",
+      removed: "{name} удалена",
+      pedestal: "{battery} кВт·ч · стойка {power} кВт",
+      privacy:
+        "Pulse не общается с зарядками напрямую — таймеры только моделируют план поездки · всегда проверяйте состояние оборудования на стойке.",
+      privacyTitle: "Приватность телеметрии",
+      privacyItems: [
+        "RLS-политики работают через auth.uid()",
+        "Anon JWT видит только ваши строки · service role отсутствует на устройстве",
+        "Realtime-публикация ограничена inserts/updates в charging_sessions · без утечек между водителями",
+      ],
+    },
+  },
+} as const;
+
+export type TranslationKey = NestedKeys<(typeof dictionaries)[typeof defaultLocale]>;
+
+type NestedKeys<T> = {
+  [K in keyof T & string]: T[K] extends readonly string[]
+    ? K
+    : T[K] extends Record<string, unknown>
+      ? `${K}.${NestedKeys<T[K]>}`
+      : K;
+}[keyof T & string];
+
+export function translate(
+  locale: Locale,
+  key: TranslationKey,
+  values?: Record<string, string | number>,
+) {
+  const text = getValue(dictionaries[locale], key) ?? getValue(dictionaries.en, key);
+
+  if (Array.isArray(text)) return text;
+  if (typeof text !== "string") return key;
+
+  return text.replace(/\{(\w+)\}/g, (_, name: string) =>
+    values?.[name] == null ? `{${name}}` : String(values[name]),
+  );
+}
+
+function getValue(source: unknown, key: string): unknown {
+  return key.split(".").reduce<unknown>((current, part) => {
+    if (current && typeof current === "object" && part in current) {
+      return (current as Record<string, unknown>)[part];
+    }
+    return undefined;
+  }, source);
+}

@@ -18,6 +18,7 @@ import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchSessionById, useSessionQuery } from "@/hooks/use-session-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
+import { useTranslation } from "@/hooks/use-translation";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
 
@@ -37,6 +38,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const liveDerived = useChargingUi((s) => s.liveDerived);
   const setLiveDerived = useChargingUi((s) => s.setLiveDerived);
+  const { t } = useTranslation();
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
   const completingRef = useRef(false);
@@ -147,7 +149,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
         );
 
         qc.invalidateQueries({ queryKey: queryKeys.sessions });
-        toast.success("Target reached · session completed");
+        toast.success(t("charging.targetReached") as string);
         return;
       }
 
@@ -255,8 +257,8 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       stopped_at: new Date().toISOString(),
     });
     qc.invalidateQueries({ queryKey: queryKeys.sessions });
-    toast.message("Session saved to history");
-  }, [qc, session, sessionId, supabase]);
+    toast.message(t("charging.saved") as string);
+  }, [qc, session, sessionId, supabase, t]);
 
   if (isLoading) {
     return (
@@ -271,9 +273,9 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   if (error || !session || !derived) {
     return (
       <div className="flex flex-col gap-6 p-4">
-        <p className="text-muted-foreground">Session not available.</p>
+        <p className="text-muted-foreground">{t("charging.unavailable")}</p>
         <Button asChild size="lg" className="min-h-[48px] text-base">
-          <Link href="/dashboard">Back to home</Link>
+          <Link href="/dashboard">{t("charging.backHome")}</Link>
         </Button>
       </div>
     );
@@ -286,17 +288,17 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-muted-foreground text-xs uppercase tracking-widest">
-            Live charging
+            {t("charging.live")}
           </p>
           <h1 className="mt-2 text-xl font-semibold tracking-tight text-balance">
-            Session
+            {t("charging.session")}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {charging ? "Charging · estimates update every second" : "Frozen"}
+            {charging ? t("charging.updating") : t("charging.frozen")}
           </p>
         </div>
         <Button asChild variant="outline" size="lg" className="min-h-[44px]">
-          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard">{t("charging.dashboard")}</Link>
         </Button>
       </div>
 
@@ -317,7 +319,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
         />
         <div className="relative flex flex-col items-center gap-2">
           <span className="text-muted-foreground text-sm font-medium">
-            Battery
+            {t("charging.battery")}
           </span>
           <motion.span
             className="text-primary drop-shadow-[0_0_32px_oklch(0.75_0.15_173_/_0.35)] text-7xl font-semibold tracking-tighter tabular-nums"
@@ -328,8 +330,10 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
             {pctForBar.toFixed(1)}%
           </motion.span>
           <p className="text-muted-foreground text-sm tabular-nums">
-            Goal {session.target_percent.toFixed(0)}% · started at{" "}
-            {session.start_percent.toFixed(0)}%
+            {t("charging.goal", {
+              target: session.target_percent.toFixed(0),
+              start: session.start_percent.toFixed(0),
+            })}
           </p>
         </div>
 
@@ -344,23 +348,23 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
             />
           </div>
           <p className="text-muted-foreground mt-3 text-xs">
-            Segment to target · {pctToTarget.toFixed(0)}%
+            {t("charging.segment", { pct: pctToTarget.toFixed(0) })}
           </p>
         </div>
       </motion.div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Elapsed" value={formatDuration(derived.elapsedSeconds)} />
+        <StatCard label={t("charging.elapsed") as string} value={formatDuration(derived.elapsedSeconds)} />
         <StatCard
-          label="Remaining"
+          label={t("charging.remaining") as string}
           value={charging ? formatDuration(derived.remainingSeconds) : "—"}
         />
         <StatCard
-          label="Energy delivered"
+          label={t("charging.energyDelivered") as string}
           value={`${derived.chargedEnergyKwh.toFixed(2)} kWh`}
         />
         <StatCard
-          label="Estimated cost"
+          label={t("charging.estimatedCost") as string}
           value={
             session.price_per_kwh > 0
               ? `€${derived.estimatedCost.toFixed(2)}`
@@ -370,10 +374,10 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       </div>
 
       <CardRow
-        label="AC power"
+        label={t("charging.acPower") as string}
         value={`${session.charger_power_kw.toFixed(1)} kW`}
       />
-      <CardRow label="Battery pack" value={`${session.battery_capacity_kwh} kWh`} />
+      <CardRow label={t("charging.batteryPack") as string} value={`${session.battery_capacity_kwh} kWh`} />
 
       <div className="mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-40 space-y-3">
         <Button
@@ -384,13 +388,13 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
           className="h-14 w-full rounded-full text-base font-semibold tracking-wide"
           onClick={() => void stopSession()}
         >
-          Stop charging
+          {t("charging.stop")}
         </Button>
         {!charging && (
           <p className="text-muted-foreground text-center text-sm">
             {session.status === "completed"
-              ? "Marked complete · view history for details."
-              : "Paused · totals saved at stop time."}
+              ? t("charging.complete")
+              : t("charging.paused")}
           </p>
         )}
       </div>
