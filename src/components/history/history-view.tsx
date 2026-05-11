@@ -5,7 +5,10 @@ import { be, ru } from "date-fns/locale";
 
 import Link from "next/link";
 
+import { BrandBadge } from "@/components/brand/BrandBadge";
+import { LogoFull } from "@/components/brand/LogoFull";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deriveChargingState, formatDuration, type ChargingParams } from "@/lib/charging-math";
 import { formatCurrencyAmount } from "@/lib/i18n";
@@ -21,9 +24,13 @@ export function HistoryView() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 p-6">
+      <div className="safe-bottom flex flex-col gap-4 px-4 pb-6 pt-5">
+        <header className="flex items-center justify-between gap-4">
+          <LogoFull />
+          <BrandBadge className="hidden min-[380px]:inline-flex">Session log</BrandBadge>
+        </header>
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-32 rounded-3xl" />
+          <Skeleton key={index} className="h-32 rounded-[1.75rem]" />
         ))}
       </div>
     );
@@ -40,16 +47,21 @@ export function HistoryView() {
   );
 
   return (
-    <div className="flex flex-col gap-5 p-6">
-      <div>
-        <p className="text-muted-foreground text-xs uppercase tracking-[0.35em]">
+    <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
+      <header className="flex items-center justify-between gap-4">
+        <LogoFull />
+        <BrandBadge className="hidden min-[380px]:inline-flex">Session log</BrandBadge>
+      </header>
+
+      <section className="voltflow-card p-5">
+        <p className="text-muted-foreground text-xs uppercase tracking-[0.28em]">
           {t("history.eyebrow")}
         </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">{t("history.title")}</h1>
-        <p className="text-muted-foreground mt-3 max-w-xl text-lg">
+        <h1 className="mt-2 font-heading text-3xl font-bold tracking-normal">{t("history.title")}</h1>
+        <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-6">
           {t("history.subtitle")}
         </p>
-      </div>
+      </section>
 
       <div className="flex flex-col gap-4">
         {finishedFirst.map((session) => (
@@ -109,8 +121,8 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
           : session.status;
 
   return (
-    <Card className="border-white/[0.08] bg-gradient-to-br from-background via-card to-primary/13">
-      <CardContent className="flex flex-col gap-4 px-6 py-6">
+    <Card className="voltflow-card border-border bg-transparent">
+      <CardContent className="flex flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-6">
           <div>
             <p className="text-muted-foreground text-xs uppercase tracking-[0.32em]">
@@ -120,18 +132,18 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
                   })
                 : t("history.queued")}
             </p>
-            <p className="mt-6 text-[40px] font-semibold tracking-tighter tabular-nums">
+            <p className="mt-4 font-heading text-4xl font-bold tracking-tight tabular-nums">
               {pct}
               %
             </p>
           </div>
           <span
-            className={`rounded-full px-6 py-2 text-xs font-semibold uppercase tracking-[0.32em] ${statusTone}`}
+            className={`rounded-full border border-border bg-white/[0.04] px-4 py-2 font-heading text-xs font-semibold uppercase tracking-[0.2em] ${statusTone}`}
           >
             {statusLabel}
           </span>
         </div>
-        <dl className="border-white/[0.05] divide-y divide-white/5 text-lg">
+        <dl className="divide-y divide-border rounded-2xl border border-border bg-white/[0.02] px-4 text-lg">
           <Row label={t("history.target") as string} value={`${session.target_percent}%`} />
           <Row
             label={t("history.energy") as string}
@@ -154,19 +166,18 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
           <Row label={t("history.duration") as string} value={elapsed} />
         </dl>
 
-        <div className="mt-10 flex gap-5">
-          <Link
-            className="text-primary text-lg font-semibold underline-offset-4 hover:underline"
-            href={`/charging/${session.id}`}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Button asChild size="lg" className="h-12 rounded-full font-heading font-semibold">
+            <Link href={`/charging/${session.id}`}>{t("history.detail")}</Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="h-12 rounded-full border-border bg-white/[0.03] font-heading font-semibold"
           >
-            {t("history.detail")}
-          </Link>
-          <Link
-            className="text-muted-foreground text-lg underline-offset-4 hover:text-foreground hover:underline"
-            href="/dashboard"
-          >
-            {t("history.startAnother")}
-          </Link>
+            <Link href="/dashboard">{t("history.startAnother")}</Link>
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -175,9 +186,9 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-6">
-      <dt className="text-muted-foreground text-base">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums">{value}</dd>
+    <div className="flex items-center justify-between py-4">
+      <dt className="text-muted-foreground text-sm">{label}</dt>
+      <dd className="font-heading text-base font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -186,24 +197,29 @@ function EmptyState() {
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-12 px-6 py-28 text-center">
-      <div className="space-y-8">
-        <p className="text-muted-foreground text-xs uppercase tracking-[0.4em]">
+    <div className="safe-bottom flex flex-1 flex-col gap-5 px-4 pb-6 pt-5">
+      <header className="flex items-center justify-between gap-4">
+        <LogoFull />
+        <BrandBadge className="hidden min-[380px]:inline-flex">Session log</BrandBadge>
+      </header>
+      <section className="voltflow-card flex flex-1 flex-col items-center justify-center gap-6 p-6 text-center">
+        <p className="text-muted-foreground text-xs uppercase tracking-[0.28em]">
           {t("history.emptyEyebrow")}
         </p>
-        <h1 className="text-balance text-4xl font-semibold tracking-tight">
+        <h1 className="text-balance font-heading text-3xl font-bold tracking-normal">
           {t("history.emptyTitle")}
         </h1>
-        <p className="text-muted-foreground mx-auto max-w-md text-lg">
+        <p className="text-muted-foreground mx-auto max-w-md text-sm leading-6">
           {t("history.emptyBody")}
         </p>
-      </div>
-      <Link
-        className="text-primary underline-offset-[8px] text-lg hover:underline"
-        href="/dashboard"
-      >
-        {t("history.headCockpit")}
-      </Link>
+        <Button
+          asChild
+          size="lg"
+          className="h-12 rounded-full bg-[linear-gradient(90deg,#00E676_0%,#00D1FF_100%)] px-8 font-heading font-semibold text-[#06110B]"
+        >
+          <Link href="/dashboard">{t("history.headCockpit")}</Link>
+        </Button>
+      </section>
     </div>
   );
 }
