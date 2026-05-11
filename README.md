@@ -47,6 +47,10 @@ npm run lint
 
 Sessions store immutable inputs (`start_*`, capacities, tariff, timestamps). Percent, kWh, cost, ETA are recomputed every second from **`started_at` + wall clock**, persisted back to Postgres so realtime and refresh stay consistent.
 
+## License
+
+MIT License. See `LICENSE`.
+
 ---
 
 Next.js middleware currently logs a deprecation note in v16 (“proxy”). Auth protection remains in `src/middleware.ts` until migrating to the new convention.
