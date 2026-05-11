@@ -19,6 +19,36 @@ export function LoginForm() {
   const next = searchParams.get("next") ?? "/dashboard";
   const [loading, setLoading] = useState(false);
 
+  const handleGoogle = async () => {
+    const supabase = createClient();
+    setLoading(true);
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/login?next=${encodeURIComponent(next)}`
+        : undefined;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          // Refresh token for long‑lived sessions where allowed.
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.message("Redirecting to Google…");
+  };
+
   const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -71,11 +101,11 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <Tabs defaultValue="signin" className="w-full px-6">
-        <TabsList className="mx-auto mb-10 grid w-full grid-cols-2 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-2">
-          <TabsTrigger className="min-h-[44px]" value="signin">
+        <TabsList className="mx-auto mb-10 flex w-full rounded-full border border-white/[0.1] bg-white/[0.03] p-1 group-data-horizontal/tabs:h-auto">
+          <TabsTrigger className="h-11 rounded-full text-base" value="signin">
             Login
           </TabsTrigger>
-          <TabsTrigger className="min-h-[44px]" value="signup">
+          <TabsTrigger className="h-11 rounded-full text-base" value="signup">
             Register
           </TabsTrigger>
         </TabsList>
@@ -109,6 +139,23 @@ export function LoginForm() {
       </Tabs>
 
       <CardFooter className="flex flex-col gap-6 pt-2 text-base">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-muted-foreground">
+            <span className="h-px flex-1 bg-white/10" />
+            Or
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-[48px] w-full rounded-full text-sm font-semibold"
+            disabled={loading}
+            onClick={() => void handleGoogle()}
+          >
+            Continue with Google
+          </Button>
+        </div>
+
         <p className="text-muted-foreground text-center">
           Offline install hint: Safari share sheet → {" "}
           <span className="text-foreground font-semibold">Add to Home Screen</span>.
