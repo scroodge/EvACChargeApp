@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import { startChargingSession } from "@/actions/sessions";
@@ -92,6 +92,13 @@ export function DashboardView() {
   const [chargerKw, setChargerKw] = useState("");
   const [price, setPrice] = useState(String(defaultPrice));
   const [submitting, setSubmitting] = useState(false);
+  const hasMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  const canStartSession = hasMounted && selectedCar && !activeSession;
 
   const handleStart = async () => {
     if (!selectedCar) return;
@@ -220,9 +227,9 @@ export function DashboardView() {
           <Button
             size="lg"
             className="shadow-[0_20px_50px_-20px_rgb(45_212_191/0.95)] hover:brightness-110 mt-6 h-[60px] w-full rounded-full text-lg font-semibold tracking-wide shadow-lg"
-            disabled={!selectedCar || Boolean(activeSession)}
+            disabled={!canStartSession}
             onClick={() => {
-              if (!activeSession && selectedCar) {
+              if (canStartSession) {
                 setPrice(String(defaultPrice));
                 setDialogOpen(true);
               }
@@ -285,7 +292,7 @@ export function DashboardView() {
                 id="energy-price"
                 type="number"
                 inputMode="decimal"
-                step="0.01"
+                step="any"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="h-[52px] rounded-xl text-lg"

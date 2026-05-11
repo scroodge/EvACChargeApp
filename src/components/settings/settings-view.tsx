@@ -110,7 +110,7 @@ export function SettingsView() {
               id="pref-price"
               name="pref-price"
               type="number"
-              step="0.01"
+              step="any"
               defaultValue={String(defaultPricePerKwh)}
               inputMode="decimal"
               min={0}
