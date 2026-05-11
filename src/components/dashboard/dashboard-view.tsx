@@ -163,6 +163,10 @@ export function DashboardView() {
               <Skeleton className="h-14 w-full rounded-2xl" />
             ) : (
               <Select
+                items={cars.map((car) => ({
+                  value: car.id,
+                  label: car.name,
+                }))}
                 value={selectedCar?.id}
                 onValueChange={(value) => setSelectedCarId(value)}
               >
