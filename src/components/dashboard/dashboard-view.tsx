@@ -46,6 +46,16 @@ import { queryKeys } from "@/lib/query-keys";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { ChargingSessionRow } from "@/types/database";
 
+async function ensureNotificationsPermission() {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "default") return;
+  try {
+    await Notification.requestPermission();
+  } catch {
+    /* non-fatal */
+  }
+}
+
 export function DashboardView() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -174,6 +184,7 @@ export function DashboardView() {
         ...overrides,
       });
       if (!res.ok) throw new Error(res.error);
+      await ensureNotificationsPermission();
       setDialogOpen(false);
       toast.success(t("dashboard.started") as string);
       router.push(`/charging/${res.sessionId}`);

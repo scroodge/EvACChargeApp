@@ -35,6 +35,47 @@ function toParams(row: ChargingSessionRow): ChargingParams {
   };
 }
 
+async function notifyChargeCompleted(sessionId: string, body: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+
+  if (Notification.permission === "default") {
+    try {
+      await Notification.requestPermission();
+    } catch {
+      return;
+    }
+  }
+
+  if (Notification.permission !== "granted") return;
+
+  const title = "Charge complete";
+  const data = { sessionId, url: `/charging/${sessionId}` };
+
+  if ("serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, {
+        body,
+        tag: `charge-complete:${sessionId}`,
+        data,
+        renotify: true,
+      });
+      return;
+    } catch {
+      /* fallback to in-page notification */
+    }
+  }
+
+  const notification = new Notification(title, {
+    body,
+    tag: `charge-complete:${sessionId}`,
+  });
+  notification.onclick = () => {
+    window.focus();
+    window.location.href = `/charging/${sessionId}`;
+  };
+}
+
 export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   const qc = useQueryClient();
   const supabase = useMemo(() => createClient(), []);
@@ -45,6 +86,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
   const completingRef = useRef(false);
+  const completionNoticeRef = useRef(false);
 
   useEffect(() => {
     const channel = supabase
@@ -78,6 +120,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     if (!session) {
       setLiveDerived(null);
       completingRef.current = false;
+      completionNoticeRef.current = false;
       return;
     }
 
@@ -93,6 +136,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
         isComplete: session.status === "completed",
       });
       completingRef.current = false;
+      completionNoticeRef.current = session.status === "completed";
       return;
     }
 
@@ -153,6 +197,10 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
 
         qc.invalidateQueries({ queryKey: queryKeys.sessions });
         toast.success(t("charging.targetReached") as string);
+        if (!completionNoticeRef.current) {
+          completionNoticeRef.current = true;
+          void notifyChargeCompleted(sessionId, t("charging.targetReached") as string);
+        }
         return;
       }
 
