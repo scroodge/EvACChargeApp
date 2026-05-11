@@ -5,10 +5,9 @@ import "@fontsource/space-grotesk/400.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
 import "@fontsource/space-grotesk/700.css";
-
 import "./globals.css";
-
 import { Providers } from "@/components/providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -59,6 +58,7 @@ export default function RootLayout({
     >
       <body className="bg-background font-sans min-h-dvh text-foreground antialiased">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
