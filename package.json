@@ -1,6 +1,6 @@
 {
-  "name": "evac-charge-timer",
-  "version": "0.1.0",
+  "name": "voltflow",
+  "version": "0.1.1",
   "private": true,
   "license": "MIT",
   "packageManager": "npm@10.9.8",
