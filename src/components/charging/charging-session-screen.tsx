@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
+import { sendChargeCompletedPush } from "@/actions/push";
 import { Button } from "@/components/ui/button";
 import {
   deriveChargingState,
@@ -58,7 +59,6 @@ async function notifyChargeCompleted(sessionId: string, body: string) {
         body,
         tag: `charge-complete:${sessionId}`,
         data,
-        renotify: true,
       });
       return;
     } catch {
@@ -200,6 +200,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
         if (!completionNoticeRef.current) {
           completionNoticeRef.current = true;
           void notifyChargeCompleted(sessionId, t("charging.targetReached") as string);
+          void sendChargeCompletedPush(sessionId);
         }
         return;
       }

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
+import { savePushSubscription } from "@/actions/push";
 import { startChargingSession, stopChargingSession } from "@/actions/sessions";
 import { BrandBadge } from "@/components/brand/BrandBadge";
 import { ChargingBolt } from "@/components/brand/ChargingBolt";
@@ -54,6 +55,55 @@ async function ensureNotificationsPermission() {
   } catch {
     /* non-fatal */
   }
+}
+
+function base64UrlToUint8Array(base64Url: string) {
+  const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
+  const normalized = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(normalized);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function ensurePushSubscription() {
+  if (
+    typeof window === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window)
+  ) {
+    return;
+  }
+
+  if (Notification.permission !== "granted") return;
+
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) return;
+
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+    });
+  }
+
+  const json = subscription.toJSON();
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
+
+  await savePushSubscription({
+    endpoint: json.endpoint,
+    expirationTime: json.expirationTime ?? null,
+    keys: {
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+    },
+  });
 }
 
 export function DashboardView() {
@@ -185,6 +235,7 @@ export function DashboardView() {
       });
       if (!res.ok) throw new Error(res.error);
       await ensureNotificationsPermission();
+      await ensurePushSubscription();
       setDialogOpen(false);
       toast.success(t("dashboard.started") as string);
       router.push(`/charging/${res.sessionId}`);

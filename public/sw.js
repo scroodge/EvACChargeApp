@@ -11,6 +11,29 @@ self.addEventListener("fetch", () => {
   /* Network-only: session state restored from Supabase + local prefs. */
 });
 
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+
+  const title = payload && payload.title ? payload.title : "Charge complete";
+  const body = payload && payload.body ? payload.body : "Battery reached target level.";
+  const tag = payload && payload.tag ? payload.tag : "charge-complete";
+  const url = payload && payload.url ? payload.url : "/dashboard";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      data: { url },
+      renotify: true,
+    }),
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
