@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchSessionById, useSessionQuery } from "@/hooks/use-session-query";
+import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
 
@@ -41,7 +42,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   const completingRef = useRef(false);
 
   useEffect(() => {
-    let channel = supabase
+    const channel = supabase
       .channel(`session-live:${sessionId}`)
       .on(
         "postgres_changes",
@@ -166,6 +167,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     void tick();
     const interval = window.setInterval(() => void tick(), 1000);
     return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- interval reads fresh rows from React Query; full `session` would thrash the timer on every write
   }, [
     qc,
     session?.id,
@@ -176,29 +178,34 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     supabase,
   ]);
 
-  const derived: DerivedChargingState | null =
-    session && session.status === "charging" && liveDerived
-      ? liveDerived
-      : session && session.status === "charging"
-        ? deriveChargingState(
-            toParams(session),
-            session.started_at
-              ? Date.parse(session.started_at)
-              : Date.now(),
-            Date.now(),
-          )
-      : session
-        ? ({
-            currentPercent: session.current_percent,
-            chargedEnergyKwh: session.charged_energy_kwh,
-            estimatedCost: session.estimated_cost,
-            elapsedSeconds: session.started_at
-              ? (Date.now() - Date.parse(session.started_at)) / 1000
-              : 0,
-            remainingSeconds: 0,
-            isComplete: session.status === "completed",
-          } satisfies DerivedChargingState)
-        : null;
+  const clockActive = session?.status === "charging";
+  const nowMs = useTickingClock(clockActive);
+
+  const derived: DerivedChargingState | null = useMemo(() => {
+    if (!session) return null;
+    if (session.status === "charging" && liveDerived) return liveDerived;
+    if (session.status === "charging" && session.started_at) {
+      return deriveChargingState(
+        toParams(session),
+        Date.parse(session.started_at),
+        nowMs,
+      );
+    }
+    const startedMs = session.started_at ? Date.parse(session.started_at) : null;
+    const stoppedMs = session.stopped_at ? Date.parse(session.stopped_at) : null;
+    const elapsedSeconds =
+      startedMs != null && stoppedMs != null
+        ? (stoppedMs - startedMs) / 1000
+        : 0;
+    return {
+      currentPercent: session.current_percent,
+      chargedEnergyKwh: session.charged_energy_kwh,
+      estimatedCost: session.estimated_cost,
+      elapsedSeconds,
+      remainingSeconds: 0,
+      isComplete: session.status === "completed",
+    } satisfies DerivedChargingState;
+  }, [session, liveDerived, nowMs]);
 
   const pctForBar =
     session && derived ? derived.currentPercent : session?.current_percent ?? 0;

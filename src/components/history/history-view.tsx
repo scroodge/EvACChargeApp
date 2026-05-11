@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deriveChargingState, formatDuration, type ChargingParams } from "@/lib/charging-math";
+import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useSessionsQuery } from "@/hooks/use-sessions-query";
 import type { ChargingSessionRow } from "@/types/database";
 
@@ -55,6 +56,7 @@ export function HistoryView() {
 }
 
 function HistoryCard({ session }: { session: ChargingSessionRow }) {
+  const nowMs = useTickingClock(session.status === "charging");
   const started = session.started_at ? new Date(session.started_at) : null;
   const ended = session.stopped_at ? new Date(session.stopped_at) : null;
 
@@ -69,7 +71,7 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 
   const derived =
     session.status === "charging" && session.started_at
-      ? deriveChargingState(params, Date.parse(session.started_at), Date.now())
+      ? deriveChargingState(params, Date.parse(session.started_at), nowMs)
       : null;
 
   const pct =

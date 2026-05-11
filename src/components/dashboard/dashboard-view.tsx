@@ -30,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { deriveChargingState, formatDuration, type ChargingParams } from "@/lib/charging-math";
 import { queryKeys } from "@/lib/query-keys";
 import { useCarsQuery } from "@/hooks/use-cars-query";
+import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { fetchSessions } from "@/hooks/use-sessions-query";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { ChargingSessionRow } from "@/types/database";
@@ -57,12 +58,7 @@ export function DashboardView() {
     [sessions],
   );
 
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (!activeSession) return;
-    const id = window.setInterval(() => setTick((x) => x + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [activeSession]);
+  const nowMs = useTickingClock(Boolean(activeSession));
 
   const selectedCar =
     cars?.find((c) => c.id === selectedCarId) ?? cars?.[0] ?? null;
@@ -86,9 +82,9 @@ export function DashboardView() {
     return deriveChargingState(
       params,
       Date.parse(activeSession.started_at),
-      Date.now(),
+      nowMs,
     );
-  }, [activeSession, tick]);
+  }, [activeSession, nowMs]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [startPct, setStartPct] = useState("42");
@@ -96,10 +92,6 @@ export function DashboardView() {
   const [chargerKw, setChargerKw] = useState("");
   const [price, setPrice] = useState(String(defaultPrice));
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    setPrice(String(defaultPrice));
-  }, [defaultPrice]);
 
   const handleStart = async () => {
     if (!selectedCar) return;
@@ -199,6 +191,7 @@ export function DashboardView() {
             selectedCar={selectedCar}
             activeSession={activeSession ?? null}
             live={liveActive}
+            nowMs={nowMs}
           />
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -224,9 +217,12 @@ export function DashboardView() {
             size="lg"
             className="shadow-[0_20px_50px_-20px_rgb(45_212_191/0.95)] hover:brightness-110 mt-6 h-[60px] w-full rounded-full text-lg font-semibold tracking-wide shadow-lg"
             disabled={!selectedCar || Boolean(activeSession)}
-            onClick={() =>
-              !activeSession && selectedCar && setDialogOpen(true)
-            }
+            onClick={() => {
+              if (!activeSession && selectedCar) {
+                setPrice(String(defaultPrice));
+                setDialogOpen(true);
+              }
+            }}
           >
             {activeSession ? "Charging..." : "Start charging"}
           </Button>
@@ -322,11 +318,13 @@ function ActivePulseCard({
   selectedCar,
   activeSession,
   live,
+  nowMs,
 }: {
   loading: boolean;
   selectedCar: Car | null;
   activeSession: ChargingSessionRow | null;
   live: ReturnType<typeof deriveChargingState> | null;
+  nowMs: number;
 }) {
   const currentLive =
     live ??
@@ -341,7 +339,7 @@ function ActivePulseCard({
             pricePerKwh: activeSession.price_per_kwh,
           },
           Date.parse(activeSession.started_at),
-          Date.now(),
+          nowMs,
         )
       : null);
 

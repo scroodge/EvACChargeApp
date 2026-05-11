@@ -9,13 +9,7 @@ import { toast } from "sonner";
 import { deleteCar } from "@/actions/cars";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -30,7 +24,6 @@ export function SettingsView() {
   const [email, setEmail] = useState<string | null>(null);
   const defaultPricePerKwh = useAppPreferences((s) => s.defaultPricePerKwh);
   const setDefaultPrice = useAppPreferences((s) => s.setDefaultPricePerKwh);
-  const [priceDraft, setPriceDraft] = useState(String(defaultPricePerKwh));
   useEffect(() => {
     let mounted = true;
     void createClient()
@@ -43,13 +36,11 @@ export function SettingsView() {
     };
   }, []);
 
-  useEffect(() => {
-    setPriceDraft(String(defaultPricePerKwh));
-  }, [defaultPricePerKwh]);
-
   const handlePriceSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const numeric = Number(priceDraft);
+    const numeric = Number(
+      String(new FormData(event.currentTarget).get("pref-price") ?? ""),
+    );
     if (!Number.isFinite(numeric) || numeric < 0) {
       toast.error("Tariff needs to stay positive.");
       return;
@@ -115,13 +106,14 @@ export function SettingsView() {
           <form className="space-y-4" onSubmit={handlePriceSave}>
             <Label htmlFor="pref-price">Electricity tariff (€/kWh)</Label>
             <Input
+              key={defaultPricePerKwh}
               id="pref-price"
+              name="pref-price"
               type="number"
               step="0.01"
-              value={priceDraft}
+              defaultValue={String(defaultPricePerKwh)}
               inputMode="decimal"
               min={0}
-              onChange={(e) => setPriceDraft(e.target.value)}
               className="h-[54px] rounded-2xl text-lg"
               required
             />

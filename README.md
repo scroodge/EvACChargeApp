@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EV Charge Pulse
 
-## Getting Started
+Mobile-first EV charging tracker — Next.js App Router, Supabase Auth/Postgres/Realtime, TanStack Query + Zustand.
 
-First, run the development server:
+## Setup
+
+1. Create a Supabase project and run SQL from `supabase/migrations/20250511000000_init.sql` (SQL Editor or CLI). Ensure **Realtime** is enabled for table `charging_sessions`.
+
+2. Copy `.env.example` to `.env.local` and set:
+
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` — reserved for future server-side tooling; client code uses the anon key with RLS.
+
+3. Configure **Auth → Redirect URLs** in Supabase for your Vercel domain (and `http://localhost:3000` for dev).
+
+4. Install and run locally:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev       # Turbopack dev server
+npm run build && npm run start
+npm run lint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## PWA / install
 
-## Learn More
+- `src/app/manifest.ts` + icons in `/public/icon-*.png`, `apple-touch-icon.png`
+- Minimal `public/sw.js` registered in production via `src/components/sw-register.tsx`
+- Prefer **Safari → Share → Add to Home Screen** (iOS); Chrome/Android use **Install app** where offered
 
-To learn more about Next.js, take a look at the following resources:
+## Charging model
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Sessions store immutable inputs (`start_*`, capacities, tariff, timestamps). Percent, kWh, cost, ETA are recomputed every second from **`started_at` + wall clock**, persisted back to Postgres so realtime and refresh stay consistent.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js middleware currently logs a deprecation note in v16 (“proxy”). Auth protection remains in `src/middleware.ts` until migrating to the new convention.

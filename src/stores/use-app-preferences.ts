@@ -20,10 +20,11 @@ export const useAppPreferences = create(
     {
       name: "ev-charge-preferences",
       storage: createJSONStorage(() => localStorage),
-      partialize: (s): Pick<AppPreferencesState, "selectedCarId" | "defaultPricePerKwh"> => ({
+      /* zustand typings expect the full store; we only persist primitives. */
+      partialize: (s) => ({
         selectedCarId: s.selectedCarId,
         defaultPricePerKwh: s.defaultPricePerKwh,
-      }),
+      }) as unknown as AppPreferencesState,
     },
   ),
 );
