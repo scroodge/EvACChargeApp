@@ -21,6 +21,12 @@ type AppPreferencesState = {
   setLocale: (locale: Locale) => void;
 };
 
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
 export const useAppPreferences = create(
   persist<AppPreferencesState>(
     (set) => ({
@@ -36,7 +42,9 @@ export const useAppPreferences = create(
     }),
     {
       name: "ev-charge-preferences",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() =>
+        typeof window === "undefined" ? noopStorage : window.localStorage,
+      ),
       merge: (persisted, current) => {
         const saved = persisted as Partial<AppPreferencesState> | undefined;
         return {
