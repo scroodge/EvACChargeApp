@@ -3,6 +3,7 @@
   "version": "0.1.2",
   "private": true,
   "license": "MIT",
+  "packageManager": "npm@10.9.2",
   "engines": {
     "node": "24.x"
   },
