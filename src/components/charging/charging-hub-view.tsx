@@ -32,41 +32,13 @@ export function ChargingHubView() {
   useEffect(() => {
     if (active?.id) {
       router.replace(`/charging/${active.id}`);
+      return;
     }
-  }, [active, router]);
 
-  if (!isLoading && !active && sessions) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-6 text-center">
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs uppercase tracking-[0.3em]">
-            {t("charging.hubEyebrow")}
-          </p>
-          <h1 className="text-balance text-3xl font-semibold tracking-tight">
-            {t("charging.idle")}
-          </h1>
-          <p className="text-muted-foreground mx-auto max-w-md text-lg">
-            {t("charging.idleBody")}
-          </p>
-        </div>
-        <div className="mx-auto mt-16 flex max-w-xl flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.02] px-6 py-8">
-          <p className="text-muted-foreground text-base">
-            {isFetching ? t("charging.refreshing") : t("charging.syncHint")}
-          </p>
-          <Button
-            className="mx-auto mt-8 h-[52px] min-w-[200px] rounded-full text-base font-semibold"
-            onClick={() => void refetch()}
-            variant="secondary"
-          >
-            {t("charging.checkAgain")}
-          </Button>
-          <Button asChild className="h-[52px] rounded-full text-base font-semibold" size="lg">
-            <Link href="/dashboard">{t("charging.backCockpit")}</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
+    if (!isLoading && sessions) {
+      router.replace("/dashboard");
+    }
+  }, [active, isLoading, router, sessions]);
 
   if (!active && (isLoading || !sessions)) {
     return (
@@ -89,5 +61,15 @@ export function ChargingHubView() {
     );
   }
 
-  return null;
+  return (
+    <div className="text-muted-foreground flex flex-1 flex-col items-center gap-6 px-6 py-24 text-center">
+      <p>{isFetching ? t("charging.refreshing") : t("charging.syncHint")}</p>
+      <Button className="h-[52px] rounded-full px-8" variant="secondary" onClick={() => void refetch()}>
+        {t("charging.checkAgain")}
+      </Button>
+      <Button asChild className="h-[52px] rounded-full px-8" size="lg">
+        <Link href="/dashboard">{t("charging.backCockpit")}</Link>
+      </Button>
+    </div>
+  );
 }
