@@ -6,6 +6,7 @@ export type Profile = {
   preferred_currency: "EUR" | "USD" | "BYN" | "RUB";
   preferred_locale: "en" | "be" | "ru";
   default_price_per_kwh: number;
+  bydmate_cloud_api_key: string | null;
   created_at: string;
 };
 
@@ -90,6 +91,7 @@ export type BydmateLocation = {
 
 export type BydmateLiveSnapshotRow = {
   vehicle_id: string;
+  user_id: string | null;
   source: "BYDMate";
   schema_version: 1;
   device_time: string;

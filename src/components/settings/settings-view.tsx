@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Code2, ExternalLink, MessageCircle, Scale } from "lucide-react";
+import { Code2, Copy, ExternalLink, KeyRound, MessageCircle, RefreshCw, Scale } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ export function SettingsView() {
   const { data: cars, isLoading } = useCarsQuery();
   const [email, setEmail] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [bydmateCloudApiKey, setBydmateCloudApiKey] = useState("");
   const defaultPricePerKwh = useAppPreferences((s) => s.defaultPricePerKwh);
   const setDefaultPrice = useAppPreferences((s) => s.setDefaultPricePerKwh);
   const currency = useAppPreferences((s) => s.currency);
@@ -60,7 +61,7 @@ export function SettingsView() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("preferred_currency, default_price_per_kwh")
+        .select("preferred_currency, default_price_per_kwh, bydmate_cloud_api_key")
         .eq("id", user.id)
         .single();
 
@@ -75,6 +76,12 @@ export function SettingsView() {
       if (Number.isFinite(defaultPrice) && defaultPrice >= 0) {
         setDefaultPrice(defaultPrice);
       }
+
+      setBydmateCloudApiKey(
+        typeof profile?.bydmate_cloud_api_key === "string"
+          ? profile.bydmate_cloud_api_key
+          : "",
+      );
     });
 
     return () => {
@@ -146,6 +153,38 @@ export function SettingsView() {
     router.refresh();
   };
 
+  const handleGenerateBydmateKey = () => {
+    if (!profileUserId) {
+      toast.error("Sign in before generating a BYDMate key");
+      return;
+    }
+
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    const key = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+    void createClient()
+      .from("profiles")
+      .update({ bydmate_cloud_api_key: key })
+      .eq("id", profileUserId)
+      .then(({ error }) => {
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        setBydmateCloudApiKey(key);
+        toast.success("BYDMate API key generated");
+      });
+  };
+
+  const handleCopyBydmateKey = () => {
+    if (!bydmateCloudApiKey) return;
+    void navigator.clipboard
+      .writeText(bydmateCloudApiKey)
+      .then(() => toast.success("BYDMate API key copied"))
+      .catch(() => toast.error("Could not copy API key"));
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
@@ -194,6 +233,56 @@ export function SettingsView() {
           >
             {t("settings.signOut")}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-white/[0.08]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-xl tracking-tight">
+            <KeyRound className="size-5" aria-hidden />
+            BYDMate Cloud Sync
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-muted-foreground text-base leading-relaxed">
+            Generate the API key used by the BYDMate Android app when it posts live
+            telemetry to VoltFlow.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="bydmate-api-key">API Key</Label>
+            <Input
+              id="bydmate-api-key"
+              value={bydmateCloudApiKey || "No key generated yet"}
+              readOnly
+              className="h-[54px] rounded-2xl font-mono text-sm"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="h-[54px] rounded-full"
+              onClick={handleGenerateBydmateKey}
+            >
+              <RefreshCw className="mr-2 size-4" aria-hidden />
+              Generate key
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-[54px] rounded-full"
+              disabled={!bydmateCloudApiKey}
+              onClick={handleCopyBydmateKey}
+            >
+              <Copy className="mr-2 size-4" aria-hidden />
+              Copy key
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            BYDMate endpoint URL: <span className="font-mono">/api/bydmate/telemetry</span>
+          </p>
         </CardContent>
       </Card>
 

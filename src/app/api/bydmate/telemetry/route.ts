@@ -47,16 +47,7 @@ const payloadSchema = z
   .passthrough();
 
 export async function POST(request: Request) {
-  const expectedApiKey = process.env.BYDMATE_CLOUD_API_KEY;
-  if (!expectedApiKey) {
-    return Response.json({ ok: false, error: "Receiver is not configured" }, { status: 503 });
-  }
-
   const apiKey = request.headers.get("x-api-key") ?? "";
-  if (apiKey !== expectedApiKey) {
-    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
   const headerVehicleId = request.headers.get("x-vehicle-id")?.trim();
   if (!headerVehicleId) {
     return Response.json({ ok: false, error: "Missing X-Vehicle-Id" }, { status: 400 });
@@ -90,8 +81,32 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createServiceClient();
+    const globalApiKey = process.env.BYDMATE_CLOUD_API_KEY;
+    let ownerUserId: string | null = null;
+
+    if (globalApiKey && apiKey === globalApiKey) {
+      ownerUserId = null;
+    } else {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("bydmate_cloud_api_key", apiKey)
+        .maybeSingle();
+
+      if (profileError) {
+        return Response.json({ ok: false, error: "Key lookup failed" }, { status: 500 });
+      }
+
+      if (!profile?.id) {
+        return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      }
+
+      ownerUserId = profile.id;
+    }
+
     const snapshotRow = {
       vehicle_id: payload.vehicle_id,
+      user_id: ownerUserId,
       source: payload.source,
       schema_version: payload.schema_version,
       device_time: deviceTime.toISOString(),
