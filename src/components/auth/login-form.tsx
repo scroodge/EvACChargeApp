@@ -119,6 +119,14 @@ export function LoginForm() {
         <TabsContent value="signin">
           <form onSubmit={handleSignIn} className="space-y-6">
             <AuthFields />
+            <div className="-mt-2 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-muted-foreground text-sm underline underline-offset-4 hover:text-primary"
+              >
+                {t("auth.forgotPassword")}
+              </Link>
+            </div>
             <Button
               className="h-[54px] w-full rounded-full text-base font-semibold"
               disabled={loading}

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/auth/callback"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/forgot-password", "/auth/callback"]);
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -69,4 +69,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-
