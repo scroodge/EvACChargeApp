@@ -5,6 +5,14 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function enumValue<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+) {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
 export function mapCar(raw: Record<string, unknown>): Car {
   return {
     id: String(raw.id),
@@ -21,6 +29,12 @@ export function mapProfile(raw: Record<string, unknown>): Profile {
   return {
     id: String(raw.id),
     email: raw.email != null ? String(raw.email) : null,
+    preferred_currency: enumValue(
+      raw.preferred_currency,
+      ["EUR", "USD", "BYN", "RUB"],
+      "EUR",
+    ),
+    preferred_locale: enumValue(raw.preferred_locale, ["en", "be", "ru"], "en"),
     created_at: String(raw.created_at ?? ""),
   };
 }

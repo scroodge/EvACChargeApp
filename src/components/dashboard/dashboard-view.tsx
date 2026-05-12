@@ -43,6 +43,7 @@ import {
   type ChargingParams,
 } from "@/lib/charging-math";
 import { currencySymbols, formatCurrencyAmount } from "@/lib/i18n";
+import { parseDecimalInput } from "@/lib/number-input";
 import { queryKeys } from "@/lib/query-keys";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { ChargingSessionRow } from "@/types/database";
@@ -223,14 +224,16 @@ export function DashboardView() {
       return toast.error(t("dashboard.percentError") as string);
 
     setSubmitting(true);
+    const chargerPowerKw =
+      chargerKw.trim() !== "" ? parseDecimalInput(chargerKw) : undefined;
     const overrides =
-      chargerKw.trim() !== "" ? { chargerPowerKw: Number(chargerKw) } : {};
+      chargerPowerKw !== undefined ? { chargerPowerKw } : {};
     try {
       const res = await startChargingSession({
         carId: selectedCar.id,
         startPercent: start,
         targetPercent: target,
-        pricePerKwh: Number(price) || 0,
+        pricePerKwh: parseDecimalInput(price) || 0,
         ...overrides,
       });
       if (!res.ok) throw new Error(res.error);
@@ -428,10 +431,11 @@ export function DashboardView() {
               <Label htmlFor="start-pct">{t("dashboard.currentCharge")}</Label>
               <Input
                 id="start-pct"
-                inputMode="decimal"
+                inputMode="numeric"
                 pattern="[0-9]*"
                 min={0}
                 max={99}
+                step="1"
                 type="number"
                 value={startPct}
                 onChange={(e) => setStartPct(e.target.value)}
@@ -442,11 +446,13 @@ export function DashboardView() {
               <Label htmlFor="target-pct">{t("dashboard.targetCharge")}</Label>
               <Input
                 id="target-pct"
-                inputMode="decimal"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 type="number"
                 value={targetPct}
                 min={Number(startPct) + 1}
                 max={100}
+                step="1"
                 onChange={(e) => setTargetPct(e.target.value)}
                 className="h-[52px] rounded-xl text-lg"
               />
@@ -458,8 +464,9 @@ export function DashboardView() {
                 placeholder={t("dashboard.defaultPower", {
                   power: selectedCar?.default_charger_power_kw ?? "--",
                 }) as string}
-                type="number"
+                type="text"
                 inputMode="decimal"
+                pattern="[0-9]*[,.]?[0-9]*"
                 step="0.1"
                 value={chargerKw}
                 onChange={(e) => setChargerKw(e.target.value)}
@@ -472,8 +479,9 @@ export function DashboardView() {
               </Label>
               <Input
                 id="energy-price"
-                type="number"
+                type="text"
                 inputMode="decimal"
+                pattern="[0-9]*[,.]?[0-9]*"
                 step="any"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}

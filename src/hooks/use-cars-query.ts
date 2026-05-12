@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createCar } from "@/actions/cars";
 import { createClient } from "@/lib/supabase/client";
 import { mapCar } from "@/lib/db-map";
+import { parseDecimalInput } from "@/lib/number-input";
 import { queryKeys } from "@/lib/query-keys";
 import { useTranslation } from "@/hooks/use-translation";
 import type { Car } from "@/types/database";
@@ -54,8 +55,8 @@ export function useCreateCarMutation() {
         id: crypto.randomUUID(),
         user_id: "local",
         name: String(formData.get("name") ?? "Vehicle"),
-        battery_capacity_kwh: Number(formData.get("battery_capacity_kwh")) || 75,
-        default_charger_power_kw: Number(formData.get("default_charger_power_kw")) || 4.4,
+        battery_capacity_kwh: parseDecimalInput(String(formData.get("battery_capacity_kwh") ?? "")) || 75,
+        default_charger_power_kw: parseDecimalInput(String(formData.get("default_charger_power_kw") ?? "")) || 4.4,
         default_efficiency_percent: Number(formData.get("default_efficiency_percent")) || 90,
         created_at: new Date().toISOString(),
       };

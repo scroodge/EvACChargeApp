@@ -32,6 +32,7 @@ import {
   isCurrency,
   type Currency,
 } from "@/lib/i18n";
+import { parseDecimalInput } from "@/lib/number-input";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { Car } from "@/types/database";
 
@@ -78,7 +79,7 @@ export function SettingsView() {
 
   const handlePriceSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const numeric = Number(
+    const numeric = parseDecimalInput(
       String(new FormData(event.currentTarget).get("pref-price") ?? ""),
     );
     if (!Number.isFinite(numeric) || numeric < 0) {
@@ -214,10 +215,11 @@ export function SettingsView() {
               key={defaultPricePerKwh}
               id="pref-price"
               name="pref-price"
-              type="number"
+              type="text"
               step="any"
               defaultValue={String(defaultPricePerKwh)}
               inputMode="decimal"
+              pattern="[0-9]*[,.]?[0-9]*"
               min={0}
               className="h-[54px] rounded-2xl text-lg"
               required

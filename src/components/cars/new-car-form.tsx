@@ -57,8 +57,9 @@ export function NewCarForm() {
             <Input
               id="battery_capacity_kwh"
               name="battery_capacity_kwh"
-              type="number"
+              type="text"
               inputMode="decimal"
+              pattern="[0-9]*[,.]?[0-9]*"
               min={10}
               max={300}
               step="0.1"
@@ -74,8 +75,9 @@ export function NewCarForm() {
               <Input
                 id="default_charger_power_kw"
                 name="default_charger_power_kw"
-                type="number"
+                type="text"
                 inputMode="decimal"
+                pattern="[0-9]*[,.]?[0-9]*"
                 step="0.1"
                 min={1}
                 max={300}

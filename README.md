@@ -122,6 +122,83 @@ npm run start     # Start production server
 npm run lint      # Run ESLint
 ```
 
+### Automatic Version Bump
+
+This local clone has a Git `pre-commit` hook at `.git/hooks/pre-commit`.
+Every normal commit automatically bumps the patch version in `package.json`
+and `package-lock.json`, then stages those files into the same commit.
+
+Example:
+
+```text
+0.1.4 -> 0.1.5
+```
+
+The hook is local to this machine because `.git/hooks` is not committed to the
+repository. If the hook ever needs to be recreated, add this file:
+
+```sh
+#!/bin/sh
+set -e
+
+node <<'NODE'
+const fs = require("fs");
+const path = require("path");
+
+const root = process.cwd();
+const packagePath = path.join(root, "package.json");
+const lockPath = path.join(root, "package-lock.json");
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function writeJson(filePath, data) {
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+function bumpPatch(version) {
+  const match = /^(\d+)\.(\d+)\.(\d+)(.*)$/.exec(version);
+
+  if (!match) {
+    throw new Error(`Unsupported package version: ${version}`);
+  }
+
+  return `${match[1]}.${match[2]}.${Number(match[3]) + 1}${match[4] || ""}`;
+}
+
+const packageJson = readJson(packagePath);
+const nextVersion = bumpPatch(packageJson.version);
+
+packageJson.version = nextVersion;
+writeJson(packagePath, packageJson);
+
+if (fs.existsSync(lockPath)) {
+  const lockJson = readJson(lockPath);
+
+  if (typeof lockJson.version === "string") {
+    lockJson.version = nextVersion;
+  }
+
+  if (lockJson.packages && lockJson.packages[""]) {
+    lockJson.packages[""].version = nextVersion;
+  }
+
+  writeJson(lockPath, lockJson);
+}
+
+console.log(`Version bumped to ${nextVersion}`);
+NODE
+
+git add package.json package-lock.json
+```
+
+Then make it executable:
+
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
 ### Charging Model
 
 VoltFlow stores immutable session inputs such as starting percent, target percent, battery capacity, charger power, efficiency, tariff, and timestamps. Runtime values are recomputed from `started_at` plus the current wall clock:
@@ -276,6 +353,27 @@ npm run dev       # Запуск Next.js dev server
 npm run build     # Production build
 npm run start     # Production server
 npm run lint      # ESLint
+```
+
+### Автоматическое обновление версии
+
+В этом локальном клоне настроен Git `pre-commit` hook:
+`.git/hooks/pre-commit`. При каждом обычном коммите он автоматически
+увеличивает patch-версию в `package.json` и `package-lock.json`, а затем
+добавляет эти файлы в тот же коммит.
+
+Пример:
+
+```text
+0.1.4 -> 0.1.5
+```
+
+Hook локальный для этой машины, потому что `.git/hooks` не коммитится в
+репозиторий. Если его нужно восстановить, используйте инструкцию из английского
+раздела Automatic Version Bump и затем выполните:
+
+```bash
+chmod +x .git/hooks/pre-commit
 ```
 
 ### Модель зарядки

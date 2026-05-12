@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { normalizeFormDecimal } from "@/lib/number-input";
 
 const carSchema = z.object({
   name: z.string().min(1).max(120),
@@ -26,8 +27,8 @@ export async function createCar(formData: FormData) {
 
   const parsed = carSchema.safeParse({
     name: formData.get("name"),
-    battery_capacity_kwh: formData.get("battery_capacity_kwh"),
-    default_charger_power_kw: formData.get("default_charger_power_kw"),
+    battery_capacity_kwh: normalizeFormDecimal(formData.get("battery_capacity_kwh")),
+    default_charger_power_kw: normalizeFormDecimal(formData.get("default_charger_power_kw")),
     default_efficiency_percent: formData.get("default_efficiency_percent"),
   });
 

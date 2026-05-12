@@ -3,6 +3,8 @@ export type SessionStatus = "idle" | "charging" | "completed" | "stopped";
 export type Profile = {
   id: string;
   email: string | null;
+  preferred_currency: "EUR" | "USD" | "BYN" | "RUB";
+  preferred_locale: "en" | "be" | "ru";
   created_at: string;
 };
 
@@ -45,4 +47,15 @@ export type ChargingSessionComputed = ChargingSessionRow & {
     remainingSeconds: number;
     isComplete: boolean;
   };
+};
+
+export type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  expiration_time: number | null;
+  created_at: string;
+  updated_at: string;
 };
