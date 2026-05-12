@@ -81,32 +81,23 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createServiceClient();
-    const globalApiKey = process.env.BYDMATE_CLOUD_API_KEY;
-    let ownerUserId: string | null = null;
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("bydmate_cloud_api_key", apiKey)
+      .maybeSingle();
 
-    if (globalApiKey && apiKey === globalApiKey) {
-      ownerUserId = null;
-    } else {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("bydmate_cloud_api_key", apiKey)
-        .maybeSingle();
+    if (profileError) {
+      return Response.json({ ok: false, error: "Key lookup failed" }, { status: 500 });
+    }
 
-      if (profileError) {
-        return Response.json({ ok: false, error: "Key lookup failed" }, { status: 500 });
-      }
-
-      if (!profile?.id) {
-        return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-      }
-
-      ownerUserId = profile.id;
+    if (!profile?.id) {
+      return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const snapshotRow = {
       vehicle_id: payload.vehicle_id,
-      user_id: ownerUserId,
+      user_id: profile.id,
       source: payload.source,
       schema_version: payload.schema_version,
       device_time: deviceTime.toISOString(),
