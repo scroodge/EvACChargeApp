@@ -1,6 +1,6 @@
 {
   "name": "voltflow",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "license": "MIT",
   "packageManager": "npm@10.9.2",

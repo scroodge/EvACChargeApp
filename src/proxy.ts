@@ -2,9 +2,25 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/forgot-password", "/auth/callback"]);
+const PUBLIC_METADATA_PATHS = new Set([
+  "/apple-icon",
+  "/favicon.ico",
+  "/icon",
+  "/manifest.webmanifest",
+  "/sw.js",
+]);
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+
+  if (
+    PUBLIC_METADATA_PATHS.has(pathname) ||
+    pathname.startsWith("/icons/") ||
+    pathname.endsWith(".webmanifest")
+  ) {
+    return response;
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,17 +49,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-
-  if (
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/sw.js" ||
-    pathname.startsWith("/icons/") ||
-    pathname.endsWith(".webmanifest")
-  ) {
-    return response;
-  }
 
   const isPublic = PUBLIC_PATHS.has(pathname);
 
