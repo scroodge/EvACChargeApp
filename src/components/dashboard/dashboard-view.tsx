@@ -157,7 +157,7 @@ export function DashboardView() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [startPct, setStartPct] = useState("42");
-  const [targetPct, setTargetPct] = useState("90");
+  const [targetPct, setTargetPct] = useState("100");
   const [chargerKw, setChargerKw] = useState("");
   const [price, setPrice] = useState(String(defaultPrice));
   const [submitting, setSubmitting] = useState(false);

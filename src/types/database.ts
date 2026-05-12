@@ -5,6 +5,7 @@ export type Profile = {
   email: string | null;
   preferred_currency: "EUR" | "USD" | "BYN" | "RUB";
   preferred_locale: "en" | "be" | "ru";
+  default_price_per_kwh: number;
   created_at: string;
 };
 

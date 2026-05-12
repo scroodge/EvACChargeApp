@@ -60,7 +60,7 @@ export function SettingsView() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("preferred_currency")
+        .select("preferred_currency, default_price_per_kwh")
         .eq("id", user.id)
         .single();
 
@@ -70,12 +70,17 @@ export function SettingsView() {
       if (typeof preferredCurrency === "string" && isCurrency(preferredCurrency)) {
         setCurrency(preferredCurrency);
       }
+
+      const defaultPrice = Number(profile?.default_price_per_kwh);
+      if (Number.isFinite(defaultPrice) && defaultPrice >= 0) {
+        setDefaultPrice(defaultPrice);
+      }
     });
 
     return () => {
       mounted = false;
     };
-  }, [setCurrency]);
+  }, [setCurrency, setDefaultPrice]);
 
   const handlePriceSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,8 +91,27 @@ export function SettingsView() {
       toast.error(t("settings.tariffPositive") as string);
       return;
     }
+
+    const previous = defaultPricePerKwh;
     setDefaultPrice(numeric);
-    toast.success(t("settings.tariffSaved") as string);
+
+    if (!profileUserId) {
+      toast.success(t("settings.tariffSaved") as string);
+      return;
+    }
+
+    void createClient()
+      .from("profiles")
+      .update({ default_price_per_kwh: numeric })
+      .eq("id", profileUserId)
+      .then(({ error }) => {
+        if (error) {
+          setDefaultPrice(previous);
+          toast.error(error.message);
+          return;
+        }
+        toast.success(t("settings.tariffSaved") as string);
+      });
   };
 
   const handleCurrencyChange = (value: Currency | null) => {
