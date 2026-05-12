@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
+    pathname.startsWith("/api/bydmate/") ||
     PUBLIC_METADATA_PATHS.has(pathname) ||
     pathname.startsWith("/icons/") ||
     pathname.endsWith(".webmanifest")

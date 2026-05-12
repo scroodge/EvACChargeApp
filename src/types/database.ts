@@ -60,3 +60,46 @@ export type PushSubscriptionRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type BydmateTelemetry = {
+  soc?: number | null;
+  speed_kmh?: number | null;
+  power_kw?: number | null;
+  battery_temp_c?: number | null;
+  cabin_temp_c?: number | null;
+  outside_temp_c?: number | null;
+  battery_voltage_v?: number | null;
+  aux_voltage_v?: number | null;
+  odometer_km?: number | null;
+  soh_percent?: number | null;
+  is_charging?: boolean | null;
+  charge_power_kw?: number | null;
+  charge_type?: string | null;
+  kwh_charged?: number | null;
+  range_est_km?: number | null;
+  current_trip_distance_km?: number | null;
+  current_trip_consumption_kwh_100km?: number | null;
+};
+
+export type BydmateLocation = {
+  lat?: number | null;
+  lon?: number | null;
+  accuracy_m?: number | null;
+  bearing_deg?: number | null;
+};
+
+export type BydmateLiveSnapshotRow = {
+  vehicle_id: string;
+  source: "BYDMate";
+  schema_version: 1;
+  device_time: string;
+  received_at: string;
+  telemetry: BydmateTelemetry;
+  location: BydmateLocation;
+  raw_payload: unknown;
+  updated_at: string;
+};
+
+export type BydmateTelemetryPointRow = Omit<BydmateLiveSnapshotRow, "updated_at"> & {
+  id: string;
+};
