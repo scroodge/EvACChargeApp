@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
     const { error: snapshotError } = await supabase
       .from("bydmate_live_snapshots")
-      .upsert(snapshotRow, { onConflict: "vehicle_id" });
+      .upsert(snapshotRow, { onConflict: "user_id,vehicle_id" });
 
     if (snapshotError) {
       return Response.json({ ok: false, error: "Snapshot write failed" }, { status: 500 });
