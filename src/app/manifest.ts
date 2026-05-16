@@ -2,14 +2,15 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "VoltFlow",
+    name: "VoltFlow BYD YUAN UP Knowledge Base",
     short_name: "VoltFlow",
-    description: "Real-time EV charging tracker and calculator",
+    description:
+      "Static Telegram Mini App knowledge base for BYD YUAN UP charging, maintenance, accessories, calculators, and owner experience.",
     lang: "en",
     display: "standalone",
     orientation: "portrait",
     scope: "/",
-    start_url: "/dashboard",
+    start_url: "/telegram",
     background_color: "#12151C",
     theme_color: "#12151C",
     icons: [

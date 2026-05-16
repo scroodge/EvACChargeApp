@@ -57,7 +57,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublic = PUBLIC_PATHS.has(pathname);
+  const isPublic = PUBLIC_PATHS.has(pathname) || pathname.startsWith("/telegram/");
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();

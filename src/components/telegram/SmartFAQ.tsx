@@ -1,7 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { CategoryFilter } from "@/components/telegram/CategoryFilter";
 import { SearchBox } from "@/components/telegram/SearchBox";
@@ -13,6 +15,7 @@ type FaqCategory = (typeof faqCategories)[number];
 type FaqFilter = "All" | FaqCategory;
 
 export function SmartFAQ() {
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<FaqFilter>("All");
   const [openQuestion, setOpenQuestion] = useState(faqItems[0]?.question ?? "");
@@ -32,6 +35,16 @@ export function SmartFAQ() {
       return matchesCategory && matchesQuery;
     });
   }, [category, query]);
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      window.setTimeout(() => {
+        setQuery(q);
+        setOpenQuestion(q);
+      }, 0);
+    }
+  }, [searchParams]);
 
   return (
     <section className="space-y-4" aria-labelledby="telegram-faq-title">
@@ -88,9 +101,17 @@ export function SmartFAQ() {
                 <div className="border-t border-border/80 px-4 pb-4 pt-3 text-sm leading-6 text-muted-foreground">
                   {item.answer}
                   {item.relatedIds?.length ? (
-                    <p className="mt-3 text-xs font-semibold text-[var(--voltflow-cyan)]">
-                      Related: {item.relatedIds.join(", ")}
-                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.relatedIds.map((id) => (
+                        <Link
+                          key={id}
+                          href={`/telegram/article/${id}`}
+                          className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs font-semibold text-[var(--voltflow-cyan)]"
+                        >
+                          {id}
+                        </Link>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               ) : null}

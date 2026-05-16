@@ -1,14 +1,71 @@
-/* Minimal service worker — enables installability + fast SW activation. */
-self.addEventListener("install", () => {
-  self.skipWaiting();
+/* Minimal service worker — installability, push, and a tiny public Telegram cache. */
+const TELEGRAM_CACHE = "voltflow-telegram-v1";
+const TELEGRAM_ASSETS = [
+  "/telegram",
+  "/manifest.webmanifest",
+  "/voltflow-icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(TELEGRAM_CACHE)
+      .then((cache) => cache.addAll(TELEGRAM_ASSETS))
+      .catch(() => undefined)
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("fetch", () => {
-  /* Network-only: session state restored from Supabase + local prefs. */
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  const isTelegramPage =
+    url.origin === self.location.origin && url.pathname.startsWith("/telegram");
+  const isPublicAsset =
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith("/_next/static/") ||
+      TELEGRAM_ASSETS.includes(url.pathname));
+
+  if (!isTelegramPage && !isPublicAsset) return;
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(TELEGRAM_CACHE).then((cache) => {
+            cache.put(request, copy).catch(() => undefined);
+          });
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) return cached;
+          if (isTelegramPage) {
+            return caches
+              .match("/telegram")
+              .then(
+                (fallback) =>
+                  fallback ||
+                  new Response("VoltFlow Telegram knowledge base is offline.", {
+                    status: 503,
+                    headers: { "Content-Type": "text/plain; charset=utf-8" },
+                  }),
+              );
+          }
+          return new Response("", { status: 504, statusText: "Offline" });
+        }),
+      ),
+  );
 });
 
 self.addEventListener("push", (event) => {

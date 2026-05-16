@@ -5,17 +5,19 @@ import {
   Calculator,
   CarFront,
   HelpCircle,
-  Search,
   Settings,
   ShoppingBag,
   Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { chargingGuides } from "@/data/telegram/charging-guides";
 import { searchTelegramKnowledge } from "@/lib/telegram/search";
 import type { TelegramTab } from "@/components/telegram/BottomTabs";
+import { ArticleCard } from "@/components/telegram/ArticleCard";
 import { SearchBox } from "@/components/telegram/SearchBox";
+import { SearchResults } from "@/components/telegram/SearchResults";
 
 type KnowledgeHomeProps = {
   isTelegram: boolean;
@@ -63,34 +65,7 @@ export function KnowledgeHome({ isTelegram, onNavigate }: KnowledgeHomeProps) {
 
       <SearchBox value={query} onChange={setQuery} />
 
-      {query.trim() ? (
-        <div className="space-y-2">
-          {results.length ? (
-            results.map((result) => (
-              <article key={`${result.type}-${result.id}`} className="voltflow-card p-4">
-                <div className="flex gap-3">
-                  <Search className="mt-1 size-4 shrink-0 text-[var(--voltflow-green)]" aria-hidden />
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--voltflow-cyan)]">
-                      {result.type} · {result.category}
-                    </p>
-                    <h2 className="mt-1 font-heading text-base font-bold">
-                      {result.title}
-                    </h2>
-                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                      {result.summary}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="voltflow-card p-4 text-sm text-muted-foreground">
-              No local result yet. Try another term.
-            </div>
-          )}
-        </div>
-      ) : null}
+      {query.trim() ? <SearchResults query={query} results={results} /> : null}
 
       <div className="grid grid-cols-2 gap-3">
         {quickCards.map(({ label, tab, icon: Icon }) => (
@@ -114,16 +89,14 @@ export function KnowledgeHome({ isTelegram, onNavigate }: KnowledgeHomeProps) {
           </h2>
         </div>
         {popularArticles.map((article) => (
-          <article key={article.id} className="voltflow-card p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--voltflow-green)]">
-              {article.category}
-            </p>
-            <h3 className="mt-1 font-heading text-base font-bold">{article.title}</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {article.summary}
-            </p>
-          </article>
+          <ArticleCard key={article.id} article={article} />
         ))}
+        <Link
+          href="/telegram/category/charging"
+          className="inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)]"
+        >
+          Open Charging category
+        </Link>
       </section>
 
       <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">

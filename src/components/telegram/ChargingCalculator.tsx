@@ -1,6 +1,6 @@
 "use client";
 
-import { BatteryMedium, Clock, Coins, PlugZap } from "lucide-react";
+import { BatteryMedium, Clock, Coins, PlugZap, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -54,6 +54,13 @@ const fields = [
   step: string;
 }>;
 
+const chargingPowerPresets = [
+  { label: "Household socket", value: 2.2 },
+  { label: "Wallbox", value: 7 },
+  { label: "Public AC", value: 11 },
+  { label: "DC fast", value: 50 },
+];
+
 export function ChargingCalculator() {
   const [input, setInput] = useState<ChargingCalculatorInput>(
     defaultChargingCalculatorInput,
@@ -65,6 +72,10 @@ export function ChargingCalculator() {
       ...current,
       [key]: Number(value),
     }));
+  }
+
+  function setChargingPower(chargingPower: number) {
+    setInput((current) => ({ ...current, chargingPower }));
   }
 
   return (
@@ -79,6 +90,23 @@ export function ChargingCalculator() {
         >
           Estimate time, energy, and cost
         </h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Estimate one charging session. Values are generic assumptions, not
+          official BYD YUAN UP charging specifications.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {chargingPowerPresets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            onClick={() => setChargingPower(preset.value)}
+            className="min-h-10 rounded-full border border-border bg-white/[0.03] px-4 text-sm font-semibold text-muted-foreground transition hover:border-[var(--voltflow-cyan)] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
+          >
+            {preset.label}: {preset.value} kW
+          </button>
+        ))}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -105,7 +133,10 @@ export function ChargingCalculator() {
       </div>
 
       {result.errors.length > 0 ? (
-        <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
+        <div
+          className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100"
+          role="status"
+        >
           {result.errors.map((error) => (
             <p key={error}>{error}</p>
           ))}
@@ -141,6 +172,22 @@ export function ChargingCalculator() {
       <div className="rounded-lg border border-[var(--voltflow-green)]/25 bg-[var(--voltflow-green)]/10 p-4 text-sm leading-6 text-emerald-100">
         {result.recommendation}
       </div>
+
+      <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
+        <p className="font-semibold text-foreground">Assumptions</p>
+        <p>Efficiency: {input.efficiency}%</p>
+        <p>Charging power: {input.chargingPower} kW</p>
+        <p>Electricity price: {input.electricityPrice} per kWh</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setInput(defaultChargingCalculatorInput)}
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)] transition hover:bg-white/[0.07] focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
+      >
+        <RotateCcw className="size-4" aria-hidden />
+        Reset defaults
+      </button>
     </section>
   );
 }

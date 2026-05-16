@@ -1,7 +1,8 @@
 "use client";
 
 import { BatteryCharging, RadioTower, UserCircle2, Zap } from "lucide-react";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { BottomTabs, type TelegramTab } from "@/components/telegram/BottomTabs";
 import { AccessoriesCatalog } from "@/components/telegram/AccessoriesCatalog";
@@ -13,25 +14,59 @@ import { MaintenanceGuides } from "@/components/telegram/MaintenanceGuides";
 import { OwnershipExperience } from "@/components/telegram/OwnershipExperience";
 import { SmartFAQ } from "@/components/telegram/SmartFAQ";
 import { guideCategories } from "@/data/telegram/categories";
+import { getTelegramThemeStyle } from "@/lib/telegram/theme";
 import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
 
 export function TelegramShell() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TelegramTab>("home");
   const [guideCategory, setGuideCategory] =
     useState<(typeof guideCategories)[number]>("Charging");
   const telegram = useTelegramWebApp();
+  const themeStyle = useMemo(
+    () => getTelegramThemeStyle(telegram.themeParams),
+    [telegram.themeParams],
+  );
   const userName =
     telegram.user?.first_name ||
     telegram.user?.username ||
     (telegram.isTelegram ? "Telegram driver" : "Web driver");
 
+  useEffect(() => {
+    const tab = searchParams.get("tab") as TelegramTab | null;
+    window.setTimeout(() => {
+      if (tab && ["home", "guides", "faq", "tools", "more"].includes(tab)) {
+        setActiveTab(tab);
+      } else {
+        setActiveTab("home");
+      }
+    }, 0);
+  }, [searchParams]);
+
+  function changeTab(tab: TelegramTab) {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams);
+    if (tab === "home") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-background text-foreground">
+    <main
+      className="relative isolate min-h-dvh overflow-x-hidden scroll-smooth bg-background text-foreground"
+      style={themeStyle}
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-8%,rgba(0,209,255,0.24),transparent_26rem),radial-gradient(circle_at_8%_18%,rgba(0,230,118,0.14),transparent_20rem),linear-gradient(180deg,rgba(18,21,28,0)_0%,#12151C_78%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px voltflow-gradient" />
 
-      <div className="mobile-page relative min-h-dvh px-4 pb-28 pt-[calc(env(safe-area-inset-top)+1rem)]">
-        <header className="space-y-4">
+      <div className="mobile-page relative min-h-dvh px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
+        <header className="sticky top-0 z-30 -mx-4 space-y-4 border-b border-border/60 bg-background/88 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur-xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="grid size-11 shrink-0 place-items-center rounded-lg border border-[var(--voltflow-green)]/30 bg-[var(--voltflow-green)]/10 text-[var(--voltflow-green)]">
@@ -80,9 +115,9 @@ export function TelegramShell() {
 
         <div className="mt-5">
           {activeTab === "home" ? (
-            <KnowledgeHome
+              <KnowledgeHome
               isTelegram={telegram.isTelegram}
-              onNavigate={setActiveTab}
+              onNavigate={changeTab}
             />
           ) : null}
           {activeTab === "guides" ? (
@@ -115,7 +150,7 @@ export function TelegramShell() {
         </div>
       </div>
 
-      <BottomTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomTabs activeTab={activeTab} onTabChange={changeTab} />
     </main>
   );
 }

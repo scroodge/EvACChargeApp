@@ -1,12 +1,16 @@
-import type { KnowledgeArticle } from "@/data/telegram/categories";
+import type { KnowledgeArticle } from "@/types/telegram";
 
 export const ownershipExperienceArticles: KnowledgeArticle[] = [
   {
     id: "first-week-yuan-up",
+    slug: "first-week-yuan-up",
     title: "First week with BYD YUAN UP",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "beginner", "setup"],
     summary: "A practical owner-style checklist for the first days after delivery.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "What owners notice first",
@@ -21,10 +25,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "city-consumption-experience",
+    slug: "city-consumption-experience",
     title: "Real city consumption",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "consumption", "city"],
     summary: "Owner-style notes about why city efficiency changes day to day.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Typical pattern",
@@ -38,10 +46,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "highway-consumption-experience",
+    slug: "highway-consumption-experience",
     title: "Highway consumption",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "consumption", "highway"],
     summary: "Why faster roads use more energy and need more planning.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Speed matters",
@@ -55,10 +67,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "winter-consumption-experience",
+    slug: "winter-consumption-experience",
     title: "Winter consumption",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "winter", "range"],
     summary: "Cold weather range loss explained in owner-friendly terms.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why winter feels different",
@@ -72,10 +88,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "cabin-comfort-experience",
+    slug: "cabin-comfort-experience",
     title: "Cabin comfort",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "comfort", "cabin"],
     summary: "Subjective comfort notes owners often compare after purchase.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "What to observe",
@@ -89,10 +109,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "multimedia-impressions",
+    slug: "multimedia-impressions",
     title: "Multimedia impressions",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "multimedia", "settings"],
     summary: "A practical way to evaluate the infotainment system.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Daily usability",
@@ -106,10 +130,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "what-owners-like",
+    slug: "what-owners-like",
     title: "What owners usually like",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "likes", "community"],
     summary: "Subjective positives commonly discussed by compact EV owners.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Common positives",
@@ -120,10 +148,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "what-owners-complain-about",
+    slug: "what-owners-complain-about",
     title: "What owners usually complain about",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "complaints", "community"],
     summary: "Subjective friction points to watch during ownership.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Common friction",
@@ -137,10 +169,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "useful-settings-after-purchase",
+    slug: "useful-settings-after-purchase",
     title: "Useful settings after purchase",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["settings", "beginner", "delivery"],
     summary: "Settings many new owners review early.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Review list",
@@ -154,10 +190,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "common-beginner-mistakes",
+    slug: "common-beginner-mistakes",
     title: "Common beginner mistakes",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["beginner", "mistakes", "owner experience"],
     summary: "Easy mistakes that make the first EV weeks more confusing.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Charging mistakes",
@@ -171,10 +211,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "long-trip-preparation",
+    slug: "long-trip-preparation",
     title: "Long trip preparation",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["trip", "planning", "charging"],
     summary: "A calm checklist before a longer drive.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Before leaving",
@@ -188,10 +232,14 @@ export const ownershipExperienceArticles: KnowledgeArticle[] = [
   },
   {
     id: "real-owner-charging-habits",
+    slug: "real-owner-charging-habits",
     title: "Charging habits from real owners",
     category: "Ownership",
+    categorySlug: "ownership",
     tags: ["owner experience", "charging habits", "daily"],
     summary: "Typical habits owners build after the first month.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Common routine",

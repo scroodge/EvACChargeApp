@@ -13,18 +13,14 @@ export type TelegramUser = {
 
 export type TelegramThemeParams = Record<string, string | undefined>;
 
-type TelegramWebApp = {
-  initData?: string;
-  initDataUnsafe?: {
-    user?: TelegramUser;
-  };
-  themeParams?: TelegramThemeParams;
-  colorScheme?: "light" | "dark";
-  viewportHeight?: number;
-  platform?: string;
-  ready?: () => void;
-  expand?: () => void;
+export type TelegramSafeAreaInset = {
+  top?: number;
+  bottom?: number;
+  left?: number;
+  right?: number;
 };
+
+type TelegramWebApp = NonNullable<Window["Telegram"]>["WebApp"];
 
 type TelegramWindow = Window & {
   Telegram?: {
@@ -32,13 +28,19 @@ type TelegramWindow = Window & {
   };
 };
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: TelegramWebApp;
-    };
-  }
-}
+type TelegramWebAppSnapshot = {
+  initData?: string;
+  initDataUnsafe?: {
+    user?: TelegramUser;
+  };
+  themeParams?: TelegramThemeParams;
+  colorScheme?: "light" | "dark";
+  viewportHeight?: number;
+  viewportStableHeight?: number;
+  platform?: string;
+  safeAreaInset?: TelegramSafeAreaInset;
+  contentSafeAreaInset?: TelegramSafeAreaInset;
+} & NonNullable<TelegramWebApp>;
 
 export type TelegramWebAppState = {
   isTelegram: boolean;
@@ -47,7 +49,10 @@ export type TelegramWebAppState = {
   themeParams: TelegramThemeParams;
   colorScheme?: "light" | "dark";
   viewportHeight?: number;
+  viewportStableHeight?: number;
   platform?: string;
+  safeAreaInset?: TelegramSafeAreaInset;
+  contentSafeAreaInset?: TelegramSafeAreaInset;
 };
 
 const defaultState: TelegramWebAppState = {
@@ -68,9 +73,16 @@ export function useTelegramWebApp() {
     webApp.ready?.();
     webApp.expand?.();
 
-    window.setTimeout(() => {
+    const updateViewport = () => {
       setState(getTelegramSnapshot());
-    }, 0);
+    };
+
+    window.setTimeout(updateViewport, 0);
+    webApp.onEvent?.("viewportChanged", updateViewport);
+
+    return () => {
+      webApp.offEvent?.("viewportChanged", updateViewport);
+    };
   }, []);
 
   return state;
@@ -79,7 +91,9 @@ export function useTelegramWebApp() {
 function getTelegramSnapshot(): TelegramWebAppState {
   if (typeof window === "undefined") return defaultState;
 
-  const webApp = (window as TelegramWindow).Telegram?.WebApp;
+  const webApp = (window as TelegramWindow).Telegram?.WebApp as
+    | TelegramWebAppSnapshot
+    | undefined;
   if (!webApp) return defaultState;
 
   return {
@@ -89,6 +103,9 @@ function getTelegramSnapshot(): TelegramWebAppState {
     themeParams: webApp.themeParams ?? {},
     colorScheme: webApp.colorScheme,
     viewportHeight: webApp.viewportHeight,
+    viewportStableHeight: webApp.viewportStableHeight,
     platform: webApp.platform,
+    safeAreaInset: webApp.safeAreaInset,
+    contentSafeAreaInset: webApp.contentSafeAreaInset,
   };
 }

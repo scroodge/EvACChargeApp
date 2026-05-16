@@ -1,41 +1,9 @@
-export type KnowledgeArticle = {
-  id: string;
-  title: string;
-  category: string;
-  tags: string[];
-  summary: string;
-  sections: {
-    heading: string;
-    body: string;
-  }[];
-  tips?: string[];
-  warnings?: string[];
-  relatedIds?: string[];
-};
-
-export type FAQItem = {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-  tags: string[];
-  relatedIds?: string[];
-};
-
-export type AccessoryPriority = "must-have" | "useful" | "optional";
-
-export type AccessoryItem = {
-  id: string;
-  title: string;
-  category: string;
-  useCase: string;
-  whyUseful: string;
-  whatToCheckBeforeBuying: string[];
-  priority: AccessoryPriority;
-  riskNotes?: string[];
-  searchKeywords: string[];
-  externalUrl?: string;
-};
+export type {
+  AccessoryItem,
+  AccessoryPriority,
+  FAQItem,
+  KnowledgeArticle,
+} from "@/types/telegram";
 
 export const guideCategories = [
   "Charging",

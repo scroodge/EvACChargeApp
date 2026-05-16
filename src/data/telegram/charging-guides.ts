@@ -1,12 +1,16 @@
-import type { KnowledgeArticle } from "@/data/telegram/categories";
+import type { KnowledgeArticle } from "@/types/telegram";
 
 export const chargingGuides: KnowledgeArticle[] = [
   {
     id: "home-charging-basics",
+    slug: "home-charging-basics",
     title: "Home charging basics",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["home", "daily charging", "AC"],
     summary: "A simple owner-friendly routine for charging BYD YUAN UP at home.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "What home charging means",
@@ -26,10 +30,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "slow-ac-charging",
+    slug: "slow-ac-charging",
     title: "Slow AC charging",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["slow charging", "AC", "battery care"],
     summary: "Why slow AC charging is useful for daily ownership.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Best use case",
@@ -45,10 +53,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "household-socket-charging",
+    slug: "household-socket-charging",
     title: "Charging from household socket",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["socket", "portable EVSE", "safety"],
     summary: "How to think about occasional household socket charging safely.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "When it helps",
@@ -67,10 +79,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "wallbox-charging",
+    slug: "wallbox-charging",
     title: "Charging from wallbox",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["wallbox", "home", "AC"],
     summary: "Why a wallbox is usually the cleaner daily home charging setup.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why owners choose it",
@@ -86,10 +102,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "public-ac-charging",
+    slug: "public-ac-charging",
     title: "Public AC charging",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["public charging", "AC", "cable"],
     summary: "Useful for longer parking sessions in cities and shopping areas.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "How it feels",
@@ -104,10 +124,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "public-dc-charging",
+    slug: "public-dc-charging",
     title: "Public DC charging",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["public charging", "DC", "road trip"],
     summary: "Fast charging basics for road trips and quick stops.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "When to use it",
@@ -123,10 +147,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "winter-charging",
+    slug: "winter-charging",
     title: "Winter charging",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["winter", "cold", "battery"],
     summary: "Cold weather can reduce charging speed and increase energy use.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "What changes",
@@ -141,10 +169,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "battery-care",
+    slug: "battery-care",
     title: "Battery care",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["battery", "daily charging", "health"],
     summary: "Simple habits that reduce battery stress.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Daily use",
@@ -160,10 +192,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "twenty-eighty-rule",
+    slug: "twenty-eighty-rule",
     title: "20-80% daily charging rule",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["20-80", "battery", "daily"],
     summary: "A practical daily range many EV owners use.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why it helps",
@@ -178,10 +214,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "charging-to-100",
+    slug: "charging-to-100",
     title: "Charging to 100%",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["100%", "range", "trip"],
     summary: "When full charging makes sense and how to use it calmly.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Good reasons",
@@ -196,10 +236,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "charging-slows-near-full",
+    slug: "charging-slows-near-full",
     title: "Why charging slows near 80-100%",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["charging curve", "80%", "100%"],
     summary: "Charging taper is normal battery protection behavior.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "What is happening",
@@ -213,10 +257,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "charging-troubleshooting",
+    slug: "charging-troubleshooting",
     title: "Charging troubleshooting",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["troubleshooting", "fault", "charger"],
     summary: "A quick checklist when charging does not behave as expected.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "First checks",
@@ -232,10 +280,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "slow-charging-checks",
+    slug: "slow-charging-checks",
     title: "What to check if charging is slower than expected",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["slow", "checks", "power"],
     summary: "Common causes of unexpectedly low charging power.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Common causes",
@@ -249,10 +301,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "cable-adapter-basics",
+    slug: "cable-adapter-basics",
     title: "Cable and adapter basics",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["cable", "adapter", "Type 2"],
     summary: "Keep charging cables simple, rated, and easy to inspect.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Cable role",
@@ -267,10 +323,14 @@ export const chargingGuides: KnowledgeArticle[] = [
   },
   {
     id: "home-charging-safety",
+    slug: "home-charging-safety",
     title: "Safety rules for home charging",
     category: "Charging",
+    categorySlug: "charging",
     tags: ["safety", "home", "electrical"],
     summary: "Simple safety rules before turning home charging into a routine.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Core rule",

@@ -42,6 +42,7 @@ export function BottomTabs({ activeTab, onTabChange }: BottomTabsProps) {
                   : "border-transparent bg-white/[0.03] text-muted-foreground hover:border-border hover:text-foreground",
               )}
               aria-current={isActive ? "page" : undefined}
+              aria-label={`Open ${label}`}
             >
               <Icon className="size-5" aria-hidden />
               <span className="leading-none">{label}</span>

@@ -1,12 +1,16 @@
-import type { KnowledgeArticle } from "@/data/telegram/categories";
+import type { KnowledgeArticle } from "@/types/telegram";
 
 export const maintenanceArticles: KnowledgeArticle[] = [
   {
     id: "maintenance-schedule-overview",
+    slug: "maintenance-schedule-overview",
     title: "Maintenance schedule overview",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["service", "schedule", "maintenance"],
     summary: "How to think about routine EV maintenance without guessing service work.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Owner role",
@@ -21,10 +25,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "tire-pressure-basics",
+    slug: "tire-pressure-basics",
     title: "Tire pressure basics",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["tires", "pressure", "range"],
     summary: "Tire pressure affects safety, comfort, tire wear, and range.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why it matters",
@@ -38,10 +46,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "brake-system-ev-notes",
+    slug: "brake-system-ev-notes",
     title: "Brake system notes for EVs",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["brakes", "regen", "safety"],
     summary: "Regenerative braking changes wear patterns, but brakes still matter.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "EV behavior",
@@ -56,10 +68,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "cabin-filter-overview",
+    slug: "cabin-filter-overview",
     title: "Cabin filter replacement overview",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["cabin filter", "air", "service"],
     summary: "A non-dangerous overview of cabin filter maintenance.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why replace it",
@@ -73,10 +89,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "twelve-volt-battery-basics",
+    slug: "twelve-volt-battery-basics",
     title: "12V battery basics",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["12V battery", "startup", "electronics"],
     summary: "The small 12V system is still important in an EV.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Why it matters",
@@ -91,10 +111,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "cooling-system-basics",
+    slug: "cooling-system-basics",
     title: "Cooling system basics",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["cooling", "battery", "service"],
     summary: "High-voltage cooling systems should be treated carefully.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Owner level",
@@ -109,10 +133,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "wipers-washer-fluid",
+    slug: "wipers-washer-fluid",
     title: "Wipers and washer fluid",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["wipers", "washer fluid", "visibility"],
     summary: "Simple visibility maintenance owners can track.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "When to replace",
@@ -123,10 +151,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "software-update-notes",
+    slug: "software-update-notes",
     title: "Software update notes",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["software", "updates", "settings"],
     summary: "A safe way to track changes after software updates.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Before update",
@@ -140,10 +172,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "warning-lights-overview",
+    slug: "warning-lights-overview",
     title: "Warning lights overview",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["warning lights", "diagnostics", "safety"],
     summary: "How to respond without guessing repairs.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Basic response",
@@ -158,10 +194,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "before-service-checklist",
+    slug: "before-service-checklist",
     title: "What to check before service",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["service", "checklist", "dealer"],
     summary: "Prepare clear information before a service visit.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Owner checklist",
@@ -175,10 +215,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "record-before-service",
+    slug: "record-before-service",
     title: "What to record before visiting service",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["service", "records", "troubleshooting"],
     summary: "A simple record template for issues.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Useful record",
@@ -189,10 +233,14 @@ export const maintenanceArticles: KnowledgeArticle[] = [
   },
   {
     id: "common-symptoms-possible-causes",
+    slug: "common-symptoms-possible-causes",
     title: "Common symptoms and possible causes",
     category: "Maintenance",
+    categorySlug: "maintenance",
     tags: ["symptoms", "troubleshooting", "service"],
     summary: "Non-diagnostic owner notes for common symptoms.",
+    updatedAt: "2026-05-16",
+    sourceLabel: "Manually curated Phase 1.5",
     sections: [
       {
         heading: "Examples",
