@@ -9,10 +9,10 @@ export default async function CategoriesPage() {
   const categories = await getCategories();
 
   return (
-    <AdminShell title="Categories" description="Categories are public-readable and used by articles, FAQ, and accessories.">
+    <AdminShell title="Разделы" description="Разделы видны публично и используются в статьях, вопросах и аксессуарах.">
       <section className="grid gap-4 lg:grid-cols-[24rem_1fr]">
         <div>
-          <h2 className="mb-3 font-heading text-xl font-bold">New category</h2>
+          <h2 className="mb-3 font-heading text-xl font-bold">Новый раздел</h2>
           <CategoryForm action={upsertCategoryAction} />
         </div>
         <div className="space-y-3">
@@ -26,7 +26,7 @@ export default async function CategoriesPage() {
                   <input type="hidden" name="id" value={category.id} />
                   <button className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 text-sm font-semibold text-destructive">
                     <Trash2 className="size-4" aria-hidden />
-                    Delete
+                    Удалить
                   </button>
                 </form>
               </div>

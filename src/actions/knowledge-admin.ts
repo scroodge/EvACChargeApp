@@ -43,7 +43,7 @@ export async function createArticleAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = await parseArticleForm(formData);
   if (isFormState(input)) return input;
@@ -59,7 +59,7 @@ export async function updateArticleAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = await parseArticleForm(formData, id);
   if (isFormState(input)) return input;
@@ -82,7 +82,7 @@ export async function createFAQAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = parseFAQForm(formData);
   if (isFormState(input)) return input;
@@ -98,7 +98,7 @@ export async function updateFAQAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = parseFAQForm(formData);
   if (isFormState(input)) return input;
@@ -121,7 +121,7 @@ export async function createAccessoryAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = parseAccessoryForm(formData);
   if (isFormState(input)) return input;
@@ -137,7 +137,7 @@ export async function updateAccessoryAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const input = parseAccessoryForm(formData);
   if (isFormState(input)) return input;
@@ -160,7 +160,7 @@ export async function upsertCategoryAction(
   formData: FormData,
 ): Promise<AdminFormState> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { message: "You do not have admin access." };
+  if (!guard.ok) return { message: "Нет доступа администратора." };
 
   const id = stringValue(formData, "id");
   const input = await parseCategoryForm(formData, id || undefined);
@@ -172,7 +172,7 @@ export async function upsertCategoryAction(
     await createCategory(input);
   }
   revalidateKnowledge();
-  return { ok: true, message: id ? "Category updated." : "Category created." };
+  return { ok: true, message: id ? "Раздел обновлен." : "Раздел создан." };
 }
 
 export async function deleteCategoryAction(formData: FormData) {
@@ -217,10 +217,10 @@ function parseFAQForm(formData: FormData): FAQInput | AdminFormState {
   };
 
   const errors: Record<string, string> = {};
-  if (!input.question) errors.question = "Question is required.";
-  if (!input.answer) errors.answer = "Answer is required.";
-  if (!input.category_id) errors.category_id = "Category is required.";
-  if (!statuses.includes(input.status)) errors.status = "Choose a valid status.";
+  if (!input.question) errors.question = "Вопрос обязателен.";
+  if (!input.answer) errors.answer = "Ответ обязателен.";
+  if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   return Object.keys(errors).length ? { errors } : input;
 }
 
@@ -240,10 +240,10 @@ function parseAccessoryForm(formData: FormData): AccessoryInput | AdminFormState
   };
 
   const errors: Record<string, string> = {};
-  if (!input.title) errors.title = "Title is required.";
-  if (!input.category_id) errors.category_id = "Category is required.";
-  if (!statuses.includes(input.status)) errors.status = "Choose a valid status.";
-  if (!priorities.includes(input.priority)) errors.priority = "Choose a valid priority.";
+  if (!input.title) errors.title = "Название обязательно.";
+  if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
+  if (!priorities.includes(input.priority)) errors.priority = "Выберите корректный приоритет.";
   return Object.keys(errors).length ? { errors } : input;
 }
 
@@ -259,23 +259,23 @@ async function parseCategoryForm(
   };
 
   const errors: Record<string, string> = {};
-  if (!input.title) errors.title = "Title is required.";
-  if (!input.slug) errors.slug = "Slug is required.";
+  if (!input.title) errors.title = "Название обязательно.";
+  if (!input.slug) errors.slug = "Slug обязателен.";
   if (input.slug && (await isSlugTaken("knowledge_categories", input.slug, currentId))) {
-    errors.slug = "Slug is already used.";
+    errors.slug = "Этот slug уже используется.";
   }
   return Object.keys(errors).length ? { errors } : input;
 }
 
 async function validateArticle(input: ArticleInput, currentId?: string) {
   const errors: Record<string, string> = {};
-  if (!input.title) errors.title = "Title is required.";
-  if (!input.slug) errors.slug = "Slug is required.";
-  if (!input.category_id) errors.category_id = "Category is required.";
-  if (!statuses.includes(input.status)) errors.status = "Choose a valid status.";
-  if (!input.content.length) errors.content = "Add at least one content section.";
+  if (!input.title) errors.title = "Название обязательно.";
+  if (!input.slug) errors.slug = "Slug обязателен.";
+  if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
+  if (!input.content.length) errors.content = "Добавьте хотя бы один блок контента.";
   if (input.slug && (await isSlugTaken("knowledge_articles", input.slug, currentId))) {
-    errors.slug = "Slug is already used.";
+    errors.slug = "Этот slug уже используется.";
   }
   return errors;
 }

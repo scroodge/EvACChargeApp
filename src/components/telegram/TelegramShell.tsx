@@ -24,7 +24,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TelegramTab>("home");
   const [guideCategory, setGuideCategory] =
-    useState<(typeof guideCategories)[number]>("Charging");
+    useState<(typeof guideCategories)[number]>("Зарядка");
   const telegram = useTelegramWebApp();
   const themeStyle = useMemo(
     () => getTelegramThemeStyle(telegram.themeParams),
@@ -33,7 +33,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   const userName =
     telegram.user?.first_name ||
     telegram.user?.username ||
-    (telegram.isTelegram ? "Telegram driver" : "Web driver");
+    (telegram.isTelegram ? "Пользователь Telegram" : "Веб-пользователь");
 
   useEffect(() => {
     const tab = searchParams.get("tab") as TelegramTab | null;
@@ -78,13 +78,13 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
                   VoltFlow
                 </h1>
                 <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                  EV Charging Assistant
+                  EV-помощник
                 </p>
               </div>
             </div>
 
             <span className="shrink-0 rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-[var(--voltflow-cyan)]">
-              {telegram.isTelegram ? "Telegram Mini App" : "Web Mode"}
+              {telegram.isTelegram ? "Мини-приложение Telegram" : "Веб-режим"}
             </span>
           </div>
 
@@ -96,11 +96,11 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
                   <span className="truncate">{userName}</span>
                 </p>
                 <p className="mt-2 font-heading text-xl font-bold">
-                  Charge smarter at home
+                  Заряжайтесь спокойнее
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Static guides, owner experience, maintenance notes,
-                  accessories, FAQ, and calculators for Phase 1.
+                  Русская база знаний: зарядка, эксплуатация, обслуживание,
+                  аксессуары, вопросы и калькуляторы.
                 </p>
               </div>
               <div className="grid size-14 place-items-center rounded-lg border border-border bg-white/[0.04] text-[var(--voltflow-green)]">
@@ -131,16 +131,16 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
                   if (category !== "All") setGuideCategory(category);
                 }}
               />
-              {guideCategory === "Charging" ? (
+              {guideCategory === "Зарядка" ? (
                 <ChargingGuides articles={data?.articles.filter((article) => article.categorySlug === "charging")} />
               ) : null}
-              {guideCategory === "Ownership" ? (
+              {guideCategory === "Эксплуатация" ? (
                 <OwnershipExperience articles={data?.articles.filter((article) => article.categorySlug === "ownership")} />
               ) : null}
-              {guideCategory === "Maintenance" ? (
+              {guideCategory === "Обслуживание" ? (
                 <MaintenanceGuides articles={data?.articles.filter((article) => article.categorySlug === "maintenance")} />
               ) : null}
-              {guideCategory === "Accessories" ? <AccessoriesCatalog items={data?.accessories} /> : null}
+              {guideCategory === "Аксессуары" ? <AccessoriesCatalog items={data?.accessories} /> : null}
             </div>
           ) : null}
           {activeTab === "faq" ? <SmartFAQ items={data?.faq} /> : null}
@@ -149,9 +149,9 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
             <div className="space-y-5">
               <AccessoriesCatalog items={data?.accessories} />
               <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-                Future phases are intentionally not active yet: Telegram group
-                import, semantic search, AI assistant, embeddings, telemetry,
-                and BYDMate / VoltFlow integrations.
+                Следующие фазы пока намеренно не включены: импорт из Telegram,
+                семантический поиск, AI-помощник, embeddings, аналитика и
+                дополнительные интеграции VoltFlow.
               </div>
             </div>
           ) : null}

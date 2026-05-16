@@ -24,12 +24,12 @@ export default async function FAQPage({ searchParams }: PageProps) {
   });
 
   return (
-    <AdminShell title="FAQ">
+    <AdminShell title="Вопросы">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <FilterForm categories={categories} filters={filters} />
         <Link href="/admin/knowledge/faq/new" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">
           <Plus className="size-4" aria-hidden />
-          New FAQ
+          Новый вопрос
         </Link>
       </div>
       <div className="space-y-3">
@@ -39,13 +39,13 @@ export default async function FAQPage({ searchParams }: PageProps) {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={item.status} />
-                  <span className="text-xs text-muted-foreground">{item.category?.title ?? "None"}</span>
+                  <span className="text-xs text-muted-foreground">{item.category?.title ?? "Без раздела"}</span>
                 </div>
                 <h2 className="mt-2 font-heading text-lg font-bold">{item.question}</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.answer}</p>
               </div>
               <div className="flex gap-2">
-                <Link href={`/admin/knowledge/faq/${item.id}`} className="grid size-8 place-items-center rounded-lg border border-border" aria-label="Edit FAQ">
+                <Link href={`/admin/knowledge/faq/${item.id}`} className="grid size-8 place-items-center rounded-lg border border-border" aria-label="Редактировать вопрос">
                   <Edit className="size-4" aria-hidden />
                 </Link>
                 <DeleteButton id={item.id} label={item.question} action={deleteFAQAction} />
@@ -68,19 +68,19 @@ function FilterForm({
   return (
     <form className="grid gap-2 md:grid-cols-[10rem_12rem_16rem_auto]">
       <select name="status" defaultValue={filters.status ?? ""} className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm">
-        <option value="">All statuses</option>
-        <option value="draft">Draft</option>
-        <option value="published">Published</option>
-        <option value="archived">Archived</option>
+        <option value="">Все статусы</option>
+        <option value="draft">Черновик</option>
+        <option value="published">Опубликовано</option>
+        <option value="archived">Архив</option>
       </select>
       <select name="category" defaultValue={filters.category ?? ""} className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm">
-        <option value="">All categories</option>
+        <option value="">Все разделы</option>
         {categories.map((category) => (
           <option key={category.id} value={category.id}>{category.title}</option>
         ))}
       </select>
-      <input name="q" defaultValue={filters.q ?? ""} placeholder="Search" className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm" />
-      <button className="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold">Filter</button>
+      <input name="q" defaultValue={filters.q ?? ""} placeholder="Поиск" className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm" />
+      <button className="min-h-10 rounded-lg border border-border px-4 text-sm font-semibold">Фильтр</button>
     </form>
   );
 }

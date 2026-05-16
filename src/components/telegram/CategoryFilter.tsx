@@ -25,7 +25,7 @@ export function CategoryFilter<T extends string>({
               : "border-border bg-white/[0.03] text-muted-foreground",
           )}
         >
-          {category}
+          {category === "All" ? "Все" : category}
         </button>
       ))}
     </div>

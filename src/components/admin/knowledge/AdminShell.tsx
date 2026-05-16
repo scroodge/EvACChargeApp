@@ -17,7 +17,7 @@ export function AdminShell({
         <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-              VoltFlow CMS
+              Админка VoltFlow
             </p>
             <h1 className="mt-2 font-heading text-3xl font-bold">{title}</h1>
             {description ? (

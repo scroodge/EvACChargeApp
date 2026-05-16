@@ -3,6 +3,7 @@ import { chargingGuides } from "@/data/telegram/charging-guides";
 import { faqItems } from "@/data/telegram/faq";
 import { maintenanceArticles } from "@/data/telegram/maintenance";
 import { ownershipExperienceArticles } from "@/data/telegram/ownership-experience";
+import { russianTelegramKnowledgeData } from "@/data/telegram/russian-fallback";
 import type { TelegramKnowledgeData } from "@/types/knowledge";
 import type { AccessoryItem, FAQItem, KnowledgeArticle } from "@/types/telegram";
 
@@ -76,10 +77,10 @@ export const telegramCategories: TelegramCategory[] = [
 ];
 
 export const staticTelegramKnowledgeData: TelegramKnowledgeData = {
-  categories: telegramCategories,
-  articles: allArticles,
-  faq: faqItems,
-  accessories,
+  categories: russianTelegramKnowledgeData.categories,
+  articles: russianTelegramKnowledgeData.articles,
+  faq: russianTelegramKnowledgeData.faq,
+  accessories: russianTelegramKnowledgeData.accessories,
 };
 
 export function getArticleBySlug(slug: string) {

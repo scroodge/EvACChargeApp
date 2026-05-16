@@ -1,16 +1,16 @@
 import Link from "next/link";
 
 const navItems = [
-  { href: "/admin/knowledge", label: "Overview" },
-  { href: "/admin/knowledge/articles", label: "Articles" },
-  { href: "/admin/knowledge/faq", label: "FAQ" },
-  { href: "/admin/knowledge/accessories", label: "Accessories" },
-  { href: "/admin/knowledge/categories", label: "Categories" },
+  { href: "/admin/knowledge", label: "Обзор" },
+  { href: "/admin/knowledge/articles", label: "Статьи" },
+  { href: "/admin/knowledge/faq", label: "Вопросы" },
+  { href: "/admin/knowledge/accessories", label: "Аксессуары" },
+  { href: "/admin/knowledge/categories", label: "Разделы" },
 ];
 
 export function AdminNav() {
   return (
-    <nav className="flex flex-wrap gap-2" aria-label="Knowledge admin">
+    <nav className="flex flex-wrap gap-2" aria-label="Админка базы знаний">
       {navItems.map((item) => (
         <Link
           key={item.href}

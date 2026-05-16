@@ -26,12 +26,12 @@ export function MaintenanceGuides({ articles: providedArticles }: { articles?: K
   return (
     <section className="space-y-4" aria-labelledby="maintenance-title">
       <SectionHeader
-        eyebrow="Repair and Maintenance"
-        title="Safe maintenance and service preparation"
-        description="Owner-level checks, service notes, symptoms, and safety boundaries."
+        eyebrow="Обслуживание"
+        title="Безопасные проверки и подготовка к сервису"
+        description="Проверки уровня владельца, симптомы, сервисные заметки и границы безопасности."
         id="maintenance-title"
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="Search maintenance guides" />
+      <SearchBox value={query} onChange={setQuery} placeholder="Искать по обслуживанию" />
       <div className="space-y-3">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} />

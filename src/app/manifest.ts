@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "VoltFlow BYD YUAN UP Knowledge Base",
+    name: "VoltFlow: база знаний BYD YUAN UP",
     short_name: "VoltFlow",
     description:
-      "Static Telegram Mini App knowledge base for BYD YUAN UP charging, maintenance, accessories, calculators, and owner experience.",
+      "Русская база знаний для BYD YUAN UP: зарядка, обслуживание, аксессуары, калькуляторы и опыт эксплуатации.",
     lang: "en",
     display: "standalone",
     orientation: "portrait",

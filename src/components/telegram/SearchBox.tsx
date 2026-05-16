@@ -13,7 +13,7 @@ type SearchBoxProps = {
 export function SearchBox({
   value,
   onChange,
-  placeholder = "Search knowledge base",
+  placeholder = "Поиск по базе знаний",
   debounceMs = 200,
 }: SearchBoxProps) {
   const [draft, setDraft] = useState(value);
@@ -45,7 +45,7 @@ export function SearchBox({
             setDraft("");
           }}
           className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition hover:bg-white/[0.06] hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
-          aria-label="Clear search"
+          aria-label="Очистить поиск"
         >
           <X className="size-4" aria-hidden />
         </button>

@@ -47,13 +47,13 @@ export function ArticleRenderer({
           className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-muted-foreground transition hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
         >
           <ArrowLeft className="size-4" aria-hidden />
-          Back
+          Назад
         </button>
         <Link
           href="/telegram"
           className="inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-muted-foreground transition hover:text-foreground focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
         >
-          Home
+          Главная
         </Link>
         <button
           type="button"
@@ -62,10 +62,10 @@ export function ArticleRenderer({
         >
           <Clipboard className="size-4" aria-hidden />
           {copyStatus === "copied"
-            ? "Copied"
+            ? "Скопировано"
             : copyStatus === "unavailable"
-              ? "Copy unavailable"
-              : "Copy link"}
+              ? "Копирование недоступно"
+              : "Скопировать"}
         </button>
       </div>
 
@@ -94,7 +94,7 @@ export function ArticleRenderer({
         </div>
         {article.updatedAt || article.sourceLabel ? (
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
-            {article.updatedAt ? `Updated ${article.updatedAt}` : null}
+            {article.updatedAt ? `Обновлено ${article.updatedAt}` : null}
             {article.updatedAt && article.sourceLabel ? " · " : null}
             {article.sourceLabel ?? null}
           </p>
@@ -113,8 +113,8 @@ export function ArticleRenderer({
       </div>
 
       {article.tips?.length ? (
-        <section className="space-y-2" aria-label="Practical tips">
-          <h2 className="font-heading text-xl font-bold">Practical tips</h2>
+        <section className="space-y-2" aria-label="Практичные советы">
+          <h2 className="font-heading text-xl font-bold">Практичные советы</h2>
           {article.tips.map((tip) => (
             <div
               key={tip}
@@ -128,8 +128,8 @@ export function ArticleRenderer({
       ) : null}
 
       {article.warnings?.length ? (
-        <section className="space-y-2" aria-label="Warnings">
-          <h2 className="font-heading text-xl font-bold">Warnings</h2>
+        <section className="space-y-2" aria-label="Предупреждения">
+          <h2 className="font-heading text-xl font-bold">Предупреждения</h2>
           {article.warnings.map((warning) => (
             <div
               key={warning}
@@ -143,8 +143,8 @@ export function ArticleRenderer({
       ) : null}
 
       {relatedArticles.length ? (
-        <section className="space-y-2" aria-label="Related articles">
-          <h2 className="font-heading text-xl font-bold">Related articles</h2>
+        <section className="space-y-2" aria-label="Связанные статьи">
+          <h2 className="font-heading text-xl font-bold">Связанные статьи</h2>
           {relatedArticles.map((related) => (
             <Link
               key={related.id}

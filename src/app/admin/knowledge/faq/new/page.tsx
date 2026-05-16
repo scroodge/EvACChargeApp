@@ -7,7 +7,7 @@ export default async function NewFAQPage() {
   const categories = await getCategories();
 
   return (
-    <AdminShell title="New FAQ">
+    <AdminShell title="Новый вопрос">
       <FAQForm categories={categories} action={createFAQAction} />
     </AdminShell>
   );

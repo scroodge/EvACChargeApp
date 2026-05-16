@@ -12,11 +12,11 @@ type BottomTabsProps = {
 };
 
 const tabs = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "guides", label: "Guides", icon: BookOpen },
-  { id: "faq", label: "FAQ", icon: HelpCircle },
-  { id: "tools", label: "Tools", icon: Calculator },
-  { id: "more", label: "More", icon: Menu },
+  { id: "home", label: "Главная", icon: Home },
+  { id: "guides", label: "Гайды", icon: BookOpen },
+  { id: "faq", label: "Вопросы", icon: HelpCircle },
+  { id: "tools", label: "Расчеты", icon: Calculator },
+  { id: "more", label: "Еще", icon: Menu },
 ] satisfies Array<{
   id: TelegramTab;
   label: string;
@@ -42,7 +42,7 @@ export function BottomTabs({ activeTab, onTabChange }: BottomTabsProps) {
                   : "border-transparent bg-white/[0.03] text-muted-foreground hover:border-border hover:text-foreground",
               )}
               aria-current={isActive ? "page" : undefined}
-              aria-label={`Open ${label}`}
+              aria-label={`Открыть ${label}`}
             >
               <Icon className="size-5" aria-hidden />
               <span className="leading-none">{label}</span>

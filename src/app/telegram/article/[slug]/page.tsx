@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!article) {
     return {
-      title: "Article not found",
+      title: "Статья не найдена",
     };
   }
 
@@ -59,20 +59,19 @@ export default async function TelegramArticlePage({ params }: PageProps) {
         ) : (
           <section className="voltflow-card p-5">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-              Article not found
+              Статья не найдена
             </p>
             <h1 className="mt-2 font-heading text-2xl font-bold">
-              This article is not in the Phase 1.5 knowledge base
+              Этой статьи пока нет в базе знаний
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              The link may be old, or the article may be planned for a future
-              import phase.
+              Ссылка может быть устаревшей, либо материал еще готовится к публикации.
             </p>
             <Link
               href="/telegram"
               className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)]"
             >
-              Back to knowledge base
+              Вернуться в базу знаний
             </Link>
           </section>
         )}

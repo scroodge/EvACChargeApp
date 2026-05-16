@@ -15,7 +15,7 @@ export default async function EditAccessoryPage({ params }: PageProps) {
   if (!item) notFound();
 
   return (
-    <AdminShell title="Edit Accessory">
+    <AdminShell title="Редактировать аксессуар">
       <AccessoryForm item={item} categories={categories} action={updateAccessoryAction.bind(null, id)} />
     </AdminShell>
   );

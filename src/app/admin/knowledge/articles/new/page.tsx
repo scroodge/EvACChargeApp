@@ -7,7 +7,7 @@ export default async function NewArticlePage() {
   const [categories, articles] = await Promise.all([getCategories(), getAdminArticles()]);
 
   return (
-    <AdminShell title="New Article">
+    <AdminShell title="Новая статья">
       <ArticleForm categories={categories} articles={articles} action={createArticleAction} />
     </AdminShell>
   );

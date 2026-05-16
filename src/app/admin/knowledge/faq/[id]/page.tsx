@@ -15,7 +15,7 @@ export default async function EditFAQPage({ params }: PageProps) {
   if (!item) notFound();
 
   return (
-    <AdminShell title="Edit FAQ">
+    <AdminShell title="Редактировать вопрос">
       <FAQForm item={item} categories={categories} action={updateFAQAction.bind(null, id)} />
     </AdminShell>
   );

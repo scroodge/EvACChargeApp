@@ -1,15 +1,15 @@
 insert into public.knowledge_categories (slug, title, description, sort_order)
 values
-  ('charging', 'Charging', 'Home charging, public charging, battery habits, safety, cables, and troubleshooting.', 10),
-  ('ownership', 'Ownership', 'Real-owner style experience, first-week habits, comfort, consumption, and trip preparation.', 20),
-  ('maintenance', 'Maintenance', 'Owner-level service preparation, symptoms, and safety-aware maintenance notes.', 30),
-  ('accessories', 'Accessories', 'Useful ownership items with priorities, risk notes, and search keywords instead of fake product links.', 40),
-  ('calculators', 'Calculators', 'EV helper tools for charging time, cost, range, and trip planning.', 50),
-  ('battery', 'Battery', 'Battery care, charging limits, cold weather behavior, and daily habits.', 60),
-  ('winter', 'Winter', 'Cold-weather charging, range, washer fluid, and winter ownership notes.', 70),
-  ('safety', 'Safety', 'Electrical, roadside, child-seat, and service safety topics.', 80),
-  ('costs', 'Costs', 'Home charging cost, tariffs, efficiency, and calculator assumptions.', 90),
-  ('byd-yuan-up', 'BYD YUAN UP', 'Model-specific ownership and knowledge-base meta topics.', 100)
+  ('charging', 'Зарядка', 'Домашняя и публичная зарядка, привычки для батареи, безопасность, кабели и типичные проблемы.', 10),
+  ('ownership', 'Эксплуатация', 'Опыт владельца, первые настройки, комфорт, расход, поездки и ежедневные привычки.', 20),
+  ('maintenance', 'Обслуживание', 'Плановое обслуживание, симптомы, подготовка к сервису и безопасные проверки владельца.', 30),
+  ('accessories', 'Аксессуары', 'Полезные вещи для владельца BYD YUAN UP: приоритет, риски и что проверить перед покупкой.', 40),
+  ('calculators', 'Калькуляторы', 'Расчет времени зарядки, стоимости, запаса хода и поездок.', 50),
+  ('battery', 'Батарея', 'Уход за батареей, лимиты зарядки, холодная погода и ежедневные привычки.', 60),
+  ('winter', 'Зима', 'Зарядка, запас хода, расход и подготовка автомобиля к холодам.', 70),
+  ('safety', 'Безопасность', 'Электробезопасность, дорога, детские кресла и сервисные ограничения.', 80),
+  ('costs', 'Расходы', 'Стоимость домашней зарядки, тарифы, эффективность и расчеты.', 90),
+  ('byd-yuan-up', 'BYD YUAN UP', 'Модельные материалы и заметки для владельцев BYD YUAN UP.', 100)
 on conflict (slug) do update set
   title = excluded.title,
   description = excluded.description,
@@ -21,71 +21,71 @@ insert into public.knowledge_articles (
 values
   (
     'home-charging-basics',
-    'Home charging basics',
-    'A simple owner-friendly routine for charging BYD YUAN UP at home.',
+    'Основы домашней зарядки',
+    'Простая и спокойная схема домашней зарядки BYD YUAN UP.',
     (select id from public.knowledge_categories where slug = 'charging'),
-    '[{"heading":"What home charging means","body":"Home charging is usually AC charging while the car is parked for several hours. It is the most convenient way to keep the car ready for city driving."},{"heading":"Daily routine","body":"Plug in when the car will sit for a while, set a sensible target if your car or charger supports it, and confirm charging starts before walking away."}]'::jsonb,
-    '["Use overnight charging if your electricity plan is cheaper at night.","Check the plug and cable temperature during the first sessions."]'::jsonb,
-    '["Use properly rated equipment and a safe grounded circuit."]'::jsonb,
-    array['home', 'daily charging', 'AC'],
+    '[{"heading":"Что такое домашняя зарядка","body":"Обычно это AC-зарядка, когда автомобиль стоит несколько часов: ночью, на работе или во дворе. Это самый удобный способ держать машину готовой к ежедневным поездкам."},{"heading":"Базовая привычка","body":"Подключайте автомобиль, когда он долго стоит, задавайте разумный лимит зарядки, если он доступен, и проверяйте, что зарядка действительно началась."}]'::jsonb,
+    '["Если ночной тариф дешевле, используйте зарядку по расписанию.","В первые сессии проверяйте, не греется ли розетка, вилка или кабель."]'::jsonb,
+    '["Используйте только исправное заземленное оборудование с подходящей нагрузкой."]'::jsonb,
+    array['дом', 'ежедневная зарядка', 'AC'],
     'published',
-    'Migrated from static Phase 1.5',
+    'Русская база VoltFlow',
     10,
     now()
   ),
   (
     'slow-ac-charging',
-    'Slow AC charging',
-    'Why slow AC charging is useful for daily ownership.',
+    'Медленная AC-зарядка',
+    'Почему медленная зарядка удобна для повседневной эксплуатации.',
     (select id from public.knowledge_categories where slug = 'charging'),
-    '[{"heading":"Best use case","body":"Slow AC charging works well when the car is parked overnight or during a long workday. It trades speed for simplicity and lower heat."},{"heading":"Owner expectation","body":"At low power, charging can take many hours. That is normal and not a fault if the car still reaches the target by departure."}]'::jsonb,
-    '["Use the calculator to estimate whether overnight charging is enough."]'::jsonb,
+    '[{"heading":"Когда это удобно","body":"Медленная AC-зарядка хорошо подходит, когда машина стоит всю ночь или весь рабочий день. Она не самая быстрая, зато предсказуемая и обычно менее тепловая."},{"heading":"Что считать нормой","body":"При низкой мощности зарядка может занимать много часов. Это нормально, если автомобиль успевает набрать нужный процент к отъезду."}]'::jsonb,
+    '["Используйте калькулятор, чтобы понять, хватит ли ночи для нужного процента."]'::jsonb,
     '[]'::jsonb,
-    array['slow charging', 'AC', 'battery care'],
+    array['AC', 'медленная зарядка', 'батарея'],
     'published',
-    'Migrated from static Phase 1.5',
+    'Русская база VoltFlow',
     20,
     now()
   ),
   (
     'battery-care',
-    'Battery care',
-    'Simple habits that reduce battery stress.',
+    'Уход за батареей',
+    'Простые привычки, которые уменьшают лишний стресс для батареи.',
     (select id from public.knowledge_categories where slug = 'charging'),
-    '[{"heading":"Daily use","body":"Many owners use the middle of the battery for daily driving and charge higher only when needed."},{"heading":"Heat and extremes","body":"Avoid leaving the car very low or very high for long periods when you can. Temperature and time both matter."}]'::jsonb,
-    '["Stable habits matter more than perfect percentages."]'::jsonb,
+    '[{"heading":"Ежедневный режим","body":"Для обычных поездок многие владельцы используют среднюю часть батареи и заряжают выше только перед дальними маршрутами."},{"heading":"Крайние значения","body":"По возможности не оставляйте автомобиль надолго с очень низким или очень высоким зарядом. Важны и процент, и температура, и время."}]'::jsonb,
+    '["Стабильная спокойная привычка важнее идеального процента каждый день."]'::jsonb,
     '[]'::jsonb,
-    array['battery', 'daily charging', 'health'],
+    array['батарея', 'ресурс', 'ежедневная зарядка'],
     'published',
-    'Migrated from static Phase 1.5',
+    'Русская база VoltFlow',
     30,
     now()
   ),
   (
     'first-week-yuan-up',
-    'First week with BYD YUAN UP',
-    'A practical owner-style checklist for the first days after delivery.',
+    'Первая неделя с BYD YUAN UP',
+    'Практичный список того, что стоит проверить после покупки.',
     (select id from public.knowledge_categories where slug = 'ownership'),
-    '[{"heading":"What owners notice first","body":"The first week is usually about learning charging habits, display menus, driver assistance settings, and how range changes with weather and speed."},{"heading":"Useful first checks","body":"Pair the phone, set preferred charging limits, inspect included cables, check tire pressure, and save trusted charging locations."}]'::jsonb,
-    '["Keep a small note of questions for the dealer or service center."]'::jsonb,
+    '[{"heading":"Что изучить сначала","body":"Первые дни обычно уходят на зарядку, меню автомобиля, ассистенты водителя, подключение телефона и понимание расхода в своей погоде."},{"heading":"Полезные проверки","body":"Подключите телефон, проверьте комплектные кабели, давление в шинах, настройки зарядки и сохраните удобные зарядные точки."}]'::jsonb,
+    '["Записывайте вопросы для дилера или сервиса, пока привыкаете к автомобилю."]'::jsonb,
     '[]'::jsonb,
-    array['owner experience', 'beginner', 'setup'],
+    array['первые дни', 'настройки', 'опыт владельца'],
     'published',
-    'Migrated from static Phase 1.5',
+    'Русская база VoltFlow',
     40,
     now()
   ),
   (
     'maintenance-schedule-overview',
-    'Maintenance schedule overview',
-    'How to think about routine EV maintenance without guessing service work.',
+    'Обзор обслуживания',
+    'Как думать об обслуживании EV без догадок и лишнего риска.',
     (select id from public.knowledge_categories where slug = 'maintenance'),
-    '[{"heading":"Owner role","body":"Use the official service schedule for your market. Owners can track dates, mileage, symptoms, tire condition, fluids, and software notes."},{"heading":"EV difference","body":"EVs have fewer engine-related items, but tires, brakes, suspension, cooling, cabin filters, and 12V systems still need attention."}]'::jsonb,
+    '[{"heading":"Роль владельца","body":"Ориентируйтесь на официальный регламент для вашего рынка. Владелец может отслеживать даты, пробег, симптомы, давление в шинах, жидкости и сообщения автомобиля."},{"heading":"Чем EV отличается","body":"Нет многих работ по ДВС, но остаются шины, тормоза, подвеска, охлаждение, салонный фильтр и 12-вольтовая система."}]'::jsonb,
     '[]'::jsonb,
-    '["Follow the owner manual and local service guidance first."]'::jsonb,
-    array['service', 'schedule', 'maintenance'],
+    '["Сначала следуйте руководству пользователя и рекомендациям официального сервиса."]'::jsonb,
+    array['сервис', 'обслуживание', 'проверки'],
     'published',
-    'Migrated from static Phase 1.5',
+    'Русская база VoltFlow',
     50,
     now()
   )
@@ -93,20 +93,20 @@ on conflict (slug) do nothing;
 
 insert into public.faq_items (question, answer, category_id, tags, status, sort_order)
 values
-  ('What is slow charging?', 'Slow charging usually means low-power AC charging from a wallbox, public AC charger, or suitable household socket. It is useful when the car can stay parked for several hours.', (select id from public.knowledge_categories where slug = 'charging'), array['slow charging', 'AC', 'home'], 'published', 10),
-  ('Is slow charging better for battery health?', 'Slow AC charging usually creates less heat than frequent high-power DC charging, so it is a good daily habit. Battery temperature and charge level still matter.', (select id from public.knowledge_categories where slug = 'battery'), array['battery health', 'AC'], 'published', 20),
-  ('What is the difference between kW and kWh?', 'kW is charging power, like speed. kWh is energy, like the amount added to the battery or used for a trip.', (select id from public.knowledge_categories where slug = 'charging'), array['kW', 'kWh', 'basics'], 'published', 30),
-  ('Should I charge to 100% every day?', 'For daily driving, many owners use a lower target such as around 80%. Charge to 100% when you need the range and drive soon after.', (select id from public.knowledge_categories where slug = 'battery'), array['100%', 'daily'], 'published', 40),
-  ('How much does home charging cost?', 'Multiply grid energy in kWh by your electricity price. The calculator estimates this using battery change, efficiency, and price.', (select id from public.knowledge_categories where slug = 'costs'), array['cost', 'calculator'], 'published', 50)
+  ('Что такое медленная зарядка?', 'Обычно это зарядка малой или средней мощностью от AC-станции, wallbox или подходящей бытовой розетки. Она удобна, когда машина стоит несколько часов.', (select id from public.knowledge_categories where slug = 'charging'), array['AC', 'дом', 'медленная зарядка'], 'published', 10),
+  ('Медленная зарядка лучше для батареи?', 'Частая высокомощная DC-зарядка обычно дает больше тепла и нагрузки. Для повседневного режима спокойная AC-зарядка часто удобнее и мягче.', (select id from public.knowledge_categories where slug = 'battery'), array['батарея', 'AC', 'ресурс'], 'published', 20),
+  ('В чем разница между кВт и кВт⋅ч?', 'кВт - это мощность, то есть скорость зарядки. кВт⋅ч - это количество энергии, которое добавилось в батарею или было потрачено на поездку.', (select id from public.knowledge_categories where slug = 'charging'), array['кВт', 'кВт⋅ч', 'основы'], 'published', 30),
+  ('Нужно ли заряжать до 100% каждый день?', 'Для обычных поездок часто удобнее использовать более низкий лимит. До 100% заряжайте перед дальней дорогой или когда запас действительно нужен.', (select id from public.knowledge_categories where slug = 'battery'), array['100%', 'ежедневно', 'запас хода'], 'published', 40),
+  ('Сколько стоит домашняя зарядка?', 'Умножьте энергию из сети в кВт⋅ч на цену электричества. Калькулятор оценивает стоимость с учетом изменения процента батареи, эффективности и тарифа.', (select id from public.knowledge_categories where slug = 'costs'), array['стоимость', 'калькулятор'], 'published', 50)
 on conflict do nothing;
 
 insert into public.accessories (
   title, category_id, use_case, why_useful, what_to_check, priority, risk_notes, search_keywords, status, sort_order
 )
 values
-  ('Type 2 charging cable', (select id from public.knowledge_categories where slug = 'accessories'), 'Public AC chargers that require the driver to bring a cable.', 'Keeps public AC charging options open during city parking or travel.', '["Connector type","Current rating","Cable length","Storage bag"]'::jsonb, 'must-have', '["Buy a cable rated for EV charging, not an unknown generic cable."]'::jsonb, array['Type 2 EV charging cable', 'BYD Yuan Up AC charging cable'], 'published', 10),
-  ('Portable EVSE', (select id from public.knowledge_categories where slug = 'accessories'), 'Backup or travel charging from suitable sockets.', 'Helpful when visiting places without a wallbox.', '["Plug type","Adjustable current","Ground protection","Weather rating"]'::jsonb, 'useful', '["Use only on safe grounded outlets suitable for continuous load."]'::jsonb, array['portable EVSE adjustable current', 'portable EV charger grounded'], 'published', 20),
-  ('Tire inflator', (select id from public.knowledge_categories where slug = 'safety'), 'Keeping tire pressure correct at home or during trips.', 'Correct pressure helps safety, tire wear, and range.', '["Pressure range","Power source","Gauge accuracy","Hose length"]'::jsonb, 'must-have', '[]'::jsonb, array['portable tire inflator car compressor'], 'published', 30),
-  ('Rubber floor mats', (select id from public.knowledge_categories where slug = 'accessories'), 'Protecting the cabin from mud, rain, snow, and family use.', 'Easier cleaning and better long-term interior protection.', '["Exact vehicle fit","Non-slip backing","Pedal clearance","Odor"]'::jsonb, 'useful', '["Mats must not interfere with pedals."]'::jsonb, array['BYD Yuan Up rubber floor mats all weather'], 'published', 40),
-  ('Winter washer fluid', (select id from public.knowledge_categories where slug = 'winter'), 'Maintaining visibility in freezing weather.', 'Prevents washer fluid from freezing when temperatures drop.', '["Temperature rating","Local legality","Compatibility"]'::jsonb, 'must-have', '[]'::jsonb, array['winter washer fluid freezing temperature'], 'published', 50)
+  ('Кабель Type 2', (select id from public.knowledge_categories where slug = 'accessories'), 'Публичные AC-станции, где водитель должен использовать свой кабель.', 'Расширяет выбор зарядок в городе, у торговых центров и в поездках.', '["Тип разъема","Допустимый ток","Длина кабеля","Сумка для хранения"]'::jsonb, 'must-have', '["Покупайте кабель, рассчитанный именно на зарядку EV."]'::jsonb, array['кабель Type 2 EV', 'BYD Yuan Up кабель зарядки'], 'published', 10),
+  ('Портативное зарядное устройство EVSE', (select id from public.knowledge_categories where slug = 'accessories'), 'Резервная или дорожная зарядка от подходящих розеток.', 'Полезно в гостях, на даче или там, где нет wallbox.', '["Тип вилки","Регулировка тока","Защита","Влагозащита"]'::jsonb, 'useful', '["Используйте только исправные заземленные розетки, рассчитанные на длительную нагрузку."]'::jsonb, array['портативная зарядка EVSE', 'зарядка для электромобиля регулируемый ток'], 'published', 20),
+  ('Компрессор для шин', (select id from public.knowledge_categories where slug = 'safety'), 'Контроль давления дома и в поездках.', 'Правильное давление влияет на безопасность, износ шин и расход энергии.', '["Диапазон давления","Источник питания","Точность манометра","Длина шланга"]'::jsonb, 'must-have', '[]'::jsonb, array['автомобильный компрессор', 'насос для шин'], 'published', 30),
+  ('Резиновые коврики', (select id from public.knowledge_categories where slug = 'accessories'), 'Защита салона от грязи, дождя, снега и семейного использования.', 'Салон проще чистить, а покрытие лучше сохраняется.', '["Точная посадка","Нескользящая основа","Безопасность педалей","Запах"]'::jsonb, 'useful', '["Коврики не должны мешать педалям."]'::jsonb, array['BYD Yuan Up резиновые коврики', 'коврики всепогодные'], 'published', 40),
+  ('Зимняя омывающая жидкость', (select id from public.knowledge_categories where slug = 'winter'), 'Поддержание видимости в мороз.', 'Не дает жидкости замерзнуть при низких температурах.', '["Температурный диапазон","Местные требования","Совместимость"]'::jsonb, 'must-have', '[]'::jsonb, array['зимняя омывайка', 'незамерзайка для авто'], 'published', 50)
 on conflict do nothing;

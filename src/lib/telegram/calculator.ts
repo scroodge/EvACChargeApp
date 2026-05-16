@@ -36,7 +36,7 @@ export function calculateCharging(
       gridEnergy: 0,
       timeHours: 0,
       cost: 0,
-      recommendation: "Adjust the highlighted values to estimate charging.",
+      recommendation: "Исправьте значения, чтобы рассчитать зарядку.",
       errors,
     };
   }
@@ -62,37 +62,37 @@ export function formatChargingTime(hours: number) {
   const wholeHours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  if (wholeHours === 0) return `${minutes} min`;
-  if (minutes === 0) return `${wholeHours} h`;
+  if (wholeHours === 0) return `${minutes} мин`;
+  if (minutes === 0) return `${wholeHours} ч`;
 
-  return `${wholeHours} h ${minutes} min`;
+  return `${wholeHours} ч ${minutes} мин`;
 }
 
 function validateChargingInput(input: ChargingCalculatorInput) {
   const errors: string[] = [];
 
   if (input.batteryCapacity <= 0) {
-    errors.push("Battery capacity must be greater than 0 kWh.");
+    errors.push("Емкость батареи должна быть больше 0 кВт⋅ч.");
   }
 
   if (input.currentPercent < 0 || input.currentPercent > 100) {
-    errors.push("Current battery must be between 0% and 100%.");
+    errors.push("Текущий заряд должен быть от 0% до 100%.");
   }
 
   if (input.targetPercent < 0 || input.targetPercent > 100) {
-    errors.push("Target battery must be between 0% and 100%.");
+    errors.push("Целевой заряд должен быть от 0% до 100%.");
   }
 
   if (input.targetPercent <= input.currentPercent) {
-    errors.push("Target battery must be greater than current battery.");
+    errors.push("Целевой заряд должен быть выше текущего.");
   }
 
   if (input.chargingPower <= 0) {
-    errors.push("Charging power must be greater than 0 kW.");
+    errors.push("Мощность зарядки должна быть больше 0 кВт.");
   }
 
   if (input.efficiency < 1 || input.efficiency > 100) {
-    errors.push("Charging efficiency must be between 1% and 100%.");
+    errors.push("Эффективность зарядки должна быть от 1% до 100%.");
   }
 
   return errors;
@@ -103,16 +103,16 @@ function getRecommendation(
   timeHours: number,
 ) {
   if (input.targetPercent > 90) {
-    return "For daily driving, consider stopping around 80% unless you need the full range.";
+    return "Для ежедневных поездок часто удобно останавливаться около 80%, если полный запас хода не нужен.";
   }
 
   if (input.chargingPower <= 2.5 && timeHours > 10) {
-    return "This is normal for household socket charging. Overnight charging is the usual pattern.";
+    return "Для бытовой розетки это нормально. Обычно такой режим используют на ночь.";
   }
 
   if (input.currentPercent < 15) {
-    return "Try to plug in before the battery gets very low, especially in cold weather.";
+    return "Старайтесь подключаться до очень низкого заряда, особенно в холодную погоду.";
   }
 
-  return "This looks like a battery-friendly daily charging session.";
+  return "Похоже на спокойную ежедневную зарядку без лишней нагрузки для батареи.";
 }

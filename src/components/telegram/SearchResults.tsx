@@ -8,16 +8,16 @@ type SearchResultsProps = {
 };
 
 const labels = {
-  article: "Articles",
-  faq: "FAQ",
-  accessory: "Accessories",
+  article: "Статьи",
+  faq: "Вопросы",
+  accessory: "Аксессуары",
 } as const;
 
 export function SearchResults({ query, results }: SearchResultsProps) {
   if (!query.trim()) {
     return (
       <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-        Search charging, maintenance, owner experience, accessories, and FAQ.
+        Ищите по зарядке, обслуживанию, опыту владельца, аксессуарам и вопросам.
       </div>
     );
   }
@@ -25,7 +25,7 @@ export function SearchResults({ query, results }: SearchResultsProps) {
   if (results.length === 0) {
     return (
       <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-        No local results for “{query}”. Try a shorter term or another category.
+        Нет результатов для «{query}». Попробуйте более короткий запрос или другой раздел.
       </div>
     );
   }

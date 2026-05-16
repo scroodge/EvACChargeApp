@@ -8,26 +8,26 @@ export type CalculatorInfo = {
 export const calculators: CalculatorInfo[] = [
   {
     id: "charging-time-cost",
-    title: "Charging time and cost calculator",
-    summary: "Estimate energy, grid draw, time, and cost for one charging session.",
+    title: "Калькулятор времени и стоимости зарядки",
+    summary: "Оценка энергии, потребления из сети, времени и стоимости одной зарядки.",
     status: "ready",
   },
   {
     id: "consumption",
-    title: "Consumption calculator",
-    summary: "Convert trip distance and energy used into consumption.",
+    title: "Калькулятор расхода",
+    summary: "Расчет расхода по дистанции и потраченной энергии.",
     status: "next-phase",
   },
   {
     id: "range-estimate",
-    title: "Range estimate calculator",
-    summary: "Estimate usable range from battery percentage and consumption.",
+    title: "Калькулятор запаса хода",
+    summary: "Оценка доступного пробега по проценту батареи и расходу.",
     status: "next-phase",
   },
   {
     id: "trip-charging",
-    title: "Trip charging estimate calculator",
-    summary: "Plan charging stops and buffer for a route.",
+    title: "Калькулятор зарядок в поездке",
+    summary: "Планирование остановок на зарядку и запаса по маршруту.",
     status: "next-phase",
   },
 ];

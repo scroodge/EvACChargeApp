@@ -27,12 +27,12 @@ type KnowledgeHomeProps = {
 };
 
 const quickCards = [
-  { label: "Charging", tab: "guides", icon: BatteryCharging },
-  { label: "Ownership", tab: "guides", icon: CarFront },
-  { label: "Maintenance", tab: "guides", icon: Wrench },
-  { label: "Accessories", tab: "more", icon: ShoppingBag },
-  { label: "Calculators", tab: "tools", icon: Calculator },
-  { label: "FAQ", tab: "faq", icon: HelpCircle },
+  { label: "Зарядка", tab: "guides", icon: BatteryCharging },
+  { label: "Эксплуатация", tab: "guides", icon: CarFront },
+  { label: "Обслуживание", tab: "guides", icon: Wrench },
+  { label: "Аксессуары", tab: "more", icon: ShoppingBag },
+  { label: "Калькуляторы", tab: "tools", icon: Calculator },
+  { label: "Вопросы", tab: "faq", icon: HelpCircle },
 ] satisfies Array<{
   label: string;
   tab: TelegramTab;
@@ -53,15 +53,15 @@ export function KnowledgeHome({ isTelegram, onNavigate, data }: KnowledgeHomePro
               VoltFlow
             </p>
             <h1 id="knowledge-home-title" className="mt-1 font-heading text-3xl font-bold leading-tight">
-              BYD YUAN UP Knowledge Base
+              База знаний BYD YUAN UP
             </h1>
           </div>
           <span className="shrink-0 rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-[var(--voltflow-cyan)]">
-            {isTelegram ? "Telegram Mini App" : "Web Mode"}
+            {isTelegram ? "Мини-приложение Telegram" : "Веб-режим"}
           </span>
         </div>
         <p className="text-base leading-7 text-muted-foreground">
-          Charging, maintenance, accessories and real owner experience
+          Зарядка, обслуживание, аксессуары и практический опыт владельца
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export function KnowledgeHome({ isTelegram, onNavigate, data }: KnowledgeHomePro
         <div className="flex items-center gap-2">
           <Settings className="size-4 text-[var(--voltflow-cyan)]" aria-hidden />
           <h2 id="popular-title" className="font-heading text-xl font-bold">
-            Popular articles
+            Популярные статьи
           </h2>
         </div>
         {popularArticles.map((article) => (
@@ -97,13 +97,13 @@ export function KnowledgeHome({ isTelegram, onNavigate, data }: KnowledgeHomePro
           href="/telegram/category/charging"
           className="inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)]"
         >
-          Open Charging category
+          Открыть раздел зарядки
         </Link>
       </section>
 
       <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
-        Phase 1 knowledge base is manually curated. Community import and AI search
-        will be added later.
+        База знаний сейчас ведется вручную. Импорт из сообщества и AI-поиск
+        будут добавлены позже.
       </div>
     </section>
   );

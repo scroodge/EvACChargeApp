@@ -16,17 +16,17 @@ export default async function KnowledgeAdminLayout({ children }: { children: Rea
       <main className="grid min-h-dvh place-items-center bg-background px-4 text-foreground">
         <section className="max-w-md rounded-lg border border-border bg-card p-6">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-            Access denied
+            Доступ запрещен
           </p>
-          <h1 className="mt-2 font-heading text-2xl font-bold">Admin access required</h1>
+          <h1 className="mt-2 font-heading text-2xl font-bold">Нужен доступ администратора</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Your account is authenticated, but it is not listed in knowledge admin users.
+            Вы вошли в аккаунт, но этот пользователь не добавлен в список администраторов базы знаний.
           </p>
           <Link
             href="/dashboard"
             className="mt-5 inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold"
           >
-            Back to dashboard
+            Вернуться в панель
           </Link>
         </section>
       </main>

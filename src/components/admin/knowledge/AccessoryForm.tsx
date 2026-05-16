@@ -25,14 +25,14 @@ export function AccessoryForm({
         <FieldError message={state.message} />
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Title</span>
+            <span>Название</span>
             <input name="title" defaultValue={item?.title ?? ""} className={inputClass} />
             <FieldError message={state.errors?.title} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Category</span>
+            <span>Раздел</span>
             <select name="category_id" defaultValue={item?.category_id ?? ""} className={inputClass}>
-              <option value="">Choose category</option>
+              <option value="">Выберите раздел</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.title}</option>
               ))}
@@ -41,55 +41,55 @@ export function AccessoryForm({
           </label>
         </div>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Use case</span>
+          <span>Сценарий использования</span>
           <textarea name="use_case" defaultValue={item?.use_case ?? ""} className={textareaClass} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Why useful</span>
+          <span>Чем полезно</span>
           <textarea name="why_useful" defaultValue={item?.why_useful ?? ""} className={textareaClass} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>What to check before buying</span>
+          <span>Что проверить перед покупкой</span>
           <textarea name="what_to_check" defaultValue={item?.what_to_check.join("\n") ?? ""} className={textareaClass} />
-          <span className="text-xs font-normal text-muted-foreground">One item per line.</span>
+          <span className="text-xs font-normal text-muted-foreground">Один пункт на строку.</span>
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Risk notes</span>
+          <span>Риски и замечания</span>
           <textarea name="risk_notes" defaultValue={item?.risk_notes.join("\n") ?? ""} className={textareaClass} />
         </label>
-        <TagsInput name="search_keywords" label="Search keywords" defaultValue={item?.search_keywords} />
+        <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={item?.search_keywords} />
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>External URL</span>
+          <span>Внешняя ссылка</span>
           <input name="external_url" defaultValue={item?.external_url ?? ""} className={inputClass} />
         </label>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Priority</span>
+            <span>Приоритет</span>
             <select name="priority" defaultValue={item?.priority ?? "useful"} className={inputClass}>
-              <option value="must-have">Must-have</option>
-              <option value="useful">Useful</option>
-              <option value="optional">Optional</option>
+              <option value="must-have">Обязательно</option>
+              <option value="useful">Полезно</option>
+              <option value="optional">Опционально</option>
             </select>
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Status</span>
+            <span>Статус</span>
             <select name="status" defaultValue={item?.status ?? "draft"} className={inputClass}>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
+              <option value="draft">Черновик</option>
+              <option value="published">Опубликовано</option>
+              <option value="archived">Архив</option>
             </select>
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Sort order</span>
+            <span>Порядок сортировки</span>
             <input name="sort_order" type="number" defaultValue={item?.sort_order ?? 0} className={inputClass} />
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
           <button disabled={pending} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
-            {pending ? "Saving..." : "Save"}
+            {pending ? "Сохранение..." : "Сохранить"}
           </button>
           <Link href="/admin/knowledge/accessories" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
-            Cancel
+            Отмена
           </Link>
         </div>
       </Panel>

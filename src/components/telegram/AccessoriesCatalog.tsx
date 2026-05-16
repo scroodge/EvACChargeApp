@@ -43,12 +43,12 @@ export function AccessoriesCatalog({ items: providedItems }: { items?: Accessory
   return (
     <section className="space-y-4" aria-labelledby="accessories-title">
       <SectionHeader
-        eyebrow="Accessories"
-        title="Useful items without fake links"
-        description="Static recommendations with checks, risks, priorities, and search keywords for Phase 1."
+        eyebrow="Аксессуары"
+        title="Полезные вещи без фейковых ссылок"
+        description="Рекомендации с проверками, рисками, приоритетом и поисковыми подсказками."
         id="accessories-title"
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="Search accessories" />
+      <SearchBox value={query} onChange={setQuery} placeholder="Искать аксессуары" />
       <CategoryFilter
         categories={accessoryCategories}
         activeCategory={category}

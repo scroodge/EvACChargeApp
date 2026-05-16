@@ -13,37 +13,37 @@ import {
 const fields = [
   {
     key: "batteryCapacity",
-    label: "Battery capacity",
-    suffix: "kWh",
+    label: "Емкость батареи",
+    suffix: "кВт⋅ч",
     step: "1",
   },
   {
     key: "currentPercent",
-    label: "Current battery",
+    label: "Текущий заряд",
     suffix: "%",
     step: "1",
   },
   {
     key: "targetPercent",
-    label: "Target battery",
+    label: "Целевой заряд",
     suffix: "%",
     step: "1",
   },
   {
     key: "chargingPower",
-    label: "Charging power",
-    suffix: "kW",
+    label: "Мощность зарядки",
+    suffix: "кВт",
     step: "0.1",
   },
   {
     key: "electricityPrice",
-    label: "Electricity price",
-    suffix: "/ kWh",
+    label: "Цена электричества",
+    suffix: "/ кВт⋅ч",
     step: "0.01",
   },
   {
     key: "efficiency",
-    label: "Charging efficiency",
+    label: "Эффективность зарядки",
     suffix: "%",
     step: "1",
   },
@@ -55,10 +55,10 @@ const fields = [
 }>;
 
 const chargingPowerPresets = [
-  { label: "Household socket", value: 2.2 },
+  { label: "Бытовая розетка", value: 2.2 },
   { label: "Wallbox", value: 7 },
-  { label: "Public AC", value: 11 },
-  { label: "DC fast", value: 50 },
+  { label: "Публичная AC", value: 11 },
+  { label: "Быстрая DC", value: 50 },
 ];
 
 export function ChargingCalculator() {
@@ -82,17 +82,17 @@ export function ChargingCalculator() {
     <section className="space-y-4" aria-labelledby="telegram-calculator-title">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-          Calculator
+          Калькулятор
         </p>
         <h2
           id="telegram-calculator-title"
           className="mt-1 font-heading text-2xl font-bold"
         >
-          Estimate time, energy, and cost
+          Оценка времени, энергии и стоимости
         </h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Estimate one charging session. Values are generic assumptions, not
-          official BYD YUAN UP charging specifications.
+          Расчет одной зарядной сессии. Значения являются ориентировочными и
+          не заменяют официальные характеристики BYD YUAN UP.
         </p>
       </div>
 
@@ -146,22 +146,22 @@ export function ChargingCalculator() {
       <div className="grid gap-3 sm:grid-cols-2">
         <ResultCard
           icon={BatteryMedium}
-          label="Energy needed"
-          value={`${result.energyNeeded.toFixed(1)} kWh`}
+          label="Нужно в батарею"
+          value={`${result.energyNeeded.toFixed(1)} кВт⋅ч`}
         />
         <ResultCard
           icon={PlugZap}
-          label="Grid energy"
-          value={`${result.gridEnergy.toFixed(1)} kWh`}
+          label="Из сети"
+          value={`${result.gridEnergy.toFixed(1)} кВт⋅ч`}
         />
         <ResultCard
           icon={Clock}
-          label="Estimated time"
+          label="Время"
           value={formatChargingTime(result.timeHours)}
         />
         <ResultCard
           icon={Coins}
-          label="Estimated cost"
+          label="Стоимость"
           value={result.cost.toLocaleString(undefined, {
             style: "currency",
             currency: "USD",
@@ -174,10 +174,10 @@ export function ChargingCalculator() {
       </div>
 
       <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-        <p className="font-semibold text-foreground">Assumptions</p>
-        <p>Efficiency: {input.efficiency}%</p>
-        <p>Charging power: {input.chargingPower} kW</p>
-        <p>Electricity price: {input.electricityPrice} per kWh</p>
+        <p className="font-semibold text-foreground">Допущения</p>
+        <p>Эффективность: {input.efficiency}%</p>
+        <p>Мощность зарядки: {input.chargingPower} кВт</p>
+        <p>Цена электричества: {input.electricityPrice} за кВт⋅ч</p>
       </div>
 
       <button
@@ -186,7 +186,7 @@ export function ChargingCalculator() {
         className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)] transition hover:bg-white/[0.07] focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
       >
         <RotateCcw className="size-4" aria-hidden />
-        Reset defaults
+        Сбросить значения
       </button>
     </section>
   );

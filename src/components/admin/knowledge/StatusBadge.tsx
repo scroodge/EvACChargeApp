@@ -7,9 +7,15 @@ export function StatusBadge({ status }: { status: ArticleStatus }) {
     archived: "border-slate-300/30 bg-slate-300/10 text-slate-200",
   };
 
+  const labels: Record<ArticleStatus, string> = {
+    draft: "Черновик",
+    published: "Опубликовано",
+    archived: "Архив",
+  };
+
   return (
     <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${styles[status]}`}>
-      {status}
+      {labels[status]}
     </span>
   );
 }

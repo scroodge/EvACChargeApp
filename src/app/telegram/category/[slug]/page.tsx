@@ -24,10 +24,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const category = data.categories.find((item) => item.slug === slug) ?? getCategoryBySlug(slug);
 
   return {
-    title: category ? `${category.title} Knowledge` : "Category not found",
+    title: category ? `${category.title} · База знаний` : "Раздел не найден",
     description: category?.description,
     openGraph: {
-      title: category ? `${category.title} · VoltFlow` : "Category not found",
+      title: category ? `${category.title} · VoltFlow` : "Раздел не найден",
       description: category?.description,
     },
   };
@@ -56,14 +56,14 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
           href="/telegram"
           className="inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-muted-foreground"
         >
-          Back to home
+          На главную
         </Link>
 
         {category ? (
           <>
             <header className="voltflow-card p-5">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-                Category
+                Раздел
               </p>
               <h1 className="mt-2 font-heading text-3xl font-bold">
                 {category.title}
@@ -74,8 +74,8 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
             </header>
 
             {safeContent.articles.length ? (
-              <section className="space-y-3" aria-label="Articles">
-                <h2 className="font-heading text-xl font-bold">Articles</h2>
+              <section className="space-y-3" aria-label="Статьи">
+                <h2 className="font-heading text-xl font-bold">Статьи</h2>
                 {safeContent.articles.map((article) => (
                   <ArticleCard key={article.id} article={article} />
                 ))}
@@ -83,8 +83,8 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
             ) : null}
 
             {safeContent.faq.length ? (
-              <section className="space-y-3" aria-label="FAQ">
-                <h2 className="font-heading text-xl font-bold">FAQ</h2>
+              <section className="space-y-3" aria-label="Вопросы">
+                <h2 className="font-heading text-xl font-bold">Вопросы</h2>
                 {safeContent.faq.map((item) => (
                   <article key={item.id} className="voltflow-card p-4">
                     <h3 className="font-heading text-base font-bold">
@@ -99,8 +99,8 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
             ) : null}
 
             {safeContent.accessories.length ? (
-              <section className="space-y-3" aria-label="Accessories">
-                <h2 className="font-heading text-xl font-bold">Accessories</h2>
+              <section className="space-y-3" aria-label="Аксессуары">
+                <h2 className="font-heading text-xl font-bold">Аксессуары</h2>
                 {safeContent.accessories.map((item) => (
                   <AccessoryCard key={item.id} item={item} />
                 ))}
@@ -111,22 +111,21 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
             !safeContent.faq.length &&
             !safeContent.accessories.length ? (
               <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-                This category is prepared for Phase 1.5, but content has not
-                been added yet.
+                Раздел подготовлен, но материалы в него еще не добавлены.
               </div>
             ) : null}
           </>
         ) : (
           <section className="voltflow-card p-5">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-              Category not found
+              Раздел не найден
             </p>
             <h1 className="mt-2 font-heading text-2xl font-bold">
-              This category does not exist
+              Такого раздела нет
             </h1>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Try charging, ownership, maintenance, accessories, battery, winter,
-              safety, or costs.
+              Попробуйте зарядку, эксплуатацию, обслуживание, аксессуары,
+              батарею, зиму, безопасность или расходы.
             </p>
           </section>
         )}

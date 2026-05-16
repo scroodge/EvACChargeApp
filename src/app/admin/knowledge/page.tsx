@@ -23,15 +23,15 @@ export default async function KnowledgeAdminPage() {
 
   return (
     <AdminShell
-      title="Knowledge Admin"
-      description="Manage BYD YUAN UP knowledge content used by the Telegram Mini App."
+      title="Админка базы знаний"
+      description="Управление русской базой знаний BYD YUAN UP для Telegram Mini App."
     >
       <section className="grid gap-4 md:grid-cols-5">
-        <Metric label="Articles" value={articles.length} href="/admin/knowledge/articles" />
-        <Metric label="FAQ" value={faq.length} href="/admin/knowledge/faq" />
-        <Metric label="Accessories" value={accessories.length} href="/admin/knowledge/accessories" />
-        <Metric label="Categories" value={categories.length} href="/admin/knowledge/categories" />
-        <Metric label="Published" value={counts.published} href="/telegram" />
+        <Metric label="Статьи" value={articles.length} href="/admin/knowledge/articles" />
+        <Metric label="Вопросы" value={faq.length} href="/admin/knowledge/faq" />
+        <Metric label="Аксессуары" value={accessories.length} href="/admin/knowledge/accessories" />
+        <Metric label="Разделы" value={categories.length} href="/admin/knowledge/categories" />
+        <Metric label="Опубликовано" value={counts.published} href="/telegram" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -46,16 +46,16 @@ export default async function KnowledgeAdminPage() {
       </section>
 
       <section className="rounded-lg border border-border bg-card p-4">
-        <h2 className="font-heading text-xl font-bold">Quick actions</h2>
+        <h2 className="font-heading text-xl font-bold">Быстрые действия</h2>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link className="min-h-10 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground" href="/admin/knowledge/articles/new">
-            New article
+            Новая статья
           </Link>
           <Link className="min-h-10 rounded-lg border border-border px-4 py-2 text-sm font-semibold" href="/admin/knowledge/faq/new">
-            New FAQ
+            Новый вопрос
           </Link>
           <Link className="min-h-10 rounded-lg border border-border px-4 py-2 text-sm font-semibold" href="/admin/knowledge/accessories/new">
-            New accessory
+            Новый аксессуар
           </Link>
         </div>
       </section>

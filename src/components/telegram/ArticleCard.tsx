@@ -22,7 +22,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
         {article.summary}
       </span>
       <span className="mt-3 block text-xs font-semibold text-[var(--voltflow-cyan)]">
-        Open article
+        Открыть статью
       </span>
     </Link>
   );
@@ -48,7 +48,7 @@ export function AccessoryCard({ item }: { item: AccessoryItem }) {
       <p className="mt-2 text-sm leading-6 text-foreground">{item.whyUseful}</p>
       <div className="mt-4">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          Check before buying
+          Проверить перед покупкой
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {item.whatToCheckBeforeBuying.map((check) => (

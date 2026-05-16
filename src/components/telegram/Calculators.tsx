@@ -10,14 +10,14 @@ export function Calculators() {
     <section className="space-y-4" aria-labelledby="tools-title">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-          Tools
+          Инструменты
         </p>
         <h2 id="tools-title" className="mt-1 font-heading text-2xl font-bold">
-          EV helper calculators
+          Калькуляторы для EV
         </h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Phase 1 includes the charging time and cost calculator. Other tools are
-          prepared as static placeholders.
+          Сейчас доступен калькулятор времени и стоимости зарядки. Остальные
+          инструменты подготовлены для следующих фаз.
         </p>
       </div>
 
@@ -34,7 +34,7 @@ export function Calculators() {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                    Coming in next phase
+                    В следующей фазе
                   </p>
                   <h3 className="mt-1 font-heading text-base font-bold">
                     {item.title}

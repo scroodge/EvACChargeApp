@@ -20,7 +20,7 @@ export default async function EditArticlePage({ params }: PageProps) {
   if (!article) notFound();
 
   return (
-    <AdminShell title="Edit Article">
+    <AdminShell title="Редактировать статью">
       <ArticleForm
         article={article}
         categories={categories}

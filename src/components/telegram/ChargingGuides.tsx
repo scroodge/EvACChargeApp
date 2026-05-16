@@ -31,12 +31,12 @@ export function ChargingGuides({ articles: providedArticles }: { articles?: Know
   return (
     <section className="space-y-4" aria-labelledby="charging-guides-title">
       <SectionHeader
-        eyebrow="Charging Guides"
-        title="Everything about charging BYD YUAN UP"
-        description="Home charging, public charging, battery habits, safety, cables, and troubleshooting."
+        eyebrow="Гайды по зарядке"
+        title="Все о зарядке BYD YUAN UP"
+        description="Домашняя и публичная зарядка, привычки для батареи, безопасность, кабели и типичные проблемы."
         id="charging-guides-title"
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="Search charging guides" />
+      <SearchBox value={query} onChange={setQuery} placeholder="Искать по зарядке" />
       <div className="space-y-3">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} />

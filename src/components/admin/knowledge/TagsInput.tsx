@@ -14,10 +14,10 @@ export function TagsInput({
         name={name}
         defaultValue={defaultValue.join(", ")}
         className="min-h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
-        placeholder="charging, winter, safety"
+        placeholder="зарядка, зима, безопасность"
       />
       <span className="block text-xs font-normal text-muted-foreground">
-        Separate values with commas.
+        Разделяйте значения запятыми.
       </span>
     </label>
   );

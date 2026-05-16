@@ -26,12 +26,12 @@ export function OwnershipExperience({ articles: providedArticles }: { articles?:
   return (
     <section className="space-y-4" aria-labelledby="ownership-title">
       <SectionHeader
-        eyebrow="Ownership Experience"
-        title="Structured real-owner knowledge"
-        description="Subjective owner-style notes, habits, comfort impressions, trip planning, and beginner mistakes."
+        eyebrow="Опыт эксплуатации"
+        title="Практичные заметки владельца"
+        description="Привычки, комфорт, расход, поездки, первые настройки и типичные ошибки новичка."
         id="ownership-title"
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="Search ownership notes" />
+      <SearchBox value={query} onChange={setQuery} placeholder="Искать по эксплуатации" />
       <div className="space-y-3">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} />

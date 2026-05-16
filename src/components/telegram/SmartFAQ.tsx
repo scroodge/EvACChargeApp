@@ -52,17 +52,17 @@ export function SmartFAQ({ items: providedItems }: { items?: FAQItem[] }) {
     <section className="space-y-4" aria-labelledby="telegram-faq-title">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-          Smart FAQ
+          Вопросы и ответы
         </p>
         <h2 id="telegram-faq-title" className="mt-1 font-heading text-2xl font-bold">
-          Answers for everyday charging
+          Ответы для ежедневной эксплуатации
         </h2>
       </div>
 
       <SearchBox
         value={query}
         onChange={setQuery}
-        placeholder="Search FAQ by topic, answer, or tag"
+        placeholder="Искать вопрос, ответ или тег"
       />
 
       <CategoryFilter
@@ -124,7 +124,7 @@ export function SmartFAQ({ items: providedItems }: { items?: FAQItem[] }) {
 
       {filteredItems.length === 0 ? (
         <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
-          No matching FAQ yet. Try a shorter search or another category.
+          Подходящих вопросов пока нет. Попробуйте более короткий запрос или другой раздел.
         </div>
       ) : null}
     </section>

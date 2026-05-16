@@ -27,7 +27,7 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
         <Panel>
           <FieldError message={state.message} />
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Title</span>
+            <span>Название</span>
             <input
               name="title"
               value={title}
@@ -53,19 +53,19 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
             <FieldError message={state.errors?.slug} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Summary</span>
+            <span>Краткое описание</span>
             <textarea name="summary" defaultValue={article?.summary ?? ""} className={textareaClass} />
           </label>
           <JsonSectionsEditor defaultValue={article?.content} error={state.errors?.content} />
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Tips</span>
+            <span>Советы</span>
             <textarea name="tips" defaultValue={article?.tips.join("\n") ?? ""} className={textareaClass} />
-            <span className="text-xs font-normal text-muted-foreground">One tip per line.</span>
+            <span className="text-xs font-normal text-muted-foreground">Один совет на строку.</span>
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Warnings</span>
+            <span>Предупреждения</span>
             <textarea name="warnings" defaultValue={article?.warnings.join("\n") ?? ""} className={textareaClass} />
-            <span className="text-xs font-normal text-muted-foreground">One warning per line.</span>
+            <span className="text-xs font-normal text-muted-foreground">Одно предупреждение на строку.</span>
           </label>
         </Panel>
       </div>
@@ -73,35 +73,35 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
       <aside className="space-y-4">
         <Panel>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Status</span>
+            <span>Статус</span>
             <select name="status" defaultValue={article?.status ?? "draft"} className={inputClass}>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
+              <option value="draft">Черновик</option>
+              <option value="published">Опубликовано</option>
+              <option value="archived">Архив</option>
             </select>
             <FieldError message={state.errors?.status} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Category</span>
+            <span>Раздел</span>
             <select name="category_id" defaultValue={article?.category_id ?? ""} className={inputClass}>
-              <option value="">Choose category</option>
+              <option value="">Выберите раздел</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.title}</option>
               ))}
             </select>
             <FieldError message={state.errors?.category_id} />
           </label>
-          <TagsInput name="tags" label="Tags" defaultValue={article?.tags} />
+          <TagsInput name="tags" label="Теги" defaultValue={article?.tags} />
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Source label</span>
+            <span>Источник</span>
             <input name="source_label" defaultValue={article?.source_label ?? ""} className={inputClass} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Sort order</span>
+            <span>Порядок сортировки</span>
             <input name="sort_order" type="number" defaultValue={article?.sort_order ?? 0} className={inputClass} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Related articles</span>
+            <span>Связанные статьи</span>
             <select
               name="related_article_ids"
               multiple
@@ -117,10 +117,10 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
           </label>
           <div className="flex flex-wrap gap-2 pt-2">
             <button disabled={pending} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
-              {pending ? "Saving..." : "Save"}
+              {pending ? "Сохранение..." : "Сохранить"}
             </button>
             <Link href="/admin/knowledge/articles" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
-              Cancel
+              Отмена
             </Link>
           </div>
         </Panel>

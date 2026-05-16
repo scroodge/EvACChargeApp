@@ -6,32 +6,32 @@ export type {
 } from "@/types/telegram";
 
 export const guideCategories = [
-  "Charging",
-  "Ownership",
-  "Maintenance",
-  "Accessories",
+  "Зарядка",
+  "Эксплуатация",
+  "Обслуживание",
+  "Аксессуары",
 ] as const;
 
 export const faqCategories = [
-  "Charging",
-  "Battery",
-  "Winter",
-  "Maintenance",
-  "Accessories",
-  "Ownership",
-  "Safety",
-  "Costs",
+  "Зарядка",
+  "Батарея",
+  "Зима",
+  "Обслуживание",
+  "Аксессуары",
+  "Эксплуатация",
+  "Безопасность",
+  "Расходы",
   "BYD Yuan Up",
 ] as const;
 
 export const accessoryCategories = [
-  "charging accessories",
-  "interior accessories",
-  "trunk/storage",
-  "protection",
-  "winter accessories",
-  "cleaning",
-  "electronics",
-  "emergency kit",
-  "child/family accessories",
+  "Аксессуары",
+  "Салон",
+  "Багажник",
+  "Защита",
+  "Зима",
+  "Уход",
+  "Электроника",
+  "Безопасность",
+  "Семья",
 ] as const;

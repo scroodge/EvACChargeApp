@@ -7,7 +7,7 @@ export default async function NewAccessoryPage() {
   const categories = await getCategories();
 
   return (
-    <AdminShell title="New Accessory">
+    <AdminShell title="Новый аксессуар">
       <AccessoryForm categories={categories} action={createAccessoryAction} />
     </AdminShell>
   );

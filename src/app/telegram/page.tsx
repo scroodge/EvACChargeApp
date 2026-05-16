@@ -6,13 +6,13 @@ import { getTelegramKnowledgeDataWithFallback } from "@/lib/supabase/knowledge";
 import { staticTelegramKnowledgeData } from "@/lib/telegram/knowledge";
 
 export const metadata: Metadata = {
-  title: "BYD YUAN UP Knowledge Base",
+  title: "База знаний BYD YUAN UP",
   description:
-    "VoltFlow Telegram Mini App knowledge base for BYD YUAN UP charging, maintenance, accessories, calculators, and owner experience.",
+    "Русская база знаний VoltFlow для BYD YUAN UP: зарядка, обслуживание, аксессуары, калькуляторы и опыт эксплуатации.",
   openGraph: {
-    title: "VoltFlow BYD YUAN UP Knowledge Base",
+    title: "VoltFlow: база знаний BYD YUAN UP",
     description:
-      "Static Telegram Mini App knowledge base for BYD YUAN UP owners.",
+      "Русская база знаний мини-приложения Telegram для владельцев BYD YUAN UP.",
     type: "website",
   },
 };

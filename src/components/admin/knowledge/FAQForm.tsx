@@ -24,46 +24,46 @@ export function FAQForm({
       <Panel>
         <FieldError message={state.message} />
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Question</span>
+          <span>Вопрос</span>
           <input name="question" defaultValue={item?.question ?? ""} className={inputClass} />
           <FieldError message={state.errors?.question} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Answer</span>
+          <span>Ответ</span>
           <textarea name="answer" defaultValue={item?.answer ?? ""} className={textareaClass} />
           <FieldError message={state.errors?.answer} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
-          <span>Category</span>
+          <span>Раздел</span>
           <select name="category_id" defaultValue={item?.category_id ?? ""} className={inputClass}>
-            <option value="">Choose category</option>
+            <option value="">Выберите раздел</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>{category.title}</option>
             ))}
           </select>
           <FieldError message={state.errors?.category_id} />
         </label>
-        <TagsInput name="tags" label="Tags" defaultValue={item?.tags} />
+        <TagsInput name="tags" label="Теги" defaultValue={item?.tags} />
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Status</span>
+            <span>Статус</span>
             <select name="status" defaultValue={item?.status ?? "draft"} className={inputClass}>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
+              <option value="draft">Черновик</option>
+              <option value="published">Опубликовано</option>
+              <option value="archived">Архив</option>
             </select>
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
-            <span>Sort order</span>
+            <span>Порядок сортировки</span>
             <input name="sort_order" type="number" defaultValue={item?.sort_order ?? 0} className={inputClass} />
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
           <button disabled={pending} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
-            {pending ? "Saving..." : "Save"}
+            {pending ? "Сохранение..." : "Сохранить"}
           </button>
           <Link href="/admin/knowledge/faq" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
-            Cancel
+            Отмена
           </Link>
         </div>
       </Panel>
