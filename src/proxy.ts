@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/forgot-password", "/auth/callback"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/forgot-password",
+  "/auth/callback",
+  "/telegram",
+]);
 const PUBLIC_METADATA_PATHS = new Set([
   "/apple-icon",
   "/favicon.ico",

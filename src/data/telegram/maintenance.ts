@@ -1,0 +1,208 @@
+import type { KnowledgeArticle } from "@/data/telegram/categories";
+
+export const maintenanceArticles: KnowledgeArticle[] = [
+  {
+    id: "maintenance-schedule-overview",
+    title: "Maintenance schedule overview",
+    category: "Maintenance",
+    tags: ["service", "schedule", "maintenance"],
+    summary: "How to think about routine EV maintenance without guessing service work.",
+    sections: [
+      {
+        heading: "Owner role",
+        body: "Use the official service schedule for your market. Owners can track dates, mileage, symptoms, tire condition, fluids, and software notes.",
+      },
+      {
+        heading: "EV difference",
+        body: "EVs have fewer engine-related items, but tires, brakes, suspension, cooling, cabin filters, and 12V systems still need attention.",
+      },
+    ],
+    warnings: ["Follow the owner manual and local service guidance first."],
+  },
+  {
+    id: "tire-pressure-basics",
+    title: "Tire pressure basics",
+    category: "Maintenance",
+    tags: ["tires", "pressure", "range"],
+    summary: "Tire pressure affects safety, comfort, tire wear, and range.",
+    sections: [
+      {
+        heading: "Why it matters",
+        body: "Low pressure can increase consumption and tire wear. High or uneven pressure can affect comfort and handling.",
+      },
+      {
+        heading: "Owner habit",
+        body: "Check pressures when tires are cold and use the label or manual value for your car and load.",
+      },
+    ],
+  },
+  {
+    id: "brake-system-ev-notes",
+    title: "Brake system notes for EVs",
+    category: "Maintenance",
+    tags: ["brakes", "regen", "safety"],
+    summary: "Regenerative braking changes wear patterns, but brakes still matter.",
+    sections: [
+      {
+        heading: "EV behavior",
+        body: "Regeneration can reduce brake pad use, but friction brakes still need inspection and can suffer from corrosion or uneven use.",
+      },
+      {
+        heading: "When to ask service",
+        body: "Noise, vibration, pulling, warning lights, fluid concerns, or reduced braking confidence require professional inspection.",
+      },
+    ],
+    warnings: ["Brake work is safety-critical. Use professional service."],
+  },
+  {
+    id: "cabin-filter-overview",
+    title: "Cabin filter replacement overview",
+    category: "Maintenance",
+    tags: ["cabin filter", "air", "service"],
+    summary: "A non-dangerous overview of cabin filter maintenance.",
+    sections: [
+      {
+        heading: "Why replace it",
+        body: "A dirty cabin filter can reduce airflow and make smells worse. Replacement intervals depend on dust, pollen, and local conditions.",
+      },
+      {
+        heading: "Owner approach",
+        body: "Check the manual for the correct filter type and procedure, or ask service to replace it during routine maintenance.",
+      },
+    ],
+  },
+  {
+    id: "twelve-volt-battery-basics",
+    title: "12V battery basics",
+    category: "Maintenance",
+    tags: ["12V battery", "startup", "electronics"],
+    summary: "The small 12V system is still important in an EV.",
+    sections: [
+      {
+        heading: "Why it matters",
+        body: "Many EV control systems rely on the 12V battery. A weak 12V battery can cause strange errors or startup problems.",
+      },
+      {
+        heading: "What to record",
+        body: "If you see repeated low-voltage warnings or unusual electronic behavior, record the message, date, and conditions before service.",
+      },
+    ],
+    warnings: ["Use correct jump-start guidance from the manual. Wrong connections can damage electronics."],
+  },
+  {
+    id: "cooling-system-basics",
+    title: "Cooling system basics",
+    category: "Maintenance",
+    tags: ["cooling", "battery", "service"],
+    summary: "High-voltage cooling systems should be treated carefully.",
+    sections: [
+      {
+        heading: "Owner level",
+        body: "Owners can watch for warnings, leaks under the car, unusual smells, or repeated overheating messages.",
+      },
+      {
+        heading: "Service level",
+        body: "Coolant type, bleeding, pumps, and high-voltage thermal management should be handled by qualified service.",
+      },
+    ],
+    warnings: ["Do not open or repair high-voltage cooling components yourself."],
+  },
+  {
+    id: "wipers-washer-fluid",
+    title: "Wipers and washer fluid",
+    category: "Maintenance",
+    tags: ["wipers", "washer fluid", "visibility"],
+    summary: "Simple visibility maintenance owners can track.",
+    sections: [
+      {
+        heading: "When to replace",
+        body: "Replace wipers when they streak, chatter, or leave blind spots. Use washer fluid suitable for your climate.",
+      },
+    ],
+    tips: ["Use winter-rated washer fluid before freezing weather arrives."],
+  },
+  {
+    id: "software-update-notes",
+    title: "Software update notes",
+    category: "Maintenance",
+    tags: ["software", "updates", "settings"],
+    summary: "A safe way to track changes after software updates.",
+    sections: [
+      {
+        heading: "Before update",
+        body: "Read the update notes if available, keep the car sufficiently charged, and avoid starting updates when you need the car immediately.",
+      },
+      {
+        heading: "After update",
+        body: "Check important settings such as charging limits, driver assistance preferences, phone pairing, and language.",
+      },
+    ],
+  },
+  {
+    id: "warning-lights-overview",
+    title: "Warning lights overview",
+    category: "Maintenance",
+    tags: ["warning lights", "diagnostics", "safety"],
+    summary: "How to respond without guessing repairs.",
+    sections: [
+      {
+        heading: "Basic response",
+        body: "Read the exact message, note whether the car drives normally, and check the manual for severity.",
+      },
+      {
+        heading: "When to stop",
+        body: "If a warning involves brakes, steering, high voltage, severe overheating, or unsafe driving behavior, stop safely and contact professional help.",
+      },
+    ],
+    warnings: ["Do not ignore safety-critical warning lights."],
+  },
+  {
+    id: "before-service-checklist",
+    title: "What to check before service",
+    category: "Maintenance",
+    tags: ["service", "checklist", "dealer"],
+    summary: "Prepare clear information before a service visit.",
+    sections: [
+      {
+        heading: "Owner checklist",
+        body: "Record symptoms, dates, battery percentage, weather, charger used, photos of messages, and whether the issue repeats.",
+      },
+      {
+        heading: "Why it helps",
+        body: "Good notes help service reproduce the issue and reduce vague back-and-forth.",
+      },
+    ],
+  },
+  {
+    id: "record-before-service",
+    title: "What to record before visiting service",
+    category: "Maintenance",
+    tags: ["service", "records", "troubleshooting"],
+    summary: "A simple record template for issues.",
+    sections: [
+      {
+        heading: "Useful record",
+        body: "Save photos or videos, exact warning text, app screenshots, charging station name, cable used, time, temperature, and whether restarting changed anything.",
+      },
+    ],
+    tips: ["Keep service records in one folder for warranty discussions."],
+  },
+  {
+    id: "common-symptoms-possible-causes",
+    title: "Common symptoms and possible causes",
+    category: "Maintenance",
+    tags: ["symptoms", "troubleshooting", "service"],
+    summary: "Non-diagnostic owner notes for common symptoms.",
+    sections: [
+      {
+        heading: "Examples",
+        body: "Slow charging may relate to charger limits, battery temperature, or cable ratings. Range drops may relate to speed, weather, tires, or heating. Electronic warnings may involve software or 12V health.",
+      },
+      {
+        heading: "Important limit",
+        body: "Possible causes are not a diagnosis. Use them to prepare questions, not to replace service.",
+      },
+    ],
+    warnings: ["Do not perform unsafe repairs based on symptom guesses."],
+  },
+];

@@ -1,0 +1,121 @@
+"use client";
+
+import { BatteryCharging, RadioTower, UserCircle2, Zap } from "lucide-react";
+import { useState } from "react";
+
+import { BottomTabs, type TelegramTab } from "@/components/telegram/BottomTabs";
+import { AccessoriesCatalog } from "@/components/telegram/AccessoriesCatalog";
+import { Calculators } from "@/components/telegram/Calculators";
+import { CategoryFilter } from "@/components/telegram/CategoryFilter";
+import { ChargingGuides } from "@/components/telegram/ChargingGuides";
+import { KnowledgeHome } from "@/components/telegram/KnowledgeHome";
+import { MaintenanceGuides } from "@/components/telegram/MaintenanceGuides";
+import { OwnershipExperience } from "@/components/telegram/OwnershipExperience";
+import { SmartFAQ } from "@/components/telegram/SmartFAQ";
+import { guideCategories } from "@/data/telegram/categories";
+import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
+
+export function TelegramShell() {
+  const [activeTab, setActiveTab] = useState<TelegramTab>("home");
+  const [guideCategory, setGuideCategory] =
+    useState<(typeof guideCategories)[number]>("Charging");
+  const telegram = useTelegramWebApp();
+  const userName =
+    telegram.user?.first_name ||
+    telegram.user?.username ||
+    (telegram.isTelegram ? "Telegram driver" : "Web driver");
+
+  return (
+    <main className="relative isolate min-h-dvh overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-8%,rgba(0,209,255,0.24),transparent_26rem),radial-gradient(circle_at_8%_18%,rgba(0,230,118,0.14),transparent_20rem),linear-gradient(180deg,rgba(18,21,28,0)_0%,#12151C_78%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px voltflow-gradient" />
+
+      <div className="mobile-page relative min-h-dvh px-4 pb-28 pt-[calc(env(safe-area-inset-top)+1rem)]">
+        <header className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="grid size-11 shrink-0 place-items-center rounded-lg border border-[var(--voltflow-green)]/30 bg-[var(--voltflow-green)]/10 text-[var(--voltflow-green)]">
+                <Zap className="size-6" aria-hidden />
+              </div>
+              <div>
+                <h1 className="font-heading text-2xl font-bold leading-none">
+                  VoltFlow
+                </h1>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                  EV Charging Assistant
+                </p>
+              </div>
+            </div>
+
+            <span className="shrink-0 rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-[var(--voltflow-cyan)]">
+              {telegram.isTelegram ? "Telegram Mini App" : "Web Mode"}
+            </span>
+          </div>
+
+          <section className="voltflow-card p-4" aria-label="Mini app status">
+            <div className="grid grid-cols-[1fr_auto] gap-3">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <UserCircle2 className="size-4" aria-hidden />
+                  <span className="truncate">{userName}</span>
+                </p>
+                <p className="mt-2 font-heading text-xl font-bold">
+                  Charge smarter at home
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Static guides, owner experience, maintenance notes,
+                  accessories, FAQ, and calculators for Phase 1.
+                </p>
+              </div>
+              <div className="grid size-14 place-items-center rounded-lg border border-border bg-white/[0.04] text-[var(--voltflow-green)]">
+                {telegram.isTelegram ? (
+                  <RadioTower className="size-7" aria-hidden />
+                ) : (
+                  <BatteryCharging className="size-7" aria-hidden />
+                )}
+              </div>
+            </div>
+          </section>
+        </header>
+
+        <div className="mt-5">
+          {activeTab === "home" ? (
+            <KnowledgeHome
+              isTelegram={telegram.isTelegram}
+              onNavigate={setActiveTab}
+            />
+          ) : null}
+          {activeTab === "guides" ? (
+            <div className="space-y-4">
+              <CategoryFilter
+                categories={guideCategories}
+                activeCategory={guideCategory}
+                onChange={(category) => {
+                  if (category !== "All") setGuideCategory(category);
+                }}
+              />
+              {guideCategory === "Charging" ? <ChargingGuides /> : null}
+              {guideCategory === "Ownership" ? <OwnershipExperience /> : null}
+              {guideCategory === "Maintenance" ? <MaintenanceGuides /> : null}
+              {guideCategory === "Accessories" ? <AccessoriesCatalog /> : null}
+            </div>
+          ) : null}
+          {activeTab === "faq" ? <SmartFAQ /> : null}
+          {activeTab === "tools" ? <Calculators /> : null}
+          {activeTab === "more" ? (
+            <div className="space-y-5">
+              <AccessoriesCatalog />
+              <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
+                Future phases are intentionally not active yet: Telegram group
+                import, semantic search, AI assistant, embeddings, telemetry,
+                and BYDMate / VoltFlow integrations.
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <BottomTabs activeTab={activeTab} onTabChange={setActiveTab} />
+    </main>
+  );
+}
