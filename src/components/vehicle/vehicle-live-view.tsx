@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BatteryCharging,
@@ -69,12 +69,15 @@ export function VehicleLiveView() {
       .reverse();
   }, [allPoints]);
   const [selectedDate, setSelectedDate] = useState(() => localDateKey(Date.now()));
-  const effectiveDate = availableDateKeys.includes(selectedDate)
-    ? selectedDate
-    : availableDateKeys[0] ?? selectedDate;
+  const [dateTouched, setDateTouched] = useState(false);
+  useEffect(() => {
+    if (!dateTouched && availableDateKeys[0] && selectedDate !== availableDateKeys[0]) {
+      setSelectedDate(availableDateKeys[0]);
+    }
+  }, [availableDateKeys, dateTouched, selectedDate]);
   const dayPoints = useMemo(() => {
-    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === effectiveDate);
-  }, [allPoints, effectiveDate]);
+    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
+  }, [allPoints, selectedDate]);
   const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
@@ -116,8 +119,10 @@ export function VehicleLiveView() {
       <Hero snapshot={snapshot} nowMs={nowMs} />
       <TelemetryGrid telemetry={snapshot.telemetry} />
       <TripBrowser
-        selectedDate={effectiveDate}
+        selectedDate={selectedDate}
+        availableDateKeys={availableDateKeys}
         onDateChange={(value) => {
+          setDateTouched(true);
           setSelectedDate(value);
           setSelectedTripId(null);
         }}
@@ -363,6 +368,7 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
 
 function TripBrowser({
   selectedDate,
+  availableDateKeys,
   onDateChange,
   trips,
   selectedTripId,
@@ -371,6 +377,7 @@ function TripBrowser({
   hasError,
 }: {
   selectedDate: string;
+  availableDateKeys: string[];
   onDateChange: (value: string) => void;
   trips: TripSegment[];
   selectedTripId: string | null;
@@ -399,6 +406,33 @@ function TripBrowser({
           />
         </label>
       </div>
+
+      {availableDateKeys.length > 0 ? (
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          {availableDateKeys.slice(0, 14).map((dateKey) => {
+            const selected = dateKey === selectedDate;
+            const date = new Date(`${dateKey}T12:00:00`);
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => onDateChange(dateKey)}
+                className={
+                  "shrink-0 rounded-full border px-3 py-2 text-sm transition " +
+                  (selected
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border bg-white/[0.03] text-muted-foreground hover:border-primary/50 hover:text-foreground")
+                }
+                title={`Telemetry data exists on ${dateKey}`}
+              >
+                <span className="font-heading font-semibold">
+                  {date.toLocaleDateString([], { month: "short", day: "numeric" })}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="mt-5 grid grid-cols-3 gap-3">
         <SummaryPill label="Trips" value={isLoading ? "…" : String(trips.length)} />
