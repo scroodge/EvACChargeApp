@@ -30,8 +30,8 @@ const quickCards = [
   { label: "Зарядка", tab: "guides", icon: BatteryCharging },
   { label: "Эксплуатация", tab: "guides", icon: CarFront },
   { label: "Обслуживание", tab: "guides", icon: Wrench },
-  { label: "Аксессуары", tab: "more", icon: ShoppingBag },
-  { label: "Калькуляторы", tab: "tools", icon: Calculator },
+  { label: "Купить", tab: "buy", icon: ShoppingBag },
+  { label: "Еще", tab: "more", icon: Calculator },
   { label: "Вопросы", tab: "faq", icon: HelpCircle },
 ] satisfies Array<{
   label: string;

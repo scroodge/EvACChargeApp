@@ -6,22 +6,30 @@ import { useState } from "react";
 
 import type { SparePartItem } from "@/types/knowledge";
 
-export function SparePartsCatalog({ items = [] }: { items?: SparePartItem[] }) {
+export function SparePartsCatalog({
+  items = [],
+  compactHeader = false,
+}: {
+  items?: SparePartItem[];
+  compactHeader?: boolean;
+}) {
   if (!items.length) return null;
 
   return (
     <section className="space-y-4" aria-labelledby="spare-parts-title">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
-          Запчасти
-        </p>
-        <h2 id="spare-parts-title" className="mt-1 font-heading text-2xl font-bold">
-          Запчасти и расходники
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Описание, совместимость, фото ракурсов и ссылки на варианты покупки.
-        </p>
-      </div>
+      {compactHeader ? null : (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
+            Запчасти
+          </p>
+          <h2 id="spare-parts-title" className="mt-1 font-heading text-2xl font-bold">
+            Запчасти и расходники
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Описание, совместимость, фото ракурсов и ссылки на варианты покупки.
+          </p>
+        </div>
+      )}
       <div className="space-y-3">
         {items.map((item) => (
           <SparePartCard key={item.id} item={item} />

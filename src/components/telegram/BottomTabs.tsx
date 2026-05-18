@@ -1,10 +1,10 @@
 "use client";
 
-import { BookOpen, Calculator, HelpCircle, Home, Menu } from "lucide-react";
+import { BookOpen, HelpCircle, Home, Menu, ShoppingBag } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type TelegramTab = "home" | "guides" | "faq" | "tools" | "more";
+export type TelegramTab = "home" | "guides" | "faq" | "buy" | "more";
 
 type BottomTabsProps = {
   activeTab: TelegramTab;
@@ -15,7 +15,7 @@ const tabs = [
   { id: "home", label: "Главная", icon: Home },
   { id: "guides", label: "Гайды", icon: BookOpen },
   { id: "faq", label: "Вопросы", icon: HelpCircle },
-  { id: "tools", label: "Расчеты", icon: Calculator },
+  { id: "buy", label: "Купить", icon: ShoppingBag },
   { id: "more", label: "Еще", icon: Menu },
 ] satisfies Array<{
   id: TelegramTab;

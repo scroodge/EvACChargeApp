@@ -6,13 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BottomTabs, type TelegramTab } from "@/components/telegram/BottomTabs";
 import { AccessoriesCatalog } from "@/components/telegram/AccessoriesCatalog";
+import { BuyCatalog } from "@/components/telegram/BuyCatalog";
 import { Calculators } from "@/components/telegram/Calculators";
 import { CategoryFilter } from "@/components/telegram/CategoryFilter";
 import { ChargingGuides } from "@/components/telegram/ChargingGuides";
 import { KnowledgeHome } from "@/components/telegram/KnowledgeHome";
 import { MaintenanceGuides } from "@/components/telegram/MaintenanceGuides";
 import { OwnershipExperience } from "@/components/telegram/OwnershipExperience";
-import { SparePartsCatalog } from "@/components/telegram/SparePartsCatalog";
 import { SmartFAQ } from "@/components/telegram/SmartFAQ";
 import { guideCategories } from "@/data/telegram/categories";
 import { getTelegramThemeStyle } from "@/lib/telegram/theme";
@@ -39,7 +39,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   useEffect(() => {
     const tab = searchParams.get("tab") as TelegramTab | null;
     window.setTimeout(() => {
-      if (tab && ["home", "guides", "faq", "tools", "more"].includes(tab)) {
+      if (tab && ["home", "guides", "faq", "buy", "more"].includes(tab)) {
         setActiveTab(tab);
       } else {
         setActiveTab("home");
@@ -145,11 +145,12 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
             </div>
           ) : null}
           {activeTab === "faq" ? <SmartFAQ items={data?.faq} /> : null}
-          {activeTab === "tools" ? <Calculators /> : null}
+          {activeTab === "buy" ? (
+            <BuyCatalog accessories={data?.accessories} spareParts={data?.spareParts} />
+          ) : null}
           {activeTab === "more" ? (
             <div className="space-y-5">
-              <AccessoriesCatalog items={data?.accessories} />
-              <SparePartsCatalog items={data?.spareParts} />
+              <Calculators />
               <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
                 Следующие фазы пока намеренно не включены: импорт из Telegram,
                 семантический поиск, AI-помощник, embeddings, аналитика и

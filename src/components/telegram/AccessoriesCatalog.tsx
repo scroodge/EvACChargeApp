@@ -12,7 +12,13 @@ import type { AccessoryItem } from "@/types/telegram";
 
 type AccessoryCategory = (typeof accessoryCategories)[number];
 
-export function AccessoriesCatalog({ items: providedItems }: { items?: AccessoryItem[] }) {
+export function AccessoriesCatalog({
+  items: providedItems,
+  compactHeader = false,
+}: {
+  items?: AccessoryItem[];
+  compactHeader?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<AccessoryCategory | "All">("All");
   const sourceItems = providedItems ?? accessories;
@@ -42,12 +48,14 @@ export function AccessoriesCatalog({ items: providedItems }: { items?: Accessory
 
   return (
     <section className="space-y-4" aria-labelledby="accessories-title">
-      <SectionHeader
-        eyebrow="Аксессуары"
-        title="Полезные вещи без фейковых ссылок"
-        description="Рекомендации с проверками, рисками, приоритетом и поисковыми подсказками."
-        id="accessories-title"
-      />
+      {compactHeader ? null : (
+        <SectionHeader
+          eyebrow="Аксессуары"
+          title="Полезные вещи без фейковых ссылок"
+          description="Рекомендации с проверками, рисками, приоритетом и поисковыми подсказками."
+          id="accessories-title"
+        />
+      )}
       <SearchBox value={query} onChange={setQuery} placeholder="Искать аксессуары" />
       <CategoryFilter
         categories={accessoryCategories}
