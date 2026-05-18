@@ -9,6 +9,9 @@ import type {
   KnowledgeArticle,
   KnowledgeArticleSection,
   KnowledgeCategory,
+  SparePartImage,
+  SparePartInput,
+  SparePartItem,
   TelegramKnowledgeData,
 } from "@/types/knowledge";
 import type {
@@ -34,6 +37,12 @@ type RawAccessory = Omit<AccessoryItem, "category" | "what_to_check" | "risk_not
   what_to_check: unknown;
   risk_notes: unknown;
   external_links: unknown;
+  knowledge_categories?: CategoryRelation;
+};
+
+type RawSparePart = Omit<SparePartItem, "category" | "external_links" | "images"> & {
+  external_links: unknown;
+  images: unknown;
   knowledge_categories?: CategoryRelation;
 };
 
@@ -285,6 +294,67 @@ export async function deleteAccessory(id: string) {
   if (error) throw error;
 }
 
+export async function getPublishedSpareParts() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("spare_parts")
+    .select("*, knowledge_categories(*)")
+    .eq("status", "published")
+    .order("sort_order", { ascending: true })
+    .order("title", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((item) => mapSparePart(item as RawSparePart));
+}
+
+export async function getAdminSpareParts() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("spare_parts")
+    .select("*, knowledge_categories(*)")
+    .order("sort_order", { ascending: true })
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((item) => mapSparePart(item as RawSparePart));
+}
+
+export async function getAdminSparePart(id: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("spare_parts")
+    .select("*, knowledge_categories(*)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapSparePart(data as RawSparePart) : null;
+}
+
+export async function createSparePart(input: SparePartInput) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("spare_parts")
+    .insert(input)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function updateSparePart(id: string, input: SparePartInput) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("spare_parts").update(input).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSparePart(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("spare_parts").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function createCategory(input: {
   slug: string;
   title: string;
@@ -331,14 +401,17 @@ export async function getTelegramKnowledgeDataWithFallback(
   fallback: TelegramKnowledgeData,
 ) {
   try {
-    const [categories, articles, faq, accessories] = await Promise.all([
+    const [categories, articles, faq, accessories, spareParts] = await Promise.all([
       getCategories(),
       getPublishedArticles(),
       getPublishedFAQ(),
       getPublishedAccessories(),
+      getPublishedSpareParts(),
     ]);
 
-    if (!articles.length && !faq.length && !accessories.length) return fallback;
+    if (!articles.length && !faq.length && !accessories.length && !spareParts.length) {
+      return fallback;
+    }
 
     return {
       categories: categories.length
@@ -353,6 +426,7 @@ export async function getTelegramKnowledgeDataWithFallback(
       accessories: accessories.length
         ? accessories.map(toTelegramAccessory)
         : fallback.accessories,
+      spareParts: spareParts.length ? spareParts : fallback.spareParts,
     };
   } catch {
     return fallback;
@@ -440,6 +514,16 @@ function mapAccessory(row: RawAccessory): AccessoryItem {
   };
 }
 
+function mapSparePart(row: RawSparePart): SparePartItem {
+  return {
+    ...row,
+    category: firstRelation(row.knowledge_categories),
+    external_links: parseExternalLinks(row.external_links),
+    images: parseImages(row.images),
+    search_keywords: row.search_keywords ?? [],
+  };
+}
+
 function firstRelation(relation: CategoryRelation | undefined) {
   return Array.isArray(relation) ? relation[0] ?? null : relation;
 }
@@ -482,6 +566,24 @@ function parseExternalLinks(value: unknown): AccessoryExternalLink[] {
       };
     })
     .filter((item): item is AccessoryExternalLink => Boolean(item));
+}
+
+function parseImages(value: unknown): SparePartImage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const image = item as Record<string, unknown>;
+      const url = String(image.url ?? "").trim();
+      if (!url) return null;
+
+      return {
+        url,
+        alt: String(image.alt ?? "").trim(),
+      };
+    })
+    .filter((item): item is SparePartImage => Boolean(item));
 }
 
 function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle {

@@ -12,6 +12,7 @@ import { ChargingGuides } from "@/components/telegram/ChargingGuides";
 import { KnowledgeHome } from "@/components/telegram/KnowledgeHome";
 import { MaintenanceGuides } from "@/components/telegram/MaintenanceGuides";
 import { OwnershipExperience } from "@/components/telegram/OwnershipExperience";
+import { SparePartsCatalog } from "@/components/telegram/SparePartsCatalog";
 import { SmartFAQ } from "@/components/telegram/SmartFAQ";
 import { guideCategories } from "@/data/telegram/categories";
 import { getTelegramThemeStyle } from "@/lib/telegram/theme";
@@ -148,6 +149,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
           {activeTab === "more" ? (
             <div className="space-y-5">
               <AccessoriesCatalog items={data?.accessories} />
+              <SparePartsCatalog items={data?.spareParts} />
               <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
                 Следующие фазы пока намеренно не включены: импорт из Telegram,
                 семантический поиск, AI-помощник, embeddings, аналитика и

@@ -45,6 +45,12 @@ export const telegramCategories: TelegramCategory[] = [
       "Useful ownership items with priorities, risk notes, and search keywords instead of fake product links.",
   },
   {
+    slug: "spare-parts",
+    title: "Запчасти",
+    description:
+      "Каталог запчастей с описанием, изображениями ракурсов и ссылками на товары.",
+  },
+  {
     slug: "calculators",
     title: "Calculators",
     description: "EV helper tools for charging time, cost, range, and trip planning.",
@@ -81,6 +87,7 @@ export const staticTelegramKnowledgeData: TelegramKnowledgeData = {
   articles: russianTelegramKnowledgeData.articles,
   faq: russianTelegramKnowledgeData.faq,
   accessories: russianTelegramKnowledgeData.accessories,
+  spareParts: russianTelegramKnowledgeData.spareParts,
 };
 
 export function getArticleBySlug(slug: string) {
@@ -105,10 +112,12 @@ export function getCategoryContent(slug: string): {
   articles: KnowledgeArticle[];
   faq: FAQItem[];
   accessories: AccessoryItem[];
+  spareParts: TelegramKnowledgeData["spareParts"];
 } {
   return {
     articles: allArticles.filter((article) => article.categorySlug === slug),
     faq: faqItems.filter((item) => item.categorySlug === slug),
     accessories: accessories.filter((item) => item.categorySlug === slug),
+    spareParts: staticTelegramKnowledgeData.spareParts.filter(() => slug === "spare-parts"),
   };
 }

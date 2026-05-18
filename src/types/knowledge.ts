@@ -12,6 +12,11 @@ export type AccessoryExternalLink = {
   url: string;
 };
 
+export type SparePartImage = {
+  url: string;
+  alt: string;
+};
+
 export type KnowledgeArticleSection = {
   heading: string;
   body: string;
@@ -81,6 +86,23 @@ export type AccessoryItem = {
   updated_at: string;
 };
 
+export type SparePartItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  category_id: string | null;
+  category?: KnowledgeCategory | null;
+  part_number: string | null;
+  compatibility: string | null;
+  external_links: AccessoryExternalLink[];
+  images: SparePartImage[];
+  search_keywords: string[];
+  status: ArticleStatus;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ArticleInput = {
   slug: string;
   title: string;
@@ -122,6 +144,19 @@ export type AccessoryInput = {
   sort_order: number;
 };
 
+export type SparePartInput = {
+  title: string;
+  description: string | null;
+  category_id: string;
+  part_number: string | null;
+  compatibility: string | null;
+  external_links: AccessoryExternalLink[];
+  images: SparePartImage[];
+  search_keywords: string[];
+  status: ArticleStatus;
+  sort_order: number;
+};
+
 export type CategoryInput = {
   slug: string;
   title: string;
@@ -138,4 +173,5 @@ export type TelegramKnowledgeData = {
   articles: TelegramKnowledgeArticle[];
   faq: TelegramFAQItem[];
   accessories: TelegramAccessoryItem[];
+  spareParts: SparePartItem[];
 };

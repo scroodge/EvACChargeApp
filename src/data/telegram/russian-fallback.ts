@@ -27,6 +27,12 @@ export const russianTelegramKnowledgeData: TelegramKnowledgeData = {
         "Полезные вещи для владельца BYD YUAN UP: приоритет, риски и что проверить перед покупкой.",
     },
     {
+      slug: "spare-parts",
+      title: "Запчасти",
+      description:
+        "Каталог запчастей с описанием, изображениями ракурсов и ссылками на товары.",
+    },
+    {
       slug: "calculators",
       title: "Калькуляторы",
       description: "Расчет времени зарядки, стоимости, запаса хода и поездок.",
@@ -250,6 +256,28 @@ export const russianTelegramKnowledgeData: TelegramKnowledgeData = {
       whatToCheckBeforeBuying: ["Диапазон давления", "Источник питания", "Точность манометра", "Длина шланга"],
       priority: "must-have",
       searchKeywords: ["автомобильный компрессор", "насос для шин"],
+    },
+  ],
+  spareParts: [
+    {
+      id: "cabin-filter-ru",
+      title: "Салонный фильтр",
+      description:
+        "Расходная запчасть для системы вентиляции. Перед покупкой нужно сверить совместимость с рынком, годом выпуска и конкретной комплектацией BYD YUAN UP.",
+      category_id: null,
+      category: null,
+      part_number: null,
+      compatibility: "BYD YUAN UP, уточнить по VIN перед покупкой.",
+      external_links: [
+        { label: "Поиск на Ozon", url: "https://www.ozon.ru/search/?text=BYD%20Yuan%20Up%20%D1%81%D0%B0%D0%BB%D0%BE%D0%BD%D0%BD%D1%8B%D0%B9%20%D1%84%D0%B8%D0%BB%D1%8C%D1%82%D1%80" },
+        { label: "Поиск на AliExpress", url: "https://www.aliexpress.com/wholesale?SearchText=BYD+Yuan+Up+cabin+filter" },
+      ],
+      images: [],
+      search_keywords: ["салонный фильтр", "cabin filter", "BYD Yuan Up"],
+      status: "published",
+      sort_order: 10,
+      created_at: "2026-05-18T00:00:00.000Z",
+      updated_at: "2026-05-18T00:00:00.000Z",
     },
   ],
 };

@@ -8,15 +8,18 @@ import {
   createArticle,
   createCategory,
   createFAQ,
+  createSparePart,
   deleteAccessory,
   deleteArticle,
   deleteCategory,
   deleteFAQ,
+  deleteSparePart,
   requireAdmin,
   updateAccessory,
   updateArticle,
   updateCategory,
   updateFAQ,
+  updateSparePart,
 } from "@/lib/supabase/knowledge";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -27,6 +30,8 @@ import type {
   CategoryInput,
   FAQInput,
   KnowledgeArticleSection,
+  SparePartImage,
+  SparePartInput,
 } from "@/types/knowledge";
 
 export type AdminFormState = {
@@ -155,6 +160,45 @@ export async function deleteAccessoryAction(formData: FormData) {
   revalidateKnowledge();
 }
 
+export async function createSparePartAction(
+  _state: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { message: "Нет доступа администратора." };
+
+  const input = await parseSparePartForm(formData);
+  if (isFormState(input)) return input;
+
+  await createSparePart(input);
+  revalidateKnowledge();
+  redirect("/admin/knowledge/spare-parts");
+}
+
+export async function updateSparePartAction(
+  id: string,
+  _state: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { message: "Нет доступа администратора." };
+
+  const input = await parseSparePartForm(formData);
+  if (isFormState(input)) return input;
+
+  await updateSparePart(id, input);
+  revalidateKnowledge();
+  redirect("/admin/knowledge/spare-parts");
+}
+
+export async function deleteSparePartAction(formData: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) redirect("/admin/knowledge");
+
+  await deleteSparePart(stringValue(formData, "id"));
+  revalidateKnowledge();
+}
+
 export async function upsertCategoryAction(
   _state: AdminFormState,
   formData: FormData,
@@ -255,6 +299,31 @@ async function parseAccessoryForm(formData: FormData): Promise<AccessoryInput | 
   return Object.keys(errors).length ? { errors } : input;
 }
 
+async function parseSparePartForm(formData: FormData): Promise<SparePartInput | AdminFormState> {
+  const input: SparePartInput = {
+    title: stringValue(formData, "title"),
+    description: nullableString(formData, "description"),
+    category_id: stringValue(formData, "category_id"),
+    part_number: nullableString(formData, "part_number"),
+    compatibility: nullableString(formData, "compatibility"),
+    external_links: externalLinksValue(formData),
+    images: existingImagesValue(formData),
+    search_keywords: listValue(formData, "search_keywords"),
+    status: statusValue(formData),
+    sort_order: numberValue(formData, "sort_order"),
+  };
+
+  const uploadedImages = await uploadSparePartImages(formData.getAll("image_files"));
+  input.images = [...input.images, ...uploadedImages];
+
+  const errors: Record<string, string> = {};
+  if (!input.title) errors.title = "Название обязательно.";
+  if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!input.description) errors.description = "Описание обязательно.";
+  if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
+  return Object.keys(errors).length ? { errors } : input;
+}
+
 async function uploadAccessoryImage(file: File) {
   const supabase = await createClient();
   const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
@@ -272,6 +341,37 @@ async function uploadAccessoryImage(file: File) {
     .from("knowledge-accessories")
     .getPublicUrl(path);
 
+  return data.publicUrl;
+}
+
+async function uploadSparePartImages(files: FormDataEntryValue[]): Promise<SparePartImage[]> {
+  const uploads = files.filter((file): file is File => file instanceof File && file.size > 0);
+  const images: SparePartImage[] = [];
+
+  for (const file of uploads) {
+    images.push({
+      url: await uploadKnowledgeImage(file, "knowledge-spare-parts"),
+      alt: file.name.replace(/\.[^.]+$/, ""),
+    });
+  }
+
+  return images;
+}
+
+async function uploadKnowledgeImage(file: File, bucket: string) {
+  const supabase = await createClient();
+  const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file, {
+      contentType: file.type || "image/jpeg",
+      upsert: false,
+    });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -358,6 +458,18 @@ function externalLinksValue(formData: FormData) {
       url: url.trim(),
     }))
     .filter((link) => link.url);
+}
+
+function existingImagesValue(formData: FormData): SparePartImage[] {
+  const urls = formData.getAll("existing_image_url").map(String);
+  const alts = formData.getAll("existing_image_alt").map(String);
+
+  return urls
+    .map((url, index) => ({
+      url: url.trim(),
+      alt: alts[index]?.trim() || "",
+    }))
+    .filter((image) => image.url);
 }
 
 function sectionValue(formData: FormData, prefix: string): KnowledgeArticleSection[] {

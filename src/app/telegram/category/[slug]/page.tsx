@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AccessoryCard, ArticleCard } from "@/components/telegram/ArticleCard";
+import { SparePartsCatalog } from "@/components/telegram/SparePartsCatalog";
 import { getTelegramKnowledgeDataWithFallback } from "@/lib/supabase/knowledge";
 import {
   getCategoryBySlug,
@@ -42,11 +43,12 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
     articles: data.articles.filter((article) => article.categorySlug === slug),
     faq: data.faq.filter((item) => item.categorySlug === slug),
     accessories: data.accessories.filter((item) => item.categorySlug === slug),
+    spareParts: data.spareParts.filter(() => slug === "spare-parts"),
   };
   const safeContent =
-    content.articles.length || content.faq.length || content.accessories.length
+    content.articles.length || content.faq.length || content.accessories.length || content.spareParts.length
       ? content
-      : fallbackContent;
+      : { ...fallbackContent, spareParts: [] };
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-background text-foreground">
@@ -107,9 +109,14 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
               </section>
             ) : null}
 
+            {safeContent.spareParts.length ? (
+              <SparePartsCatalog items={safeContent.spareParts} />
+            ) : null}
+
             {!safeContent.articles.length &&
             !safeContent.faq.length &&
-            !safeContent.accessories.length ? (
+            !safeContent.accessories.length &&
+            !safeContent.spareParts.length ? (
               <div className="voltflow-card p-4 text-sm leading-6 text-muted-foreground">
                 Раздел подготовлен, но материалы в него еще не добавлены.
               </div>
