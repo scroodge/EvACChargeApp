@@ -8,6 +8,7 @@ import "@fontsource/space-grotesk/700.css";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -61,6 +62,7 @@ export default function RootLayout({
       <body className="bg-background font-sans min-h-dvh text-foreground antialiased">
         <Providers>{children}</Providers>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
