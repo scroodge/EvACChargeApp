@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import type { AdminFormState } from "@/actions/knowledge-admin";
 import { FieldError, inputClass, Panel, textareaClass } from "@/components/admin/knowledge/ArticleForm";
+import { stateKey, stateString } from "@/components/admin/knowledge/form-state";
 import type { KnowledgeCategory } from "@/types/knowledge";
 
 export function CategoryForm({
@@ -14,12 +15,12 @@ export function CategoryForm({
   action: (state: AdminFormState, formData: FormData) => Promise<AdminFormState>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
-  const [title, setTitle] = useState(category?.title ?? "");
-  const [slug, setSlug] = useState(category?.slug ?? "");
+  const [title, setTitle] = useState(stateString(state, "title", category?.title ?? ""));
+  const [slug, setSlug] = useState(stateString(state, "slug", category?.slug ?? ""));
   const [slugTouched, setSlugTouched] = useState(Boolean(category?.slug));
 
   return (
-    <form action={formAction}>
+    <form key={stateKey(state)} action={formAction}>
       <Panel>
         {category ? <input type="hidden" name="id" value={category.id} /> : null}
         <FieldError message={state.message} />
@@ -54,11 +55,11 @@ export function CategoryForm({
         </div>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Description</span>
-          <textarea name="description" defaultValue={category?.description ?? ""} className={textareaClass} />
+          <textarea name="description" defaultValue={stateString(state, "description", category?.description ?? "")} className={textareaClass} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Порядок сортировки</span>
-          <input name="sort_order" type="number" defaultValue={category?.sort_order ?? 0} className={inputClass} />
+          <input name="sort_order" type="number" defaultValue={stateString(state, "sort_order", String(category?.sort_order ?? 0))} className={inputClass} />
         </label>
         <button disabled={pending} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
           {pending ? "Сохранение..." : category ? "Обновить раздел" : "Создать раздел"}

@@ -8,6 +8,7 @@ import type { AdminFormState } from "@/actions/knowledge-admin";
 import { FieldError, inputClass, Panel, textareaClass } from "@/components/admin/knowledge/ArticleForm";
 import { ExternalLinksEditor } from "@/components/admin/knowledge/ExternalLinksEditor";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
+import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
 import type { AccessoryItem, KnowledgeCategory } from "@/types/knowledge";
 
 export function AccessoryForm({
@@ -22,18 +23,18 @@ export function AccessoryForm({
   const [state, formAction, pending] = useActionState(action, {});
 
   return (
-    <form action={formAction} className="max-w-4xl">
+    <form key={stateKey(state)} action={formAction} className="max-w-4xl">
       <Panel>
         <FieldError message={state.message} />
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Название</span>
-            <input name="title" defaultValue={item?.title ?? ""} className={inputClass} />
+            <input name="title" defaultValue={stateString(state, "title", item?.title ?? "")} className={inputClass} />
             <FieldError message={state.errors?.title} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Раздел</span>
-            <select name="category_id" defaultValue={item?.category_id ?? ""} className={inputClass}>
+            <select name="category_id" defaultValue={stateString(state, "category_id", item?.category_id ?? "")} className={inputClass}>
               <option value="">Выберите раздел</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.title}</option>
@@ -44,30 +45,39 @@ export function AccessoryForm({
         </div>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Сценарий использования</span>
-          <textarea name="use_case" defaultValue={item?.use_case ?? ""} className={textareaClass} />
+          <textarea name="use_case" defaultValue={stateString(state, "use_case", item?.use_case ?? "")} className={textareaClass} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Чем полезно</span>
-          <textarea name="why_useful" defaultValue={item?.why_useful ?? ""} className={textareaClass} />
+          <textarea name="why_useful" defaultValue={stateString(state, "why_useful", item?.why_useful ?? "")} className={textareaClass} />
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Что проверить перед покупкой</span>
-          <textarea name="what_to_check" defaultValue={item?.what_to_check.join("\n") ?? ""} className={textareaClass} />
+          <textarea name="what_to_check" defaultValue={stateString(state, "what_to_check", item?.what_to_check.join("\n") ?? "")} className={textareaClass} />
           <span className="text-xs font-normal text-muted-foreground">Один пункт на строку.</span>
         </label>
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Риски и замечания</span>
-          <textarea name="risk_notes" defaultValue={item?.risk_notes.join("\n") ?? ""} className={textareaClass} />
+          <textarea name="risk_notes" defaultValue={stateString(state, "risk_notes", item?.risk_notes.join("\n") ?? "")} className={textareaClass} />
         </label>
-        <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={item?.search_keywords} />
+        <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={stateString(state, "search_keywords", item?.search_keywords.join(", ") ?? "")} />
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Основная внешняя ссылка</span>
-          <input name="external_url" defaultValue={item?.external_url ?? ""} className={inputClass} />
+          <input name="external_url" defaultValue={stateString(state, "external_url", item?.external_url ?? "")} className={inputClass} />
           <span className="text-xs font-normal text-muted-foreground">
             Старое одиночное поле. Для нескольких магазинов используйте список ниже.
           </span>
         </label>
-        <ExternalLinksEditor defaultValue={item?.external_links} />
+        <ExternalLinksEditor
+          defaultValue={
+            state.values
+              ? stateList(state, "external_link_url").map((url, index) => ({
+                  url,
+                  label: stateList(state, "external_link_label")[index] ?? "",
+                }))
+              : item?.external_links
+          }
+        />
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Изображение</span>
@@ -83,7 +93,7 @@ export function AccessoryForm({
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Описание изображения</span>
-            <input name="image_alt" defaultValue={item?.image_alt ?? ""} className={inputClass} />
+            <input name="image_alt" defaultValue={stateString(state, "image_alt", item?.image_alt ?? "")} className={inputClass} />
           </label>
         </div>
         <input type="hidden" name="image_url" value={item?.image_url ?? ""} />
@@ -105,7 +115,7 @@ export function AccessoryForm({
         <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Приоритет</span>
-            <select name="priority" defaultValue={item?.priority ?? "useful"} className={inputClass}>
+            <select name="priority" defaultValue={stateString(state, "priority", item?.priority ?? "useful")} className={inputClass}>
               <option value="must-have">Обязательно</option>
               <option value="useful">Полезно</option>
               <option value="optional">Опционально</option>
@@ -113,7 +123,7 @@ export function AccessoryForm({
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Статус</span>
-            <select name="status" defaultValue={item?.status ?? "draft"} className={inputClass}>
+            <select name="status" defaultValue={stateString(state, "status", item?.status ?? "draft")} className={inputClass}>
               <option value="draft">Черновик</option>
               <option value="published">Опубликовано</option>
               <option value="archived">Архив</option>
@@ -121,7 +131,7 @@ export function AccessoryForm({
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Порядок сортировки</span>
-            <input name="sort_order" type="number" defaultValue={item?.sort_order ?? 0} className={inputClass} />
+            <input name="sort_order" type="number" defaultValue={stateString(state, "sort_order", String(item?.sort_order ?? 0))} className={inputClass} />
           </label>
         </div>
         <div className="flex flex-wrap gap-2">

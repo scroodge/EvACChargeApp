@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Code2, Copy, ExternalLink, KeyRound, MessageCircle, RefreshCw, Scale } from "lucide-react";
+import { Code2, Copy, ExternalLink, KeyRound, MessageCircle, RefreshCw, Scale, ShieldCheck } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -36,7 +36,7 @@ import { parseDecimalInput } from "@/lib/number-input";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { Car } from "@/types/database";
 
-export function SettingsView() {
+export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   const router = useRouter();
   const { data: cars, isLoading } = useCarsQuery();
   const [email, setEmail] = useState<string | null>(null);
@@ -235,6 +235,37 @@ export function SettingsView() {
           </Button>
         </CardContent>
       </Card>
+
+      {isAdmin ? (
+        <Card className="border-white/[0.08]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-xl tracking-tight">
+              <ShieldCheck className="size-5 text-[var(--voltflow-green)]" aria-hidden />
+              CMS базы знаний
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Управление статьями, вопросами, аксессуарами, запчастями и разделами
+              для Telegram-базы знаний VoltFlow.
+            </p>
+            <Button
+              asChild
+              variant="secondary"
+              size="lg"
+              className="h-[54px] w-full justify-between rounded-full px-5 text-base font-semibold"
+            >
+              <Link href="/admin/knowledge">
+                <span className="inline-flex items-center gap-3">
+                  <ShieldCheck className="size-5" aria-hidden />
+                  Открыть CMS
+                </span>
+                <ExternalLink className="size-4" aria-hidden />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-white/[0.08]">
         <CardHeader>

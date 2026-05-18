@@ -6,6 +6,7 @@ import { useActionState, useState } from "react";
 import type { AdminFormState } from "@/actions/knowledge-admin";
 import { JsonSectionsEditor } from "@/components/admin/knowledge/JsonSectionsEditor";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
+import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
 import type { KnowledgeArticle, KnowledgeCategory } from "@/types/knowledge";
 
 type ArticleFormProps = {
@@ -17,12 +18,12 @@ type ArticleFormProps = {
 
 export function ArticleForm({ article, categories, articles, action }: ArticleFormProps) {
   const [state, formAction, pending] = useActionState(action, {});
-  const [title, setTitle] = useState(article?.title ?? "");
-  const [slug, setSlug] = useState(article?.slug ?? "");
+  const [title, setTitle] = useState(stateString(state, "title", article?.title ?? ""));
+  const [slug, setSlug] = useState(stateString(state, "slug", article?.slug ?? ""));
   const [slugTouched, setSlugTouched] = useState(Boolean(article?.slug));
 
   return (
-    <form action={formAction} className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+    <form key={stateKey(state)} action={formAction} className="grid gap-5 lg:grid-cols-[1fr_20rem]">
       <div className="space-y-4">
         <Panel>
           <FieldError message={state.message} />
@@ -54,17 +55,27 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Краткое описание</span>
-            <textarea name="summary" defaultValue={article?.summary ?? ""} className={textareaClass} />
+            <textarea name="summary" defaultValue={stateString(state, "summary", article?.summary ?? "")} className={textareaClass} />
           </label>
-          <JsonSectionsEditor defaultValue={article?.content} error={state.errors?.content} />
+          <JsonSectionsEditor
+            defaultValue={
+              state.values
+                ? stateList(state, "content_heading").map((heading, index) => ({
+                    heading,
+                    body: stateList(state, "content_body")[index] ?? "",
+                  }))
+                : article?.content
+            }
+            error={state.errors?.content}
+          />
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Советы</span>
-            <textarea name="tips" defaultValue={article?.tips.join("\n") ?? ""} className={textareaClass} />
+            <textarea name="tips" defaultValue={stateString(state, "tips", article?.tips.join("\n") ?? "")} className={textareaClass} />
             <span className="text-xs font-normal text-muted-foreground">Один совет на строку.</span>
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Предупреждения</span>
-            <textarea name="warnings" defaultValue={article?.warnings.join("\n") ?? ""} className={textareaClass} />
+            <textarea name="warnings" defaultValue={stateString(state, "warnings", article?.warnings.join("\n") ?? "")} className={textareaClass} />
             <span className="text-xs font-normal text-muted-foreground">Одно предупреждение на строку.</span>
           </label>
         </Panel>
@@ -74,7 +85,7 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
         <Panel>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Статус</span>
-            <select name="status" defaultValue={article?.status ?? "draft"} className={inputClass}>
+            <select name="status" defaultValue={stateString(state, "status", article?.status ?? "draft")} className={inputClass}>
               <option value="draft">Черновик</option>
               <option value="published">Опубликовано</option>
               <option value="archived">Архив</option>
@@ -83,7 +94,7 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Раздел</span>
-            <select name="category_id" defaultValue={article?.category_id ?? ""} className={inputClass}>
+            <select name="category_id" defaultValue={stateString(state, "category_id", article?.category_id ?? "")} className={inputClass}>
               <option value="">Выберите раздел</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.title}</option>
@@ -91,21 +102,21 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
             </select>
             <FieldError message={state.errors?.category_id} />
           </label>
-          <TagsInput name="tags" label="Теги" defaultValue={article?.tags} />
+          <TagsInput name="tags" label="Теги" defaultValue={stateString(state, "tags", article?.tags.join(", ") ?? "")} />
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Источник</span>
-            <input name="source_label" defaultValue={article?.source_label ?? ""} className={inputClass} />
+            <input name="source_label" defaultValue={stateString(state, "source_label", article?.source_label ?? "")} className={inputClass} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Порядок сортировки</span>
-            <input name="sort_order" type="number" defaultValue={article?.sort_order ?? 0} className={inputClass} />
+            <input name="sort_order" type="number" defaultValue={stateString(state, "sort_order", String(article?.sort_order ?? 0))} className={inputClass} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Связанные статьи</span>
             <select
               name="related_article_ids"
               multiple
-              defaultValue={article?.related_article_ids ?? []}
+              defaultValue={stateList(state, "related_article_ids", article?.related_article_ids ?? [])}
               className="min-h-40 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
             >
               {articles

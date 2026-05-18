@@ -38,6 +38,7 @@ export type AdminFormState = {
   ok?: boolean;
   message?: string;
   errors?: Record<string, string>;
+  values?: Record<string, string | string[]>;
 };
 
 const statuses = ["draft", "published", "archived"] as const;
@@ -247,7 +248,7 @@ async function parseArticleForm(
   };
 
   const errors = await validateArticle(input, currentId);
-  return Object.keys(errors).length ? { errors } : input;
+  return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }
 
 function parseFAQForm(formData: FormData): FAQInput | AdminFormState {
@@ -265,7 +266,7 @@ function parseFAQForm(formData: FormData): FAQInput | AdminFormState {
   if (!input.answer) errors.answer = "Ответ обязателен.";
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
-  return Object.keys(errors).length ? { errors } : input;
+  return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }
 
 async function parseAccessoryForm(formData: FormData): Promise<AccessoryInput | AdminFormState> {
@@ -296,7 +297,7 @@ async function parseAccessoryForm(formData: FormData): Promise<AccessoryInput | 
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   if (!priorities.includes(input.priority)) errors.priority = "Выберите корректный приоритет.";
-  return Object.keys(errors).length ? { errors } : input;
+  return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }
 
 async function parseSparePartForm(formData: FormData): Promise<SparePartInput | AdminFormState> {
@@ -321,7 +322,7 @@ async function parseSparePartForm(formData: FormData): Promise<SparePartInput | 
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
   if (!input.description) errors.description = "Описание обязательно.";
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
-  return Object.keys(errors).length ? { errors } : input;
+  return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }
 
 async function uploadAccessoryImage(file: File) {
@@ -392,7 +393,7 @@ async function parseCategoryForm(
   if (input.slug && (await isSlugTaken("knowledge_categories", input.slug, currentId))) {
     errors.slug = "Этот slug уже используется.";
   }
-  return Object.keys(errors).length ? { errors } : input;
+  return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }
 
 async function validateArticle(input: ArticleInput, currentId?: string) {
@@ -422,6 +423,22 @@ async function isSlugTaken(
 
 function stringValue(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
+}
+
+function formValues(formData: FormData) {
+  const values: Record<string, string | string[]> = {};
+
+  for (const key of new Set(formData.keys())) {
+    const items = formData
+      .getAll(key)
+      .filter((item) => !(item instanceof File))
+      .map(String);
+
+    if (items.length === 0) continue;
+    values[key] = items.length === 1 ? items[0] : items;
+  }
+
+  return values;
 }
 
 function nullableString(formData: FormData, name: string) {

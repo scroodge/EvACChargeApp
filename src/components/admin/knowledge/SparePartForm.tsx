@@ -8,6 +8,7 @@ import type { AdminFormState } from "@/actions/knowledge-admin";
 import { ExternalLinksEditor } from "@/components/admin/knowledge/ExternalLinksEditor";
 import { FieldError, inputClass, Panel, textareaClass } from "@/components/admin/knowledge/ArticleForm";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
+import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
 import type { KnowledgeCategory, SparePartItem } from "@/types/knowledge";
 
 export function SparePartForm({
@@ -22,18 +23,18 @@ export function SparePartForm({
   const [state, formAction, pending] = useActionState(action, {});
 
   return (
-    <form action={formAction} className="max-w-4xl">
+    <form key={stateKey(state)} action={formAction} className="max-w-4xl">
       <Panel>
         <FieldError message={state.message} />
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Название запчасти</span>
-            <input name="title" defaultValue={item?.title ?? ""} className={inputClass} />
+            <input name="title" defaultValue={stateString(state, "title", item?.title ?? "")} className={inputClass} />
             <FieldError message={state.errors?.title} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Раздел</span>
-            <select name="category_id" defaultValue={item?.category_id ?? ""} className={inputClass}>
+            <select name="category_id" defaultValue={stateString(state, "category_id", item?.category_id ?? "")} className={inputClass}>
               <option value="">Выберите раздел</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.title}</option>
@@ -45,22 +46,31 @@ export function SparePartForm({
 
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Описание</span>
-          <textarea name="description" defaultValue={item?.description ?? ""} className={textareaClass} />
+          <textarea name="description" defaultValue={stateString(state, "description", item?.description ?? "")} className={textareaClass} />
           <FieldError message={state.errors?.description} />
         </label>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Номер детали</span>
-            <input name="part_number" defaultValue={item?.part_number ?? ""} className={inputClass} />
+            <input name="part_number" defaultValue={stateString(state, "part_number", item?.part_number ?? "")} className={inputClass} />
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Совместимость</span>
-            <input name="compatibility" defaultValue={item?.compatibility ?? ""} className={inputClass} />
+            <input name="compatibility" defaultValue={stateString(state, "compatibility", item?.compatibility ?? "")} className={inputClass} />
           </label>
         </div>
 
-        <ExternalLinksEditor defaultValue={item?.external_links} />
+        <ExternalLinksEditor
+          defaultValue={
+            state.values
+              ? stateList(state, "external_link_url").map((url, index) => ({
+                  url,
+                  label: stateList(state, "external_link_label")[index] ?? "",
+                }))
+              : item?.external_links
+          }
+        />
 
         <div className="space-y-3">
           <label className="space-y-1.5 text-sm font-semibold">
@@ -101,12 +111,12 @@ export function SparePartForm({
           ) : null}
         </div>
 
-        <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={item?.search_keywords} />
+        <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={stateString(state, "search_keywords", item?.search_keywords.join(", ") ?? "")} />
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Статус</span>
-            <select name="status" defaultValue={item?.status ?? "draft"} className={inputClass}>
+            <select name="status" defaultValue={stateString(state, "status", item?.status ?? "draft")} className={inputClass}>
               <option value="draft">Черновик</option>
               <option value="published">Опубликовано</option>
               <option value="archived">Архив</option>
@@ -114,7 +124,7 @@ export function SparePartForm({
           </label>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Порядок сортировки</span>
-            <input name="sort_order" type="number" defaultValue={item?.sort_order ?? 0} className={inputClass} />
+            <input name="sort_order" type="number" defaultValue={stateString(state, "sort_order", String(item?.sort_order ?? 0))} className={inputClass} />
           </label>
         </div>
 

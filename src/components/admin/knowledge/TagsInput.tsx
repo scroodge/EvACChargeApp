@@ -5,14 +5,14 @@ export function TagsInput({
 }: {
   name: string;
   label: string;
-  defaultValue?: string[];
+  defaultValue?: string[] | string;
 }) {
   return (
     <label className="space-y-1.5 text-sm font-semibold">
       <span>{label}</span>
       <input
         name={name}
-        defaultValue={defaultValue.join(", ")}
+        defaultValue={Array.isArray(defaultValue) ? defaultValue.join(", ") : defaultValue}
         className="min-h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
         placeholder="зарядка, зима, безопасность"
       />
