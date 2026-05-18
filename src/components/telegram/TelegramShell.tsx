@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { BottomTabs, type TelegramTab } from "@/components/telegram/BottomTabs";
-import { AccessoriesCatalog } from "@/components/telegram/AccessoriesCatalog";
+import { ArticleList } from "@/components/telegram/ArticleList";
 import { BuyCatalog } from "@/components/telegram/BuyCatalog";
 import { Calculators } from "@/components/telegram/Calculators";
 import { CategoryFilter } from "@/components/telegram/CategoryFilter";
@@ -25,7 +25,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TelegramTab>("home");
   const [guideCategory, setGuideCategory] =
-    useState<(typeof guideCategories)[number]>("Зарядка");
+    useState<(typeof guideCategories)[number] | "All">("All");
   const telegram = useTelegramWebApp();
   const themeStyle = useMemo(
     () => getTelegramThemeStyle(telegram.themeParams),
@@ -128,10 +128,11 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
               <CategoryFilter
                 categories={guideCategories}
                 activeCategory={guideCategory}
-                onChange={(category) => {
-                  if (category !== "All") setGuideCategory(category);
-                }}
+                onChange={setGuideCategory}
               />
+              {guideCategory === "All" ? (
+                <ArticleList articles={data?.articles ?? []} />
+              ) : null}
               {guideCategory === "Зарядка" ? (
                 <ChargingGuides articles={data?.articles.filter((article) => article.categorySlug === "charging")} />
               ) : null}
@@ -141,7 +142,6 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
               {guideCategory === "Обслуживание" ? (
                 <MaintenanceGuides articles={data?.articles.filter((article) => article.categorySlug === "maintenance")} />
               ) : null}
-              {guideCategory === "Аксессуары" ? <AccessoriesCatalog items={data?.accessories} /> : null}
             </div>
           ) : null}
           {activeTab === "faq" ? <SmartFAQ items={data?.faq} /> : null}

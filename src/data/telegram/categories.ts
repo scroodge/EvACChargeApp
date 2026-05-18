@@ -9,7 +9,6 @@ export const guideCategories = [
   "Зарядка",
   "Эксплуатация",
   "Обслуживание",
-  "Аксессуары",
 ] as const;
 
 export const faqCategories = [
