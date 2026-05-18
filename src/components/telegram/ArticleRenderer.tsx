@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, Clipboard, Lightbulb } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Clipboard, Lightbulb, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -20,6 +21,13 @@ export function ArticleRenderer({
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "unavailable">(
     "idle",
   );
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
+  const images = article.images ?? [];
+
+  function moveImage(delta: number) {
+    setActiveImage((current) => (current + delta + images.length) % images.length);
+  }
 
   async function copyLink() {
     if (typeof window === "undefined" || !navigator.clipboard) {
@@ -101,6 +109,52 @@ export function ArticleRenderer({
         ) : null}
       </header>
 
+      {images.length ? (
+        <section className="space-y-3" aria-label="Фотографии статьи">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveImage(0);
+              setGalleryOpen(true);
+            }}
+            className="block w-full overflow-hidden rounded-lg border border-border text-left"
+          >
+            <Image
+              src={images[0].url}
+              alt={images[0].alt || article.title}
+              width={800}
+              height={450}
+              unoptimized
+              className="aspect-[16/9] w-full object-cover"
+            />
+          </button>
+          {images.length > 1 ? (
+            <div className="grid grid-cols-4 gap-2">
+              {images.slice(1, 5).map((image, index) => (
+                <button
+                  key={`${image.url}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setActiveImage(index + 1);
+                    setGalleryOpen(true);
+                  }}
+                  className="overflow-hidden rounded-lg border border-border"
+                >
+                  <Image
+                    src={image.url}
+                    alt={image.alt || article.title}
+                    width={180}
+                    height={120}
+                    unoptimized
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="space-y-3">
         {article.sections.map((section) => (
           <section key={section.heading} className="voltflow-card p-5">
@@ -163,6 +217,57 @@ export function ArticleRenderer({
             </Link>
           ))}
         </section>
+      ) : null}
+
+      {galleryOpen && images.length ? (
+        <div className="fixed inset-0 z-[80] bg-black/80 p-4 backdrop-blur-sm">
+          <div className="mx-auto flex h-full max-w-[430px] flex-col justify-center">
+            <div className="rounded-lg border border-border bg-card p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-bold">{article.title}</p>
+                <button
+                  type="button"
+                  onClick={() => setGalleryOpen(false)}
+                  className="grid size-9 place-items-center rounded-lg border border-border"
+                  aria-label="Закрыть галерею"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </div>
+              <Image
+                src={images[activeImage].url}
+                alt={images[activeImage].alt || article.title}
+                width={800}
+                height={600}
+                unoptimized
+                className="max-h-[70dvh] w-full rounded-lg object-contain"
+              />
+              {images.length > 1 ? (
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => moveImage(-1)}
+                    className="grid size-10 place-items-center rounded-lg border border-border"
+                    aria-label="Предыдущее фото"
+                  >
+                    <ChevronLeft className="size-5" aria-hidden />
+                  </button>
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {activeImage + 1} / {images.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => moveImage(1)}
+                    className="grid size-10 place-items-center rounded-lg border border-border"
+                    aria-label="Следующее фото"
+                  >
+                    <ChevronRight className="size-5" aria-hidden />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
       ) : null}
     </article>
   );

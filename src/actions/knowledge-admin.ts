@@ -239,6 +239,7 @@ async function parseArticleForm(
     category_id: stringValue(formData, "category_id"),
     tags: listValue(formData, "tags"),
     content: sectionValue(formData, "content"),
+    images: existingImagesValue(formData),
     tips: multilineValue(formData, "tips"),
     warnings: multilineValue(formData, "warnings"),
     source_label: nullableString(formData, "source_label"),
@@ -246,6 +247,9 @@ async function parseArticleForm(
     sort_order: numberValue(formData, "sort_order"),
     related_article_ids: formData.getAll("related_article_ids").map(String),
   };
+
+  const uploadedImages = await uploadArticleImages(formData.getAll("image_files"));
+  input.images = [...input.images, ...uploadedImages];
 
   const errors = await validateArticle(input, currentId);
   return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
@@ -346,12 +350,20 @@ async function uploadAccessoryImage(file: File) {
 }
 
 async function uploadSparePartImages(files: FormDataEntryValue[]): Promise<SparePartImage[]> {
+  return uploadImageList(files, "knowledge-spare-parts");
+}
+
+async function uploadArticleImages(files: FormDataEntryValue[]): Promise<SparePartImage[]> {
+  return uploadImageList(files, "knowledge-articles");
+}
+
+async function uploadImageList(files: FormDataEntryValue[], bucket: string): Promise<SparePartImage[]> {
   const uploads = files.filter((file): file is File => file instanceof File && file.size > 0);
   const images: SparePartImage[] = [];
 
   for (const file of uploads) {
     images.push({
-      url: await uploadKnowledgeImage(file, "knowledge-spare-parts"),
+      url: await uploadKnowledgeImage(file, bucket),
       alt: file.name.replace(/\.[^.]+$/, ""),
     });
   }

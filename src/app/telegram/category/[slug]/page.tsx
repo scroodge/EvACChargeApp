@@ -103,8 +103,8 @@ export default async function TelegramCategoryPage({ params }: PageProps) {
             {safeContent.accessories.length ? (
               <section className="space-y-3" aria-label="Аксессуары">
                 <h2 className="font-heading text-xl font-bold">Аксессуары</h2>
-                {safeContent.accessories.map((item) => (
-                  <AccessoryCard key={item.id} item={item} />
+                {safeContent.accessories.map((item, index) => (
+                  <AccessoryCard key={item.id} item={item} priorityImage={index === 0} />
                 ))}
               </section>
             ) : null}

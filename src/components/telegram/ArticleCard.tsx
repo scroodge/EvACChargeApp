@@ -9,11 +9,23 @@ type ArticleCardProps = {
 };
 
 export function ArticleCard({ article }: ArticleCardProps) {
+  const cover = article.images?.[0];
+
   return (
     <Link
       href={`/telegram/article/${article.slug}`}
       className="voltflow-card block p-4 transition hover:border-[var(--voltflow-cyan)]/60 focus-visible:ring-3 focus-visible:ring-[var(--voltflow-cyan)]/30"
     >
+      {cover ? (
+        <Image
+          src={cover.url}
+          alt={cover.alt || article.title}
+          width={640}
+          height={360}
+          unoptimized
+          className="mb-4 aspect-[16/9] w-full rounded-lg border border-border object-cover"
+        />
+      ) : null}
       <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--voltflow-green)]">
         {article.category}
       </span>
@@ -30,7 +42,13 @@ export function ArticleCard({ article }: ArticleCardProps) {
   );
 }
 
-export function AccessoryCard({ item }: { item: AccessoryItem }) {
+export function AccessoryCard({
+  item,
+  priorityImage = false,
+}: {
+  item: AccessoryItem;
+  priorityImage?: boolean;
+}) {
   const priorityLabel = {
     "must-have": "Обязательно",
     useful: "Полезно",
@@ -52,6 +70,7 @@ export function AccessoryCard({ item }: { item: AccessoryItem }) {
           width={640}
           height={360}
           unoptimized
+          priority={priorityImage}
           className="mb-4 aspect-[16/9] w-full rounded-lg border border-border object-cover"
         />
       ) : null}

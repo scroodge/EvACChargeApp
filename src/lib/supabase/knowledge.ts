@@ -22,8 +22,9 @@ import type {
 
 type CategoryRelation = KnowledgeCategory | KnowledgeCategory[] | null;
 
-type RawArticle = Omit<KnowledgeArticle, "category" | "content" | "tips" | "warnings"> & {
+type RawArticle = Omit<KnowledgeArticle, "category" | "content" | "images" | "tips" | "warnings"> & {
   content: unknown;
+  images: unknown;
   tips: unknown;
   warnings: unknown;
   knowledge_categories?: CategoryRelation;
@@ -474,6 +475,7 @@ function toArticleRow(input: ArticleInput) {
     summary: input.summary,
     category_id: input.category_id,
     content: input.content,
+    images: input.images,
     tips: input.tips,
     warnings: input.warnings,
     tags: input.tags,
@@ -489,6 +491,7 @@ function mapArticle(row: RawArticle): KnowledgeArticle {
     ...row,
     category: firstRelation(row.knowledge_categories),
     content: parseSections(row.content),
+    images: parseImages(row.images),
     tips: parseStringArray(row.tips),
     warnings: parseStringArray(row.warnings),
     tags: row.tags ?? [],
@@ -596,6 +599,7 @@ function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle 
     tags: article.tags,
     summary: article.summary ?? "",
     sections: article.content,
+    images: article.images,
     tips: article.tips,
     warnings: article.warnings,
     relatedIds: article.related_article_ids,

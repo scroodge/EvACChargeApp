@@ -10,6 +10,10 @@ export type KnowledgeArticle = {
     heading: string;
     body: string;
   }[];
+  images?: {
+    url: string;
+    alt: string;
+  }[];
   tips?: string[];
   warnings?: string[];
   relatedIds?: string[];

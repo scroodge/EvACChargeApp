@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -21,6 +22,12 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
   const [title, setTitle] = useState(stateString(state, "title", article?.title ?? ""));
   const [slug, setSlug] = useState(stateString(state, "slug", article?.slug ?? ""));
   const [slugTouched, setSlugTouched] = useState(Boolean(article?.slug));
+  const images = state.values
+    ? stateList(state, "existing_image_url").map((url, index) => ({
+        url,
+        alt: stateList(state, "existing_image_alt")[index] ?? "",
+      }))
+    : article?.images ?? [];
 
   return (
     <form key={stateKey(state)} action={formAction} className="grid gap-5 lg:grid-cols-[1fr_20rem]">
@@ -68,6 +75,44 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
             }
             error={state.errors?.content}
           />
+          <div className="space-y-3">
+            <label className="space-y-1.5 text-sm font-semibold">
+              <span>Фото статьи</span>
+              <input
+                name="image_files"
+                type="file"
+                accept="image/*"
+                multiple
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-primary-foreground"
+              />
+              <span className="text-xs font-normal text-muted-foreground">
+                Можно загрузить несколько фото. Первое фото будет обложкой карточки и первым слайдом галереи.
+              </span>
+            </label>
+            {images.length ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {images.map((image, index) => (
+                  <div key={`${image.url}-${index}`} className="rounded-lg border border-border bg-white/[0.03] p-2">
+                    <Image
+                      src={image.url}
+                      alt={image.alt || article?.title || "Фото статьи"}
+                      width={320}
+                      height={180}
+                      unoptimized
+                      className="aspect-[16/9] w-full rounded-lg object-cover"
+                    />
+                    <input type="hidden" name="existing_image_url" value={image.url} />
+                    <input
+                      name="existing_image_alt"
+                      defaultValue={image.alt}
+                      className="mt-2 min-h-9 w-full rounded-lg border border-input bg-background px-2 text-xs outline-none"
+                      placeholder="Описание фото"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Советы</span>
             <textarea name="tips" defaultValue={stateString(state, "tips", article?.tips.join("\n") ?? "")} className={textareaClass} />

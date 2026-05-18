@@ -63,8 +63,8 @@ export function AccessoriesCatalog({
         onChange={setCategory}
       />
       <div className="space-y-3">
-        {items.map((item) => (
-          <AccessoryCard key={item.id} item={item} />
+        {items.map((item, index) => (
+          <AccessoryCard key={item.id} item={item} priorityImage={index === 0} />
         ))}
       </div>
     </section>

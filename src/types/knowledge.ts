@@ -40,6 +40,7 @@ export type KnowledgeArticle = {
   category_id: string | null;
   category?: KnowledgeCategory | null;
   content: KnowledgeArticleSection[];
+  images: SparePartImage[];
   tips: string[];
   warnings: string[];
   tags: string[];
@@ -109,6 +110,7 @@ export type ArticleInput = {
   summary: string | null;
   category_id: string;
   content: KnowledgeArticleSection[];
+  images: SparePartImage[];
   tips: string[];
   warnings: string[];
   tags: string[];
