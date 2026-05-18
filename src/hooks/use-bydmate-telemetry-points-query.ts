@@ -17,7 +17,7 @@ async function fetchBydmateTelemetryPoints(): Promise<BydmateTelemetryPointRow[]
     .select("*")
     .eq("user_id", user.id)
     .order("received_at", { ascending: false })
-    .limit(240);
+    .limit(2000);
 
   if (error) throw error;
 

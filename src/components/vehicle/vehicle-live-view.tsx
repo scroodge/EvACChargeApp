@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
   Activity,
   BatteryCharging,
@@ -15,6 +16,7 @@ import {
 import { BrandBadge } from "@/components/brand/BrandBadge";
 import { LogoFull } from "@/components/brand/LogoFull";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useBydmateTelemetryPointsQuery } from "@/hooks/use-bydmate-telemetry-points-query";
@@ -59,6 +61,23 @@ export function VehicleLiveView() {
   } = useBydmateTelemetryPointsQuery();
   const nowMs = useTickingClock(true);
   const snapshot = data?.[0] ?? null;
+  const allPoints = points ?? [];
+  const availableDateKeys = useMemo(() => {
+    return Array.from(new Set(allPoints.map((point) => localDateKey(pointTimeMs(point)))))
+      .filter((key) => key !== "1970-01-01")
+      .sort()
+      .reverse();
+  }, [allPoints]);
+  const [selectedDate, setSelectedDate] = useState(() => localDateKey(Date.now()));
+  const effectiveDate = availableDateKeys.includes(selectedDate)
+    ? selectedDate
+    : availableDateKeys[0] ?? selectedDate;
+  const dayPoints = useMemo(() => {
+    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === effectiveDate);
+  }, [allPoints, effectiveDate]);
+  const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
 
   if (isLoading) {
     return (
@@ -96,11 +115,24 @@ export function VehicleLiveView() {
       <Header />
       <Hero snapshot={snapshot} nowMs={nowMs} />
       <TelemetryGrid telemetry={snapshot.telemetry} />
-      <TelemetryHistoryCharts
-        points={points ?? []}
+      <TripBrowser
+        selectedDate={effectiveDate}
+        onDateChange={(value) => {
+          setSelectedDate(value);
+          setSelectedTripId(null);
+        }}
+        trips={trips}
+        selectedTripId={selectedTrip?.id ?? null}
+        onSelectTrip={setSelectedTripId}
         isLoading={isHistoryLoading}
         hasError={Boolean(historyError)}
       />
+      <TelemetryHistoryCharts
+        points={selectedTrip?.points ?? []}
+        isLoading={isHistoryLoading}
+        hasError={Boolean(historyError)}
+      />
+      <RouteMap points={selectedTrip?.points ?? []} />
       <LocationCard snapshot={snapshot} />
     </div>
   );
@@ -223,6 +255,21 @@ type ChartSeries = {
   points: ChartPoint[];
 };
 
+type TripSegment = {
+  id: string;
+  points: BydmateTelemetryPointRow[];
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+  distanceKm: number | null;
+  socStart: number | null;
+  socEnd: number | null;
+  maxSpeed: number | null;
+  avgSpeed: number | null;
+};
+
+const TRIP_GAP_MS = 5 * 60 * 1000;
+
 function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -230,6 +277,203 @@ function validNumber(value: number | null | undefined) {
 function validTempNumber(value: number | null | undefined) {
   const n = validNumber(value);
   return n != null && n >= -50 && n <= 90 ? n : null;
+}
+
+function pointTimeMs(point: BydmateTelemetryPointRow) {
+  const deviceMs = Date.parse(point.device_time);
+  if (Number.isFinite(deviceMs)) return deviceMs;
+  const receivedMs = Date.parse(point.received_at);
+  return Number.isFinite(receivedMs) ? receivedMs : 0;
+}
+
+function pad2(value: number) {
+  return value.toString().padStart(2, "0");
+}
+
+function localDateKey(ms: number) {
+  const date = new Date(ms);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function formatClock(ms: number) {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDuration(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
+  const sorted = [...points]
+    .filter((point) => pointTimeMs(point) > 0)
+    .sort((a, b) => pointTimeMs(a) - pointTimeMs(b));
+
+  const groups: BydmateTelemetryPointRow[][] = [];
+  for (const point of sorted) {
+    const lastGroup = groups.at(-1);
+    const previous = lastGroup?.at(-1);
+    if (!lastGroup || !previous || pointTimeMs(point) - pointTimeMs(previous) > TRIP_GAP_MS) {
+      groups.push([point]);
+    } else {
+      lastGroup.push(point);
+    }
+  }
+
+  return groups.map((tripPoints, index) => {
+    const startMs = pointTimeMs(tripPoints[0]);
+    const endMs = pointTimeMs(tripPoints.at(-1) ?? tripPoints[0]);
+    const speeds = tripPoints
+      .map((point) => validNumber(point.telemetry.speed_kmh))
+      .filter((value): value is number => value != null);
+    const odometerValues = tripPoints
+      .map((point) => validNumber(point.telemetry.odometer_km))
+      .filter((value): value is number => value != null);
+    const tripDistanceValues = tripPoints
+      .map((point) => validNumber(point.telemetry.current_trip_distance_km))
+      .filter((value): value is number => value != null);
+    const odometerDistance =
+      odometerValues.length > 1 ? odometerValues.at(-1)! - odometerValues[0] : null;
+    const tripDistance =
+      tripDistanceValues.length > 0 ? Math.max(...tripDistanceValues) - Math.min(...tripDistanceValues) : null;
+    const distanceKm =
+      odometerDistance != null && odometerDistance >= 0
+        ? odometerDistance
+        : tripDistance != null && tripDistance >= 0
+          ? tripDistance
+          : null;
+
+    return {
+      id: `${startMs}-${index}`,
+      points: tripPoints,
+      startMs,
+      endMs,
+      durationMs: Math.max(0, endMs - startMs),
+      distanceKm,
+      socStart: validNumber(tripPoints[0]?.telemetry.soc),
+      socEnd: validNumber(tripPoints.at(-1)?.telemetry.soc),
+      maxSpeed: speeds.length ? Math.max(...speeds) : null,
+      avgSpeed: speeds.length ? speeds.reduce((sum, value) => sum + value, 0) / speeds.length : null,
+    };
+  }).reverse();
+}
+
+function TripBrowser({
+  selectedDate,
+  onDateChange,
+  trips,
+  selectedTripId,
+  onSelectTrip,
+  isLoading,
+  hasError,
+}: {
+  selectedDate: string;
+  onDateChange: (value: string) => void;
+  trips: TripSegment[];
+  selectedTripId: string | null;
+  onSelectTrip: (id: string) => void;
+  isLoading: boolean;
+  hasError: boolean;
+}) {
+  const totalDistance = trips.reduce((sum, trip) => sum + (trip.distanceKm ?? 0), 0);
+
+  return (
+    <section className="voltflow-card p-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">Trips</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trips are split when telemetry is silent for more than 5 minutes.
+          </p>
+        </div>
+        <label className="grid gap-1 text-sm text-muted-foreground">
+          Date
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(event) => onDateChange(event.target.value)}
+            className="w-44"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <SummaryPill label="Trips" value={isLoading ? "…" : String(trips.length)} />
+        <SummaryPill label="Distance" value={`${fmt(totalDistance, 1)} km`} />
+        <SummaryPill
+          label="Points"
+          value={String(trips.reduce((sum, trip) => sum + trip.points.length, 0))}
+        />
+      </div>
+
+      {hasError ? (
+        <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+          Could not load trip history.
+        </p>
+      ) : trips.length === 0 ? (
+        <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+          No telemetry trips for this date yet.
+        </p>
+      ) : (
+        <div className="mt-5 grid gap-3">
+          {trips.map((trip, index) => (
+            <button
+              key={trip.id}
+              type="button"
+              onClick={() => onSelectTrip(trip.id)}
+              className={
+                "rounded-2xl border p-4 text-left transition " +
+                (trip.id === selectedTripId
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-white/[0.02] hover:border-primary/50")
+              }
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-heading text-lg font-semibold tracking-tight">
+                    Trip {trips.length - index}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
+                  </p>
+                </div>
+                <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  {trip.points.length} pts
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
+                <MiniStat label="Distance" value={`${fmt(trip.distanceKm, 1)} km`} />
+                <MiniStat label="SOC" value={`${fmt(trip.socStart)}% → ${fmt(trip.socEnd)}%`} />
+                <MiniStat label="Max speed" value={`${fmt(trip.maxSpeed)} km/h`} />
+                <MiniStat label="Avg speed" value={`${fmt(trip.avgSpeed)} km/h`} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SummaryPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white/[0.02] p-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-1 font-heading text-lg font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+      <p className="mt-1 font-heading text-base font-semibold tabular-nums">{value}</p>
+    </div>
+  );
 }
 
 function seriesFromPoints(
@@ -295,10 +539,10 @@ function TelemetryHistoryCharts({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-2xl font-semibold tracking-tight">
-            Telemetry history
+            Trip charts
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Last {visiblePoints.length} cloud points
+            {visiblePoints.length} cloud points
             {start && end ? ` · ${new Date(start).toLocaleTimeString()} - ${new Date(end).toLocaleTimeString()}` : ""}
           </p>
         </div>
@@ -413,6 +657,87 @@ function TelemetryLineChart({
         })}
       </svg>
     </article>
+  );
+}
+
+function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
+  const routePoints = points.flatMap((point) => {
+    const lat = validNumber(point.location.lat);
+    const lon = validNumber(point.location.lon);
+    const time = pointTimeMs(point);
+    return lat != null && lon != null && Number.isFinite(time) ? [{ lat, lon, time }] : [];
+  });
+
+  const hasRoute = routePoints.length > 0;
+  const minLat = hasRoute ? Math.min(...routePoints.map((point) => point.lat)) : 0;
+  const maxLat = hasRoute ? Math.max(...routePoints.map((point) => point.lat)) : 1;
+  const minLon = hasRoute ? Math.min(...routePoints.map((point) => point.lon)) : 0;
+  const maxLon = hasRoute ? Math.max(...routePoints.map((point) => point.lon)) : 1;
+  const latPad = Math.max((maxLat - minLat) * 0.12, maxLat === minLat ? 0.001 : 0);
+  const lonPad = Math.max((maxLon - minLon) * 0.12, maxLon === minLon ? 0.001 : 0);
+  const yMin = minLat - latPad;
+  const yMax = maxLat + latPad;
+  const xMin = minLon - lonPad;
+  const xMax = maxLon + lonPad;
+
+  const x = (lon: number) => 16 + ((lon - xMin) / (xMax - xMin)) * 288;
+  const y = (lat: number) => 164 - ((lat - yMin) / (yMax - yMin)) * 148;
+  const path = routePoints
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.lon).toFixed(2)} ${y(point.lat).toFixed(2)}`)
+    .join(" ");
+  const start = routePoints[0];
+  const end = routePoints.at(-1);
+
+  return (
+    <section className="voltflow-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">Route</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {routePoints.length} GPS points in the selected trip
+          </p>
+        </div>
+        {start && end ? (
+          <span className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            {formatClock(start.time)} - {formatClock(end.time)}
+          </span>
+        ) : null}
+      </div>
+
+      {routePoints.length === 0 ? (
+        <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+          No GPS points in this trip. Check location permission in CloudEV Gateway.
+        </p>
+      ) : (
+        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]">
+          <svg className="h-64 w-full" viewBox="0 0 320 180" role="img" aria-label="Selected trip route">
+            <defs>
+              <pattern id="route-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M24 0H0V24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width="320" height="180" fill="url(#route-grid)" />
+            {routePoints.length > 1 ? (
+              <path d={path} fill="none" stroke="var(--voltflow-cyan)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            ) : null}
+            {start ? (
+              <circle cx={x(start.lon)} cy={y(start.lat)} r="5" fill="#22c55e">
+                <title>Start</title>
+              </circle>
+            ) : null}
+            {end ? (
+              <circle cx={x(end.lon)} cy={y(end.lat)} r="5" fill="#facc15">
+                <title>End</title>
+              </circle>
+            ) : null}
+          </svg>
+          <div className="grid grid-cols-2 gap-3 border-t border-border p-4 text-sm">
+            <MiniStat label="Start" value={start ? `${start.lat.toFixed(5)}, ${start.lon.toFixed(5)}` : "—"} />
+            <MiniStat label="End" value={end ? `${end.lat.toFixed(5)}, ${end.lon.toFixed(5)}` : "—"} />
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
