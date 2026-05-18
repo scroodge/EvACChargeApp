@@ -1,6 +1,6 @@
 "use client";
 
-import { BatteryCharging, RadioTower, UserCircle2, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,8 +9,11 @@ import { ArticleList } from "@/components/telegram/ArticleList";
 import { BuyCatalog } from "@/components/telegram/BuyCatalog";
 import { Calculators } from "@/components/telegram/Calculators";
 import { CategoryFilter } from "@/components/telegram/CategoryFilter";
+import { GenerationFilter } from "@/components/telegram/GenerationFilter";
 import { KnowledgeHome } from "@/components/telegram/KnowledgeHome";
 import { SmartFAQ } from "@/components/telegram/SmartFAQ";
+import { useTelegramGeneration } from "@/hooks/use-telegram-generation";
+import { filterArticlesByGeneration } from "@/lib/telegram/generation";
 import { getTelegramThemeStyle } from "@/lib/telegram/theme";
 import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
 import type { TelegramKnowledgeData } from "@/types/knowledge";
@@ -21,6 +24,7 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TelegramTab>("home");
   const [guideCategory, setGuideCategory] = useState<string | "All">("All");
+  const [generation, setGeneration] = useTelegramGeneration();
   const articleCategories = useMemo(() => {
     const categoryMap = new Map<string, string>();
     for (const article of data?.articles ?? []) {
@@ -28,15 +32,25 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
     }
     return Array.from(categoryMap.entries()).map(([slug, title]) => ({ slug, title }));
   }, [data?.articles]);
+  const filteredArticles = useMemo(
+    () => filterArticlesByGeneration(data?.articles ?? [], generation),
+    [data?.articles, generation],
+  );
+  const filteredData = useMemo(
+    () =>
+      data
+        ? {
+            ...data,
+            articles: filteredArticles,
+          }
+        : undefined,
+    [data, filteredArticles],
+  );
   const telegram = useTelegramWebApp();
   const themeStyle = useMemo(
     () => getTelegramThemeStyle(telegram.themeParams),
     [telegram.themeParams],
   );
-  const userName =
-    telegram.user?.first_name ||
-    telegram.user?.username ||
-    (telegram.isTelegram ? "Пользователь Telegram" : "Веб-пользователь");
 
   useEffect(() => {
     const tab = searchParams.get("tab") as TelegramTab | null;
@@ -81,48 +95,32 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
                   VoltFlow
                 </h1>
                 <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                  EV-помощник
+                  База знаний BYD YUAN UP
                 </p>
               </div>
             </div>
 
             <span className="shrink-0 rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-[var(--voltflow-cyan)]">
-              {telegram.isTelegram ? "Мини-приложение Telegram" : "Веб-режим"}
+              {telegram.isTelegram ? "Telegram" : "Веб"}
             </span>
           </div>
 
-          <section className="voltflow-card p-4" aria-label="Mini app status">
-            <div className="grid grid-cols-[1fr_auto] gap-3">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <UserCircle2 className="size-4" aria-hidden />
-                  <span className="truncate">{userName}</span>
-                </p>
-                <p className="mt-2 font-heading text-xl font-bold">
-                  Заряжайтесь спокойнее
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Русская база знаний: зарядка, эксплуатация, обслуживание,
-                  аксессуары, вопросы и калькуляторы.
-                </p>
-              </div>
-              <div className="grid size-14 place-items-center rounded-lg border border-border bg-white/[0.04] text-[var(--voltflow-green)]">
-                {telegram.isTelegram ? (
-                  <RadioTower className="size-7" aria-hidden />
-                ) : (
-                  <BatteryCharging className="size-7" aria-hidden />
-                )}
-              </div>
+          <section className="voltflow-card p-4" aria-label="Поколение автомобиля">
+            <p className="text-sm leading-6 text-muted-foreground">
+              Выберите поколение — покажем статьи только для вашей версии Yuan Up.
+            </p>
+            <div className="mt-4">
+              <GenerationFilter value={generation} onChange={setGeneration} />
             </div>
           </section>
         </header>
 
         <div className="mt-5">
           {activeTab === "home" ? (
-              <KnowledgeHome
+            <KnowledgeHome
               isTelegram={telegram.isTelegram}
               onNavigate={changeTab}
-              data={data}
+              data={filteredData}
             />
           ) : null}
           {activeTab === "guides" ? (
@@ -136,14 +134,25 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
                 )}
               />
               {guideCategory === "All" ? (
-                <ArticleList articles={data?.articles ?? []} />
+                <ArticleList articles={filteredArticles} />
               ) : null}
               {guideCategory !== "All" ? (
                 <ArticleList
-                  articles={(data?.articles ?? []).filter((article) => article.categorySlug === guideCategory)}
-                  eyebrow={articleCategories.find((category) => category.slug === guideCategory)?.title ?? "Гайды"}
+                  articles={filteredArticles.filter(
+                    (article) => article.categorySlug === guideCategory,
+                  )}
+                  eyebrow={
+                    articleCategories.find((category) => category.slug === guideCategory)
+                      ?.title ?? "Гайды"
+                  }
                   title="Статьи раздела"
                 />
+              ) : null}
+              {!filteredArticles.length ? (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Для выбранного поколения статей пока нет. Попробуйте другое поколение или
+                  загляните позже.
+                </p>
               ) : null}
             </div>
           ) : null}

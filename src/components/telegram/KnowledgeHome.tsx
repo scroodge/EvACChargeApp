@@ -12,6 +12,8 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { useTelegramGeneration } from "@/hooks/use-telegram-generation";
+
 import { chargingGuides } from "@/data/telegram/charging-guides";
 import { searchTelegramKnowledge } from "@/lib/telegram/search";
 import type { TelegramTab } from "@/components/telegram/BottomTabs";
@@ -41,8 +43,11 @@ const quickCards = [
 
 export function KnowledgeHome({ isTelegram, onNavigate, data }: KnowledgeHomeProps) {
   const [query, setQuery] = useState("");
+  const [generation] = useTelegramGeneration();
   const results = useMemo(() => searchTelegramKnowledge(query, 6, data), [data, query]);
-  const popularArticles = (data?.articles.filter((article) => article.categorySlug === "charging") ?? chargingGuides).slice(0, 4);
+  const popularArticles = (
+    data?.articles.filter((article) => article.categorySlug === "charging") ?? chargingGuides
+  ).slice(0, 4);
 
   return (
     <section className="space-y-5" aria-labelledby="knowledge-home-title">
@@ -94,7 +99,7 @@ export function KnowledgeHome({ isTelegram, onNavigate, data }: KnowledgeHomePro
           <ArticleCard key={article.id} article={article} priorityImage={index === 0} />
         ))}
         <Link
-          href="/telegram/category/charging"
+          href={`/telegram/category/charging?gen=${generation}`}
           className="inline-flex min-h-11 items-center rounded-lg border border-border bg-white/[0.04] px-4 text-sm font-semibold text-[var(--voltflow-cyan)]"
         >
           Открыть раздел зарядки

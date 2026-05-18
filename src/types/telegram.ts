@@ -1,9 +1,12 @@
+import type { CarGeneration } from "@/lib/car-generations";
+
 export type KnowledgeArticle = {
   id: string;
   slug: string;
   title: string;
   category: string;
   categorySlug: string;
+  modelGenerations?: CarGeneration[];
   tags: string[];
   summary: string;
   sections: {

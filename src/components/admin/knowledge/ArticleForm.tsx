@@ -8,6 +8,8 @@ import type { AdminFormState } from "@/actions/knowledge-admin";
 import { JsonSectionsEditor } from "@/components/admin/knowledge/JsonSectionsEditor";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
 import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
+import { carGenerations } from "@/lib/car-generations";
+import { telegramGenerationLabels } from "@/lib/telegram/generation";
 import type { KnowledgeArticle, KnowledgeCategory } from "@/types/knowledge";
 
 type ArticleFormProps = {
@@ -137,6 +139,26 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
             </select>
             <FieldError message={state.errors?.status} />
           </label>
+          <fieldset className="space-y-2 text-sm font-semibold">
+            <legend>Поколения Yuan Up</legend>
+            <div className="space-y-2">
+              {carGenerations.map((generation) => (
+                <label key={generation} className="flex items-center gap-2 font-normal">
+                  <input
+                    type="checkbox"
+                    name="model_generations"
+                    value={generation}
+                    defaultChecked={(article?.model_generations ?? carGenerations).includes(
+                      generation,
+                    )}
+                    className="size-4 rounded border border-input"
+                  />
+                  <span>{telegramGenerationLabels[generation]}</span>
+                </label>
+              ))}
+            </div>
+            <FieldError message={state.errors?.model_generations} />
+          </fieldset>
           <label className="space-y-1.5 text-sm font-semibold">
             <span>Раздел</span>
             <select name="category_id" defaultValue={stateString(state, "category_id", article?.category_id ?? "")} className={inputClass}>

@@ -1,3 +1,4 @@
+import type { CarGeneration } from "@/lib/car-generations";
 import type {
   AccessoryItem as TelegramAccessoryItem,
   FAQItem as TelegramFAQItem,
@@ -44,6 +45,7 @@ export type KnowledgeArticle = {
   tips: string[];
   warnings: string[];
   tags: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   source_label: string | null;
   sort_order: number;
@@ -114,6 +116,7 @@ export type ArticleInput = {
   tips: string[];
   warnings: string[];
   tags: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   source_label: string | null;
   sort_order: number;

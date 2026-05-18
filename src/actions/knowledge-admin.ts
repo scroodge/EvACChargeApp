@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { isCarGeneration } from "@/lib/car-generations";
+
 import {
   createAccessory,
   createArticle,
@@ -237,6 +239,10 @@ async function parseArticleForm(
     slug: slugify(stringValue(formData, "slug")),
     summary: nullableString(formData, "summary"),
     category_id: stringValue(formData, "category_id"),
+    model_generations: formData
+      .getAll("model_generations")
+      .map(String)
+      .filter(isCarGeneration),
     tags: listValue(formData, "tags"),
     content: sectionValue(formData, "content"),
     images: existingImagesValue(formData),
@@ -415,6 +421,9 @@ async function validateArticle(input: ArticleInput, currentId?: string) {
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   if (!input.content.length) errors.content = "Добавьте хотя бы один блок контента.";
+  if (!input.model_generations.length) {
+    errors.model_generations = "Выберите хотя бы одно поколение.";
+  }
   if (input.slug && (await isSlugTaken("knowledge_articles", input.slug, currentId))) {
     errors.slug = "Этот slug уже используется.";
   }

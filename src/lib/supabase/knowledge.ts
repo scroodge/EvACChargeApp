@@ -1,4 +1,6 @@
+import { isCarGeneration } from "@/lib/car-generations";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeModelGenerations } from "@/lib/telegram/generation";
 import type {
   AccessoryInput,
   AccessoryExternalLink,
@@ -22,11 +24,15 @@ import type {
 
 type CategoryRelation = KnowledgeCategory | KnowledgeCategory[] | null;
 
-type RawArticle = Omit<KnowledgeArticle, "category" | "content" | "images" | "tips" | "warnings"> & {
+type RawArticle = Omit<
+  KnowledgeArticle,
+  "category" | "content" | "images" | "tips" | "warnings" | "model_generations"
+> & {
   content: unknown;
   images: unknown;
   tips: unknown;
   warnings: unknown;
+  model_generations?: unknown;
   knowledge_categories?: CategoryRelation;
 };
 
@@ -479,6 +485,7 @@ function toArticleRow(input: ArticleInput) {
     tips: input.tips,
     warnings: input.warnings,
     tags: input.tags,
+    model_generations: input.model_generations,
     status: input.status,
     source_label: input.source_label,
     sort_order: input.sort_order,
@@ -495,6 +502,7 @@ function mapArticle(row: RawArticle): KnowledgeArticle {
     tips: parseStringArray(row.tips),
     warnings: parseStringArray(row.warnings),
     tags: row.tags ?? [],
+    model_generations: parseModelGenerations(row.model_generations),
   };
 }
 
@@ -589,6 +597,11 @@ function parseImages(value: unknown): SparePartImage[] {
     .filter((item): item is SparePartImage => Boolean(item));
 }
 
+function parseModelGenerations(value: unknown) {
+  if (!Array.isArray(value)) return normalizeModelGenerations(undefined);
+  return normalizeModelGenerations(value.filter(isCarGeneration));
+}
+
 function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle {
   return {
     id: article.id,
@@ -596,6 +609,7 @@ function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle 
     title: article.title,
     category: article.category?.title ?? "Knowledge",
     categorySlug: article.category?.slug ?? "knowledge",
+    modelGenerations: article.model_generations,
     tags: article.tags,
     summary: article.summary ?? "",
     sections: article.content,
