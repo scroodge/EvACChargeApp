@@ -1,4 +1,6 @@
 import { isCarGeneration } from "@/lib/car-generations";
+import { buildKnowledgeEmbeddingText, createEmbedding } from "@/lib/embeddings";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeModelGenerations } from "@/lib/telegram/generation";
 import type {
@@ -159,6 +161,7 @@ export async function createArticle(input: ArticleInput) {
 
   if (error) throw error;
   await replaceArticleRelations(data.id, input.related_article_ids ?? []);
+  await upsertArticleKnowledgeItem(data.id as string, input);
   return data.id as string;
 }
 
@@ -171,12 +174,14 @@ export async function updateArticle(id: string, input: ArticleInput) {
 
   if (error) throw error;
   await replaceArticleRelations(id, input.related_article_ids ?? []);
+  await upsertArticleKnowledgeItem(id, input);
 }
 
 export async function deleteArticle(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("knowledge_articles").delete().eq("id", id);
   if (error) throw error;
+  await deleteKnowledgeItem(id);
 }
 
 export async function getPublishedFAQ() {
@@ -225,6 +230,7 @@ export async function createFAQ(input: FAQInput) {
     .single();
 
   if (error) throw error;
+  await upsertFAQKnowledgeItem(data.id as string, input);
   return data.id as string;
 }
 
@@ -232,12 +238,14 @@ export async function updateFAQ(id: string, input: FAQInput) {
   const supabase = await createClient();
   const { error } = await supabase.from("faq_items").update(input).eq("id", id);
   if (error) throw error;
+  await upsertFAQKnowledgeItem(id, input);
 }
 
 export async function deleteFAQ(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("faq_items").delete().eq("id", id);
   if (error) throw error;
+  await deleteKnowledgeItem(id);
 }
 
 export async function getPublishedAccessories() {
@@ -286,6 +294,7 @@ export async function createAccessory(input: AccessoryInput) {
     .single();
 
   if (error) throw error;
+  await upsertAccessoryKnowledgeItem(data.id as string, input);
   return data.id as string;
 }
 
@@ -293,12 +302,14 @@ export async function updateAccessory(id: string, input: AccessoryInput) {
   const supabase = await createClient();
   const { error } = await supabase.from("accessories").update(input).eq("id", id);
   if (error) throw error;
+  await upsertAccessoryKnowledgeItem(id, input);
 }
 
 export async function deleteAccessory(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("accessories").delete().eq("id", id);
   if (error) throw error;
+  await deleteKnowledgeItem(id);
 }
 
 export async function getPublishedSpareParts() {
@@ -347,6 +358,7 @@ export async function createSparePart(input: SparePartInput) {
     .single();
 
   if (error) throw error;
+  await upsertSparePartKnowledgeItem(data.id as string, input);
   return data.id as string;
 }
 
@@ -354,12 +366,14 @@ export async function updateSparePart(id: string, input: SparePartInput) {
   const supabase = await createClient();
   const { error } = await supabase.from("spare_parts").update(input).eq("id", id);
   if (error) throw error;
+  await upsertSparePartKnowledgeItem(id, input);
 }
 
 export async function deleteSparePart(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("spare_parts").delete().eq("id", id);
   if (error) throw error;
+  await deleteKnowledgeItem(id);
 }
 
 export async function createCategory(input: {
@@ -491,6 +505,139 @@ function toArticleRow(input: ArticleInput) {
     sort_order: input.sort_order,
     published_at: input.status === "published" ? new Date().toISOString() : null,
   };
+}
+
+async function upsertArticleKnowledgeItem(id: string, input: ArticleInput) {
+  const category = await getCategorySlug(input.category_id);
+  const content = [
+    input.summary,
+    ...input.content.map((section) => `${section.heading}\n${section.body}`),
+    ...input.tips.map((tip) => `Совет: ${tip}`),
+    ...input.warnings.map((warning) => `Важно: ${warning}`),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  await upsertKnowledgeItem({
+    id,
+    title: input.title,
+    content,
+    category,
+    source_type: "article",
+    source_url: `/telegram/article/${input.slug}`,
+    source_slug: input.slug,
+    tags: input.tags,
+    is_published: input.status === "published",
+  });
+}
+
+async function upsertFAQKnowledgeItem(id: string, input: FAQInput) {
+  const category = await getCategorySlug(input.category_id);
+  await upsertKnowledgeItem({
+    id,
+    title: input.question,
+    content: input.answer,
+    category,
+    source_type: "faq",
+    source_url: "/telegram?tab=faq",
+    tags: input.tags,
+    is_published: input.status === "published",
+  });
+}
+
+async function upsertAccessoryKnowledgeItem(id: string, input: AccessoryInput) {
+  const category = await getCategorySlug(input.category_id);
+  const content = [
+    input.use_case,
+    input.why_useful,
+    ...input.what_to_check.map((item) => `Проверить: ${item}`),
+    ...input.risk_notes.map((item) => `Риск: ${item}`),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  await upsertKnowledgeItem({
+    id,
+    title: input.title,
+    content,
+    category,
+    source_type: "accessory",
+    source_url: input.external_url,
+    tags: input.search_keywords,
+    is_published: input.status === "published",
+  });
+}
+
+async function upsertSparePartKnowledgeItem(id: string, input: SparePartInput) {
+  const category = await getCategorySlug(input.category_id);
+  const content = [input.description, input.part_number, input.compatibility]
+    .filter(Boolean)
+    .join("\n\n");
+
+  await upsertKnowledgeItem({
+    id,
+    title: input.title,
+    content,
+    category,
+    source_type: "spare_part",
+    tags: input.search_keywords,
+    is_published: input.status === "published",
+  });
+}
+
+async function upsertKnowledgeItem(item: {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  source_type: string;
+  source_url?: string | null;
+  source_slug?: string | null;
+  tags: string[];
+  is_published: boolean;
+}) {
+  const embeddingText = buildKnowledgeEmbeddingText({
+    title: item.title,
+    content: item.content,
+    category: item.category,
+    tags: item.tags,
+  });
+  const embedding = await createEmbedding(embeddingText);
+  const { error } = await supabaseAdmin.from("knowledge_items").upsert({
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    category: item.category,
+    source_type: item.source_type,
+    source_url: item.source_url ?? null,
+    telegram_message_id: null,
+    source_id: item.id,
+    source_slug: item.source_slug ?? null,
+    tags: item.tags,
+    embedding,
+    is_published: item.is_published,
+  });
+
+  if (error) throw error;
+}
+
+async function deleteKnowledgeItem(id: string) {
+  const { error } = await supabaseAdmin.from("knowledge_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
+async function getCategorySlug(categoryId: string | null) {
+  if (!categoryId) return "faq";
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("knowledge_categories")
+    .select("slug")
+    .eq("id", categoryId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.slug ?? "faq";
 }
 
 function mapArticle(row: RawArticle): KnowledgeArticle {

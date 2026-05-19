@@ -7,6 +7,7 @@ const PUBLIC_PATHS = new Set([
   "/forgot-password",
   "/auth/callback",
   "/telegram",
+  "/knowledge/search",
 ]);
 const PUBLIC_METADATA_PATHS = new Set([
   "/apple-icon",

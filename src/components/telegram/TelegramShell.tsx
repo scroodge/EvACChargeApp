@@ -64,6 +64,11 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   }, [searchParams]);
 
   function changeTab(tab: TelegramTab) {
+    if (tab === "search") {
+      router.push("/knowledge/search");
+      return;
+    }
+
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams);
     if (tab === "home") {

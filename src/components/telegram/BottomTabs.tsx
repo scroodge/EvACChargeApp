@@ -1,10 +1,10 @@
 "use client";
 
-import { BookOpen, HelpCircle, Home, Menu, ShoppingBag } from "lucide-react";
+import { BookOpen, HelpCircle, Home, Menu, Search, ShoppingBag } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type TelegramTab = "home" | "guides" | "faq" | "buy" | "more";
+export type TelegramTab = "home" | "guides" | "faq" | "buy" | "search" | "more";
 
 type BottomTabsProps = {
   activeTab: TelegramTab;
@@ -16,6 +16,7 @@ const tabs = [
   { id: "guides", label: "Гайды", icon: BookOpen },
   { id: "faq", label: "Вопросы", icon: HelpCircle },
   { id: "buy", label: "Купить", icon: ShoppingBag },
+  { id: "search", label: "Умный поиск", icon: Search },
   { id: "more", label: "Еще", icon: Menu },
 ] satisfies Array<{
   id: TelegramTab;
@@ -26,7 +27,7 @@ const tabs = [
 export function BottomTabs({ activeTab, onTabChange }: BottomTabsProps) {
   return (
     <nav className="bottom-nav" aria-label="Telegram mini app sections">
-      <div className="mx-auto grid max-w-[430px] grid-cols-5 gap-2">
+      <div className="mx-auto grid max-w-[430px] grid-cols-6 gap-1">
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
 
