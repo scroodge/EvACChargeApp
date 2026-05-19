@@ -5,20 +5,24 @@ import { deleteFAQAction } from "@/actions/knowledge-admin";
 import { AdminShell } from "@/components/admin/knowledge/AdminShell";
 import { DeleteButton } from "@/components/admin/knowledge/DeleteButton";
 import { StatusBadge } from "@/components/admin/knowledge/StatusBadge";
+import { carGenerations, isCarGeneration } from "@/lib/car-generations";
 import { getAdminFAQ, getCategories } from "@/lib/supabase/knowledge";
+import { telegramGenerationLabels } from "@/lib/telegram/generation";
 
 type PageProps = {
-  searchParams: Promise<{ status?: string; category?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; category?: string; generation?: string; q?: string }>;
 };
 
 export default async function FAQPage({ searchParams }: PageProps) {
   const filters = await searchParams;
   const [items, categories] = await Promise.all([getAdminFAQ(), getCategories()]);
+  const generationFilter = isCarGeneration(filters.generation) ? filters.generation : null;
   const filtered = items.filter((item) => {
     const q = filters.q?.toLowerCase().trim();
     return (
       (!filters.status || item.status === filters.status) &&
       (!filters.category || item.category_id === filters.category) &&
+      (!generationFilter || item.model_generations.includes(generationFilter)) &&
       (!q || [item.question, item.answer].join(" ").toLowerCase().includes(q))
     );
   });
@@ -40,6 +44,11 @@ export default async function FAQPage({ searchParams }: PageProps) {
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={item.status} />
                   <span className="text-xs text-muted-foreground">{item.category?.title ?? "Без раздела"}</span>
+                  {item.model_generations.map((generation) => (
+                    <span key={generation} className="text-xs text-muted-foreground">
+                      {telegramGenerationLabels[generation]}
+                    </span>
+                  ))}
                 </div>
                 <h2 className="mt-2 font-heading text-lg font-bold">{item.question}</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.answer}</p>
@@ -63,10 +72,10 @@ function FilterForm({
   filters,
 }: {
   categories: Awaited<ReturnType<typeof getCategories>>;
-  filters: { status?: string; category?: string; q?: string };
+  filters: { status?: string; category?: string; generation?: string; q?: string };
 }) {
   return (
-    <form className="grid gap-2 md:grid-cols-[10rem_12rem_16rem_auto]">
+    <form className="grid gap-2 md:grid-cols-[10rem_12rem_13rem_16rem_auto]">
       <select name="status" defaultValue={filters.status ?? ""} className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm">
         <option value="">Все статусы</option>
         <option value="draft">Черновик</option>
@@ -77,6 +86,12 @@ function FilterForm({
         <option value="">Все разделы</option>
         {categories.map((category) => (
           <option key={category.id} value={category.id}>{category.title}</option>
+        ))}
+      </select>
+      <select name="generation" defaultValue={filters.generation ?? ""} className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm">
+        <option value="">Все поколения</option>
+        {carGenerations.map((generation) => (
+          <option key={generation} value={generation}>{telegramGenerationLabels[generation]}</option>
         ))}
       </select>
       <input name="q" defaultValue={filters.q ?? ""} placeholder="Поиск" className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm" />
