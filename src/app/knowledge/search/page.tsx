@@ -3,6 +3,9 @@
 import { Loader2, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
+import { carGenerations, type CarGeneration } from "@/lib/car-generations";
+import { telegramGenerationLabels } from "@/lib/telegram/generation";
+
 type KnowledgeSearchResult = {
   id: string;
   title: string;
@@ -29,6 +32,7 @@ const categories = [
 export default function KnowledgeSearchPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
+  const [generation, setGeneration] = useState<CarGeneration>("gen1_2024");
   const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +69,7 @@ export default function KnowledgeSearchPage() {
         body: JSON.stringify({
           query: text,
           category: category || undefined,
+          generation,
           limit: 8,
         }),
       });
@@ -127,6 +132,24 @@ export default function KnowledgeSearchPage() {
               ))}
             </select>
           </label>
+
+          <div className="grid grid-cols-2 gap-2">
+            {carGenerations.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setGeneration(item)}
+                className={[
+                  "min-h-10 rounded-lg border px-3 text-xs font-bold transition",
+                  generation === item
+                    ? "border-[var(--voltflow-green)] bg-[var(--voltflow-green)] text-black"
+                    : "border-border bg-white/[0.035] text-muted-foreground",
+                ].join(" ")}
+              >
+                {telegramGenerationLabels[item]}
+              </button>
+            ))}
+          </div>
 
           <button
             type="submit"

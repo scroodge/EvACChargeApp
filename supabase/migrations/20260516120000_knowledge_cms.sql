@@ -59,6 +59,7 @@ create table if not exists public.accessories (
   priority text not null default 'useful',
   risk_notes jsonb default '[]'::jsonb,
   search_keywords text[] default '{}'::text[],
+  model_generations text[] not null default array['gen1_2024', 'gen2_2025']::text[],
   external_url text,
   status text not null default 'draft',
   sort_order integer not null default 0,

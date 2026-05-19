@@ -1,4 +1,5 @@
 import { createEmbedding } from "@/lib/embeddings";
+import { isCarGeneration, type CarGeneration } from "@/lib/car-generations";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export type KnowledgeSearchResult = {
@@ -16,6 +17,7 @@ export type KnowledgeSearchResult = {
 export async function searchKnowledge(params: {
   query: string;
   category?: string | null;
+  generation?: CarGeneration | null;
   limit?: number;
 }) {
   const query = params.query.trim();
@@ -31,6 +33,7 @@ export async function searchKnowledge(params: {
     match_threshold: 0.2,
     match_count: params.limit ?? 8,
     filter_category: params.category || null,
+    filter_generation: isCarGeneration(params.generation) ? params.generation : null,
   });
 
   if (error) {

@@ -289,6 +289,10 @@ async function parseAccessoryForm(formData: FormData): Promise<AccessoryInput | 
     priority: priorityValue(formData),
     risk_notes: multilineValue(formData, "risk_notes"),
     search_keywords: listValue(formData, "search_keywords"),
+    model_generations: formData
+      .getAll("model_generations")
+      .map(String)
+      .filter(isCarGeneration),
     external_url: nullableString(formData, "external_url"),
     external_links: externalLinksValue(formData),
     image_url: nullableString(formData, "image_url"),
@@ -305,6 +309,9 @@ async function parseAccessoryForm(formData: FormData): Promise<AccessoryInput | 
   const errors: Record<string, string> = {};
   if (!input.title) errors.title = "Название обязательно.";
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!input.model_generations.length) {
+    errors.model_generations = "Выберите хотя бы одно поколение.";
+  }
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   if (!priorities.includes(input.priority)) errors.priority = "Выберите корректный приоритет.";
   return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
@@ -320,6 +327,10 @@ async function parseSparePartForm(formData: FormData): Promise<SparePartInput | 
     external_links: externalLinksValue(formData),
     images: existingImagesValue(formData),
     search_keywords: listValue(formData, "search_keywords"),
+    model_generations: formData
+      .getAll("model_generations")
+      .map(String)
+      .filter(isCarGeneration),
     status: statusValue(formData),
     sort_order: numberValue(formData, "sort_order"),
   };
@@ -331,6 +342,9 @@ async function parseSparePartForm(formData: FormData): Promise<SparePartInput | 
   if (!input.title) errors.title = "Название обязательно.";
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
   if (!input.description) errors.description = "Описание обязательно.";
+  if (!input.model_generations.length) {
+    errors.model_generations = "Выберите хотя бы одно поколение.";
+  }
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }

@@ -52,6 +52,7 @@ export type AccessoryItem = {
   priority: AccessoryPriority;
   riskNotes?: string[];
   searchKeywords: string[];
+  modelGenerations?: CarGeneration[];
   externalUrl?: string;
   externalLinks?: AccessoryExternalLink[];
   imageUrl?: string;

@@ -13,7 +13,10 @@ import { GenerationFilter } from "@/components/telegram/GenerationFilter";
 import { KnowledgeHome } from "@/components/telegram/KnowledgeHome";
 import { SmartFAQ } from "@/components/telegram/SmartFAQ";
 import { useTelegramGeneration } from "@/hooks/use-telegram-generation";
-import { filterArticlesByGeneration } from "@/lib/telegram/generation";
+import {
+  filterArticlesByGeneration,
+  normalizeModelGenerations,
+} from "@/lib/telegram/generation";
 import { getTelegramThemeStyle } from "@/lib/telegram/theme";
 import { useTelegramWebApp } from "@/lib/telegram/useTelegramWebApp";
 import type { TelegramKnowledgeData } from "@/types/knowledge";
@@ -36,15 +39,28 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
     () => filterArticlesByGeneration(data?.articles ?? [], generation),
     [data?.articles, generation],
   );
+  const filteredAccessories = useMemo(
+    () => filterArticlesByGeneration(data?.accessories ?? [], generation),
+    [data?.accessories, generation],
+  );
+  const filteredSpareParts = useMemo(
+    () =>
+      (data?.spareParts ?? []).filter((item) =>
+        normalizeModelGenerations(item.model_generations).includes(generation),
+      ),
+    [data?.spareParts, generation],
+  );
   const filteredData = useMemo(
     () =>
       data
         ? {
             ...data,
             articles: filteredArticles,
+            accessories: filteredAccessories,
+            spareParts: filteredSpareParts,
           }
         : undefined,
-    [data, filteredArticles],
+    [data, filteredAccessories, filteredArticles, filteredSpareParts],
   );
   const telegram = useTelegramWebApp();
   const themeStyle = useMemo(
@@ -64,11 +80,6 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
   }, [searchParams]);
 
   function changeTab(tab: TelegramTab) {
-    if (tab === "search") {
-      router.push("/knowledge/search");
-      return;
-    }
-
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams);
     if (tab === "home") {
@@ -110,21 +121,18 @@ export function TelegramShell({ data }: { data?: TelegramKnowledgeData }) {
             </span>
           </div>
 
-          <section className="voltflow-card p-4" aria-label="Поколение автомобиля">
-            <p className="text-sm leading-6 text-muted-foreground">
-              Выберите поколение — покажем статьи только для вашей версии Yuan Up.
-            </p>
-            <div className="mt-4">
-              <GenerationFilter value={generation} onChange={setGeneration} />
-            </div>
+          <section className="voltflow-card p-2.5" aria-label="Поколение автомобиля">
+            <GenerationFilter value={generation} onChange={setGeneration} />
           </section>
         </header>
 
         <div className="mt-5">
           {activeTab === "home" ? (
             <KnowledgeHome
+              key={generation}
               isTelegram={telegram.isTelegram}
               onNavigate={changeTab}
+              generation={generation}
               data={filteredData}
             />
           ) : null}

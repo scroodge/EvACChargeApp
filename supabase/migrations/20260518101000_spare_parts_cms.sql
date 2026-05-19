@@ -20,6 +20,7 @@ create table if not exists public.spare_parts (
   external_links jsonb not null default '[]'::jsonb,
   images jsonb not null default '[]'::jsonb,
   search_keywords text[] default '{}'::text[],
+  model_generations text[] not null default array['gen1_2024', 'gen2_2025']::text[],
   status text not null default 'draft',
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),

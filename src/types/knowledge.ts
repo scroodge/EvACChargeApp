@@ -79,6 +79,7 @@ export type AccessoryItem = {
   priority: AccessoryPriority;
   risk_notes: string[];
   search_keywords: string[];
+  model_generations: CarGeneration[];
   external_url: string | null;
   external_links: AccessoryExternalLink[];
   image_url: string | null;
@@ -100,6 +101,7 @@ export type SparePartItem = {
   external_links: AccessoryExternalLink[];
   images: SparePartImage[];
   search_keywords: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   sort_order: number;
   created_at: string;
@@ -141,6 +143,7 @@ export type AccessoryInput = {
   priority: AccessoryPriority;
   risk_notes: string[];
   search_keywords: string[];
+  model_generations: CarGeneration[];
   external_url: string | null;
   external_links: AccessoryExternalLink[];
   image_url: string | null;
@@ -158,6 +161,7 @@ export type SparePartInput = {
   external_links: AccessoryExternalLink[];
   images: SparePartImage[];
   search_keywords: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   sort_order: number;
 };

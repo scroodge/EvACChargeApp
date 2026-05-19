@@ -9,6 +9,8 @@ import { ExternalLinksEditor } from "@/components/admin/knowledge/ExternalLinksE
 import { FieldError, inputClass, Panel, textareaClass } from "@/components/admin/knowledge/ArticleForm";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
 import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
+import { carGenerations } from "@/lib/car-generations";
+import { telegramGenerationLabels } from "@/lib/telegram/generation";
 import type { KnowledgeCategory, SparePartItem } from "@/types/knowledge";
 
 export function SparePartForm({
@@ -21,6 +23,9 @@ export function SparePartForm({
   action: (state: AdminFormState, formData: FormData) => Promise<AdminFormState>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+  const selectedGenerations = state.values
+    ? stateList(state, "model_generations")
+    : item?.model_generations ?? carGenerations;
 
   return (
     <form key={stateKey(state)} action={formAction} className="max-w-4xl">
@@ -112,6 +117,25 @@ export function SparePartForm({
         </div>
 
         <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={stateString(state, "search_keywords", item?.search_keywords.join(", ") ?? "")} />
+
+        <fieldset className="space-y-2 text-sm font-semibold">
+          <legend>Поколения Yuan Up</legend>
+          <div className="space-y-2">
+            {carGenerations.map((generation) => (
+              <label key={generation} className="flex items-center gap-2 font-normal">
+                <input
+                  type="checkbox"
+                  name="model_generations"
+                  value={generation}
+                  defaultChecked={selectedGenerations.includes(generation)}
+                  className="size-4 rounded border border-input"
+                />
+                <span>{telegramGenerationLabels[generation]}</span>
+              </label>
+            ))}
+          </div>
+          <FieldError message={state.errors?.model_generations} />
+        </fieldset>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-semibold">

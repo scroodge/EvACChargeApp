@@ -9,6 +9,8 @@ import { FieldError, inputClass, Panel, textareaClass } from "@/components/admin
 import { ExternalLinksEditor } from "@/components/admin/knowledge/ExternalLinksEditor";
 import { TagsInput } from "@/components/admin/knowledge/TagsInput";
 import { stateKey, stateList, stateString } from "@/components/admin/knowledge/form-state";
+import { carGenerations } from "@/lib/car-generations";
+import { telegramGenerationLabels } from "@/lib/telegram/generation";
 import type { AccessoryItem, KnowledgeCategory } from "@/types/knowledge";
 
 export function AccessoryForm({
@@ -21,6 +23,9 @@ export function AccessoryForm({
   action: (state: AdminFormState, formData: FormData) => Promise<AdminFormState>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+  const selectedGenerations = state.values
+    ? stateList(state, "model_generations")
+    : item?.model_generations ?? carGenerations;
 
   return (
     <form key={stateKey(state)} action={formAction} className="max-w-4xl">
@@ -60,6 +65,24 @@ export function AccessoryForm({
           <span>Риски и замечания</span>
           <textarea name="risk_notes" defaultValue={stateString(state, "risk_notes", item?.risk_notes.join("\n") ?? "")} className={textareaClass} />
         </label>
+        <fieldset className="space-y-2 text-sm font-semibold">
+          <legend>Поколения Yuan Up</legend>
+          <div className="space-y-2">
+            {carGenerations.map((generation) => (
+              <label key={generation} className="flex items-center gap-2 font-normal">
+                <input
+                  type="checkbox"
+                  name="model_generations"
+                  value={generation}
+                  defaultChecked={selectedGenerations.includes(generation)}
+                  className="size-4 rounded border border-input"
+                />
+                <span>{telegramGenerationLabels[generation]}</span>
+              </label>
+            ))}
+          </div>
+          <FieldError message={state.errors?.model_generations} />
+        </fieldset>
         <TagsInput name="search_keywords" label="Поисковые фразы" defaultValue={stateString(state, "search_keywords", item?.search_keywords.join(", ") ?? "")} />
         <label className="space-y-1.5 text-sm font-semibold">
           <span>Основная внешняя ссылка</span>

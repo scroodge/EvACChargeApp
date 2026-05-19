@@ -1,4 +1,4 @@
-import { isCarGeneration } from "@/lib/car-generations";
+import { isCarGeneration, type CarGeneration } from "@/lib/car-generations";
 import { buildKnowledgeEmbeddingText, createEmbedding } from "@/lib/embeddings";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -42,16 +42,24 @@ type RawFAQ = Omit<FAQItem, "category"> & {
   knowledge_categories?: CategoryRelation;
 };
 
-type RawAccessory = Omit<AccessoryItem, "category" | "what_to_check" | "risk_notes" | "external_links"> & {
+type RawAccessory = Omit<
+  AccessoryItem,
+  "category" | "what_to_check" | "risk_notes" | "external_links" | "model_generations"
+> & {
   what_to_check: unknown;
   risk_notes: unknown;
   external_links: unknown;
+  model_generations?: unknown;
   knowledge_categories?: CategoryRelation;
 };
 
-type RawSparePart = Omit<SparePartItem, "category" | "external_links" | "images"> & {
+type RawSparePart = Omit<
+  SparePartItem,
+  "category" | "external_links" | "images" | "model_generations"
+> & {
   external_links: unknown;
   images: unknown;
+  model_generations?: unknown;
   knowledge_categories?: CategoryRelation;
 };
 
@@ -527,6 +535,7 @@ async function upsertArticleKnowledgeItem(id: string, input: ArticleInput) {
     source_url: `/telegram/article/${input.slug}`,
     source_slug: input.slug,
     tags: input.tags,
+    model_generations: input.model_generations,
     is_published: input.status === "published",
   });
 }
@@ -541,6 +550,7 @@ async function upsertFAQKnowledgeItem(id: string, input: FAQInput) {
     source_type: "faq",
     source_url: "/telegram?tab=faq",
     tags: input.tags,
+    model_generations: ["gen1_2024", "gen2_2025"],
     is_published: input.status === "published",
   });
 }
@@ -564,6 +574,7 @@ async function upsertAccessoryKnowledgeItem(id: string, input: AccessoryInput) {
     source_type: "accessory",
     source_url: input.external_url,
     tags: input.search_keywords,
+    model_generations: input.model_generations,
     is_published: input.status === "published",
   });
 }
@@ -581,6 +592,7 @@ async function upsertSparePartKnowledgeItem(id: string, input: SparePartInput) {
     category,
     source_type: "spare_part",
     tags: input.search_keywords,
+    model_generations: input.model_generations,
     is_published: input.status === "published",
   });
 }
@@ -594,6 +606,7 @@ async function upsertKnowledgeItem(item: {
   source_url?: string | null;
   source_slug?: string | null;
   tags: string[];
+  model_generations: CarGeneration[];
   is_published: boolean;
 }) {
   const embeddingText = buildKnowledgeEmbeddingText({
@@ -613,6 +626,7 @@ async function upsertKnowledgeItem(item: {
     telegram_message_id: null,
     source_id: item.id,
     source_slug: item.source_slug ?? null,
+    model_generations: item.model_generations,
     tags: item.tags,
     embedding,
     is_published: item.is_published,
@@ -668,6 +682,7 @@ function mapAccessory(row: RawAccessory): AccessoryItem {
     what_to_check: parseStringArray(row.what_to_check),
     risk_notes: parseStringArray(row.risk_notes),
     search_keywords: row.search_keywords ?? [],
+    model_generations: parseModelGenerations(row.model_generations),
     external_links: parseExternalLinks(row.external_links),
   };
 }
@@ -679,6 +694,7 @@ function mapSparePart(row: RawSparePart): SparePartItem {
     external_links: parseExternalLinks(row.external_links),
     images: parseImages(row.images),
     search_keywords: row.search_keywords ?? [],
+    model_generations: parseModelGenerations(row.model_generations),
   };
 }
 
@@ -792,6 +808,7 @@ function toTelegramAccessory(item: AccessoryItem): TelegramAccessoryItem {
     priority: item.priority,
     riskNotes: item.risk_notes,
     searchKeywords: item.search_keywords,
+    modelGenerations: item.model_generations,
     externalUrl: item.external_url ?? undefined,
     externalLinks: item.external_links.length
       ? item.external_links

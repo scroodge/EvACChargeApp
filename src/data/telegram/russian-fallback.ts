@@ -274,6 +274,7 @@ export const russianTelegramKnowledgeData: TelegramKnowledgeData = {
       ],
       images: [],
       search_keywords: ["салонный фильтр", "cabin filter", "BYD Yuan Up"],
+      model_generations: ["gen1_2024", "gen2_2025"],
       status: "published",
       sort_order: 10,
       created_at: "2026-05-18T00:00:00.000Z",

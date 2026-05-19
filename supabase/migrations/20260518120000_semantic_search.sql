@@ -12,6 +12,7 @@ create table if not exists public.knowledge_items (
   telegram_message_id text,
   source_id uuid,
   source_slug text,
+  model_generations text[] not null default array['gen1_2024', 'gen2_2025']::text[],
 
   tags text[] not null default '{}',
 
@@ -32,11 +33,21 @@ alter table public.knowledge_items
   add column if not exists telegram_message_id text,
   add column if not exists source_id uuid,
   add column if not exists source_slug text,
+  add column if not exists model_generations text[] not null default array['gen1_2024', 'gen2_2025']::text[],
   add column if not exists tags text[] not null default '{}',
   add column if not exists embedding extensions.vector(1536),
   add column if not exists is_published boolean not null default true,
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
+
+alter table public.knowledge_items
+  drop constraint if exists knowledge_items_model_generations_check;
+
+alter table public.knowledge_items
+  add constraint knowledge_items_model_generations_check check (
+    cardinality(model_generations) > 0
+    and model_generations <@ array['gen1_2024', 'gen2_2025']::text[]
+  );
 
 create index if not exists knowledge_items_embedding_hnsw_idx
 on public.knowledge_items
@@ -51,6 +62,9 @@ on public.knowledge_items(is_published);
 create index if not exists knowledge_items_source_idx
 on public.knowledge_items(source_type, source_id);
 
+create index if not exists knowledge_items_model_generations_idx
+on public.knowledge_items using gin(model_generations);
+
 drop trigger if exists set_knowledge_items_updated_at on public.knowledge_items;
 create trigger set_knowledge_items_updated_at
 before update on public.knowledge_items
@@ -60,7 +74,8 @@ create or replace function public.match_knowledge_items(
   query_embedding extensions.vector(1536),
   match_threshold float default 0.2,
   match_count int default 8,
-  filter_category text default null
+  filter_category text default null,
+  filter_generation text default null
 )
 returns table (
   id uuid,
@@ -91,6 +106,7 @@ as $$
     knowledge_items.is_published = true
     and knowledge_items.embedding is not null
     and (filter_category is null or knowledge_items.category = filter_category)
+    and (filter_generation is null or knowledge_items.model_generations @> array[filter_generation]::text[])
     and 1 - (knowledge_items.embedding <=> query_embedding) > match_threshold
   order by knowledge_items.embedding <=> query_embedding asc
   limit least(match_count, 20);
@@ -114,7 +130,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 insert into public.knowledge_items (
-  title, content, category, source_type, source_slug, tags, is_published
+  title, content, category, source_type, source_slug, model_generations, tags, is_published
 )
 values
   (
@@ -123,6 +139,7 @@ values
     'charging',
     'seed',
     'winter-charging-byd-yuan-up',
+    array['gen1_2024', 'gen2_2025'],
     array['зима', 'зарядка', 'AC', 'батарея'],
     true
   ),
@@ -132,6 +149,7 @@ values
     'charging',
     'seed',
     'slow-home-ac-charging',
+    array['gen1_2024', 'gen2_2025'],
     array['медленная зарядка', 'дом', 'EVSE', 'AC'],
     true
   ),
@@ -141,6 +159,7 @@ values
     'accessories',
     'seed',
     'byd-yuan-up-accessories',
+    array['gen1_2024', 'gen2_2025'],
     array['аксессуары', 'коврики', 'кабель', 'компрессор'],
     true
   ),
@@ -150,6 +169,7 @@ values
     'ownership',
     'seed',
     'byd-yuan-up-ownership',
+    array['gen1_2024', 'gen2_2025'],
     array['опыт владельца', 'первые дни', 'настройки'],
     true
   ),
@@ -159,6 +179,7 @@ values
     'maintenance',
     'seed',
     'byd-yuan-up-maintenance',
+    array['gen1_2024', 'gen2_2025'],
     array['обслуживание', 'ремонт', 'сервис', 'проверки'],
     true
   )
