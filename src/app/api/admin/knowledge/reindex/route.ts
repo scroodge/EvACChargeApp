@@ -12,6 +12,23 @@ type KnowledgeItemForReindex = {
   tags: string[] | null;
 };
 
+type ReindexFailure = {
+  id: string;
+  title: string;
+  error: string;
+};
+
+type ReindexResult = {
+  ok: true;
+  id: string;
+} | {
+  ok: false;
+  failure: ReindexFailure;
+};
+
+const DEFAULT_REINDEX_CONCURRENCY = 4;
+const MAX_REINDEX_CONCURRENCY = 5;
+
 export async function POST(request: NextRequest) {
   const guard = await requireAdmin();
   if (!guard.ok) {
@@ -21,6 +38,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const force = body?.force === true;
+    const concurrency = clampConcurrency(body?.concurrency);
 
     let query = supabaseAdmin
       .from("knowledge_items")
@@ -37,31 +55,89 @@ export async function POST(request: NextRequest) {
       throw new Error(error.message);
     }
 
-    let count = 0;
+    const items = (data ?? []) as KnowledgeItemForReindex[];
+    const results = await mapWithConcurrency(items, concurrency, reindexKnowledgeItem);
+    const failures = results.flatMap((result) => result.ok ? [] : [result.failure]);
+    const count = results.length - failures.length;
 
-    for (const item of (data ?? []) as KnowledgeItemForReindex[]) {
-      const embeddingText = buildKnowledgeEmbeddingText({
-        title: item.title,
-        content: item.content,
-        category: item.category,
-        tags: item.tags ?? [],
-      });
-      const embedding = await createEmbedding(embeddingText);
-      const { error: updateError } = await supabaseAdmin
-        .from("knowledge_items")
-        .update({ embedding })
-        .eq("id", item.id);
-
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
-
-      count += 1;
-    }
-
-    return NextResponse.json({ count, force });
+    return NextResponse.json(
+      {
+        count,
+        failed: failures,
+        failureCount: failures.length,
+        total: items.length,
+        force,
+        concurrency,
+      },
+      { status: failures.length > 0 ? 207 : 200 },
+    );
   } catch (error) {
     console.error("Knowledge reindex error:", error);
     return NextResponse.json({ error: "Knowledge reindex failed." }, { status: 500 });
   }
+}
+
+async function reindexKnowledgeItem(item: KnowledgeItemForReindex): Promise<ReindexResult> {
+  try {
+    const embeddingText = buildKnowledgeEmbeddingText({
+      title: item.title,
+      content: item.content,
+      category: item.category,
+      tags: item.tags ?? [],
+    });
+    const embedding = await createEmbedding(embeddingText);
+    const { error: updateError } = await supabaseAdmin
+      .from("knowledge_items")
+      .update({ embedding })
+      .eq("id", item.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return { ok: true, id: item.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown reindex error.";
+    console.error(`Knowledge reindex item failed (${item.id}):`, error);
+
+    return {
+      ok: false,
+      failure: {
+        id: item.id,
+        title: item.title,
+        error: message,
+      },
+    };
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<R>,
+) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await task(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
+function clampConcurrency(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_REINDEX_CONCURRENCY;
+  }
+
+  return Math.max(1, Math.min(MAX_REINDEX_CONCURRENCY, Math.floor(value)));
 }
