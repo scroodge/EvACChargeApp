@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   BatteryCharging,
@@ -61,26 +61,23 @@ export function VehicleLiveView() {
   } = useBydmateTelemetryPointsQuery();
   const nowMs = useTickingClock(true);
   const snapshot = data?.[0] ?? null;
-  const allPoints = points ?? [];
+  const allPoints = useMemo(() => points ?? [], [points]);
   const availableDateKeys = useMemo(() => {
     return Array.from(new Set(allPoints.map((point) => localDateKey(pointTimeMs(point)))))
       .filter((key) => key !== "1970-01-01")
       .sort()
       .reverse();
   }, [allPoints]);
-  const [selectedDate, setSelectedDate] = useState(() => localDateKey(Date.now()));
-  const [dateTouched, setDateTouched] = useState(false);
-  useEffect(() => {
-    if (!dateTouched && availableDateKeys[0] && selectedDate !== availableDateKeys[0]) {
-      setSelectedDate(availableDateKeys[0]);
-    }
-  }, [availableDateKeys, dateTouched, selectedDate]);
+  const [fallbackDate] = useState(() => localDateKey(Date.now()));
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
+  const selectedDate = selectedDateOverride ?? availableDateKeys[0] ?? fallbackDate;
   const dayPoints = useMemo(() => {
     return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
   }, [allPoints, selectedDate]);
   const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
+  const selectedTripPoints = selectedTrip?.points ?? EMPTY_TELEMETRY_POINTS;
 
   if (isLoading) {
     return (
@@ -122,8 +119,7 @@ export function VehicleLiveView() {
         selectedDate={selectedDate}
         availableDateKeys={availableDateKeys}
         onDateChange={(value) => {
-          setDateTouched(true);
-          setSelectedDate(value);
+          setSelectedDateOverride(value);
           setSelectedTripId(null);
         }}
         trips={trips}
@@ -133,11 +129,11 @@ export function VehicleLiveView() {
         hasError={Boolean(historyError)}
       />
       <TelemetryHistoryCharts
-        points={selectedTrip?.points ?? []}
+        points={selectedTripPoints}
         isLoading={isHistoryLoading}
         hasError={Boolean(historyError)}
       />
-      <RouteMap points={selectedTrip?.points ?? []} />
+      <RouteMap points={selectedTripPoints} />
       <LocationCard snapshot={snapshot} />
     </div>
   );
@@ -254,10 +250,27 @@ type ChartPoint = {
   value: number;
 };
 
+type RoutePoint = {
+  lat: number;
+  lon: number;
+  time: number;
+};
+
 type ChartSeries = {
   label: string;
   color: string;
   points: ChartPoint[];
+};
+
+type TelemetryChart = {
+  title: string;
+  unit: string;
+  series: ChartSeries[];
+  minValue: number;
+  maxValue: number;
+  minTime: number;
+  maxTime: number;
+  hasData: boolean;
 };
 
 type TripSegment = {
@@ -274,6 +287,9 @@ type TripSegment = {
 };
 
 const TRIP_GAP_MS = 5 * 60 * 1000;
+const MAX_CHART_POINTS = 240;
+const MAX_ROUTE_POINTS = 400;
+const EMPTY_TELEMETRY_POINTS: BydmateTelemetryPointRow[] = [];
 
 function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -510,21 +526,102 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function seriesFromPoints(
-  points: BydmateTelemetryPointRow[],
-  key: keyof BydmateTelemetry,
-  label: string,
-  color: string,
-  normalize: (value: number | null | undefined) => number | null = validNumber,
-): ChartSeries {
+function downsamplePoints<T>(points: T[], maxPoints: number) {
+  if (points.length <= maxPoints) return points;
+  if (maxPoints <= 1) return points.slice(0, 1);
+
+  const lastIndex = points.length - 1;
+  const sampled: T[] = [];
+  let previousIndex = -1;
+
+  for (let index = 0; index < maxPoints; index += 1) {
+    const sourceIndex = Math.round((index * lastIndex) / (maxPoints - 1));
+    if (sourceIndex !== previousIndex) {
+      sampled.push(points[sourceIndex]);
+      previousIndex = sourceIndex;
+    }
+  }
+
+  return sampled;
+}
+
+function createChart(
+  title: string,
+  unit: string,
+  series: ChartSeries[],
+): TelemetryChart {
   return {
-    label,
-    color,
-    points: points.flatMap((point) => {
-      const value = normalize(point.telemetry[key] as number | null | undefined);
-      const time = Date.parse(point.received_at);
-      return value != null && Number.isFinite(time) ? [{ time, value }] : [];
-    }),
+    title,
+    unit,
+    series,
+    minValue: 0,
+    maxValue: 1,
+    minTime: 0,
+    maxTime: 1,
+    hasData: false,
+  };
+}
+
+function addChartPoint(chart: TelemetryChart, seriesIndex: number, time: number, value: number | null) {
+  if (value == null || !Number.isFinite(time)) return;
+
+  chart.series[seriesIndex].points.push({ time, value });
+  chart.minValue = chart.hasData ? Math.min(chart.minValue, value) : value;
+  chart.maxValue = chart.hasData ? Math.max(chart.maxValue, value) : value;
+  chart.minTime = chart.hasData ? Math.min(chart.minTime, time) : time;
+  chart.maxTime = chart.hasData ? Math.max(chart.maxTime, time) : time;
+  chart.hasData = true;
+}
+
+function prepareTelemetryHistory(points: BydmateTelemetryPointRow[]) {
+  const socChart = createChart("SOC", "%", [
+    { label: "SOC", color: "var(--voltflow-cyan)", points: [] },
+  ]);
+  const speedChart = createChart("Speed", "km/h", [
+    { label: "Speed", color: "#7dd3fc", points: [] },
+  ]);
+  const powerChart = createChart("Power", "kW", [
+    { label: "Power", color: "#facc15", points: [] },
+  ]);
+  const temperatureChart = createChart("Temperatures", "°C", [
+    { label: "Battery", color: "#22c55e", points: [] },
+    { label: "Outside", color: "#38bdf8", points: [] },
+    { label: "Cabin", color: "#fb7185", points: [] },
+  ]);
+
+  let visiblePointCount = 0;
+  let start: string | undefined;
+  let end: string | undefined;
+
+  for (const point of points) {
+    if (!point.telemetry) continue;
+
+    visiblePointCount += 1;
+    start ??= point.received_at;
+    end = point.received_at;
+
+    const time = Date.parse(point.received_at);
+    addChartPoint(socChart, 0, time, validNumber(point.telemetry.soc));
+    addChartPoint(speedChart, 0, time, validNumber(point.telemetry.speed_kmh));
+    addChartPoint(powerChart, 0, time, validNumber(point.telemetry.power_kw));
+    addChartPoint(temperatureChart, 0, time, validTempNumber(point.telemetry.battery_temp_c));
+    addChartPoint(temperatureChart, 1, time, validTempNumber(point.telemetry.outside_temp_c));
+    addChartPoint(temperatureChart, 2, time, validTempNumber(point.telemetry.cabin_temp_c));
+  }
+
+  const charts = [socChart, speedChart, powerChart, temperatureChart].map((chart) => ({
+    ...chart,
+    series: chart.series.map((series) => ({
+      ...series,
+      points: downsamplePoints(series.points, MAX_CHART_POINTS),
+    })),
+  }));
+
+  return {
+    visiblePointCount,
+    start,
+    end,
+    charts,
   };
 }
 
@@ -537,36 +634,7 @@ function TelemetryHistoryCharts({
   isLoading: boolean;
   hasError: boolean;
 }) {
-  const visiblePoints = points.filter((point) => point.telemetry);
-  const start = visiblePoints[0]?.received_at;
-  const end = visiblePoints.at(-1)?.received_at;
-
-  const charts = [
-    {
-      title: "SOC",
-      unit: "%",
-      series: [seriesFromPoints(visiblePoints, "soc", "SOC", "var(--voltflow-cyan)")],
-    },
-    {
-      title: "Speed",
-      unit: "km/h",
-      series: [seriesFromPoints(visiblePoints, "speed_kmh", "Speed", "#7dd3fc")],
-    },
-    {
-      title: "Power",
-      unit: "kW",
-      series: [seriesFromPoints(visiblePoints, "power_kw", "Power", "#facc15")],
-    },
-    {
-      title: "Temperatures",
-      unit: "°C",
-      series: [
-        seriesFromPoints(visiblePoints, "battery_temp_c", "Battery", "#22c55e", validTempNumber),
-        seriesFromPoints(visiblePoints, "outside_temp_c", "Outside", "#38bdf8", validTempNumber),
-        seriesFromPoints(visiblePoints, "cabin_temp_c", "Cabin", "#fb7185", validTempNumber),
-      ],
-    },
-  ];
+  const history = useMemo(() => prepareTelemetryHistory(points), [points]);
 
   return (
     <section className="voltflow-card p-5">
@@ -576,8 +644,8 @@ function TelemetryHistoryCharts({
             Trip charts
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {visiblePoints.length} cloud points
-            {start && end ? ` · ${new Date(start).toLocaleTimeString()} - ${new Date(end).toLocaleTimeString()}` : ""}
+            {history.visiblePointCount} cloud points
+            {history.start && history.end ? ` · ${new Date(history.start).toLocaleTimeString()} - ${new Date(history.end).toLocaleTimeString()}` : ""}
           </p>
         </div>
         <span className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -595,24 +663,22 @@ function TelemetryHistoryCharts({
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
           Could not load telemetry history.
         </p>
-      ) : visiblePoints.length === 0 ? (
+      ) : history.visiblePointCount === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
           History will appear after CloudEV Mate sends telemetry points.
         </p>
       ) : (
         <>
-          {visiblePoints.length < 2 ? (
+          {history.visiblePointCount < 2 ? (
             <p className="mt-5 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary">
               One point received. Charts will turn into lines after the next cloud payload.
             </p>
           ) : null}
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {charts.map((chart) => (
+            {history.charts.map((chart) => (
               <TelemetryLineChart
                 key={chart.title}
-                title={chart.title}
-                unit={chart.unit}
-                series={chart.series}
+                chart={chart}
               />
             ))}
           </div>
@@ -622,23 +688,8 @@ function TelemetryHistoryCharts({
   );
 }
 
-function TelemetryLineChart({
-  title,
-  unit,
-  series,
-}: {
-  title: string;
-  unit: string;
-  series: ChartSeries[];
-}) {
-  const allPoints = series.flatMap((item) => item.points);
-  const values = allPoints.map((point) => point.value);
-  const times = allPoints.map((point) => point.time);
-  const hasData = allPoints.length > 0;
-  const minValue = hasData ? Math.min(...values) : 0;
-  const maxValue = hasData ? Math.max(...values) : 1;
-  const minTime = hasData ? Math.min(...times) : 0;
-  const maxTime = hasData ? Math.max(...times) : 1;
+function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
+  const { title, unit, series, hasData, minValue, maxValue, minTime, maxTime } = chart;
   const valuePad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
   const yMin = minValue - valuePad;
   const yMax = maxValue + valuePad;
@@ -683,8 +734,8 @@ function TelemetryLineChart({
               {item.points.length > 1 ? (
                 <path d={d} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               ) : null}
-              {item.points.map((point) => (
-                <circle key={`${item.label}-${point.time}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color} />
+              {item.points.map((point, index) => (
+                <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color} />
               ))}
             </g>
           );
@@ -694,19 +745,52 @@ function TelemetryLineChart({
   );
 }
 
-function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
-  const routePoints = points.flatMap((point) => {
+function prepareRoute(points: BydmateTelemetryPointRow[]) {
+  const routePoints: RoutePoint[] = [];
+  let minLat = 0;
+  let maxLat = 1;
+  let minLon = 0;
+  let maxLon = 1;
+
+  for (const point of points) {
     const lat = validNumber(point.location.lat);
     const lon = validNumber(point.location.lon);
     const time = pointTimeMs(point);
-    return lat != null && lon != null && Number.isFinite(time) ? [{ lat, lon, time }] : [];
-  });
+    if (lat == null || lon == null || !Number.isFinite(time)) continue;
 
-  const hasRoute = routePoints.length > 0;
-  const minLat = hasRoute ? Math.min(...routePoints.map((point) => point.lat)) : 0;
-  const maxLat = hasRoute ? Math.max(...routePoints.map((point) => point.lat)) : 1;
-  const minLon = hasRoute ? Math.min(...routePoints.map((point) => point.lon)) : 0;
-  const maxLon = hasRoute ? Math.max(...routePoints.map((point) => point.lon)) : 1;
+    routePoints.push({ lat, lon, time });
+    if (routePoints.length === 1) {
+      minLat = lat;
+      maxLat = lat;
+      minLon = lon;
+      maxLon = lon;
+    } else {
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+    }
+  }
+
+  return {
+    points: downsamplePoints(routePoints, MAX_ROUTE_POINTS),
+    totalPoints: routePoints.length,
+    start: routePoints[0],
+    end: routePoints.at(-1),
+    minLat,
+    maxLat,
+    minLon,
+    maxLon,
+  };
+}
+
+function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
+  const route = useMemo(() => prepareRoute(points), [points]);
+  const hasRoute = route.totalPoints > 0;
+  const minLat = hasRoute ? route.minLat : 0;
+  const maxLat = hasRoute ? route.maxLat : 1;
+  const minLon = hasRoute ? route.minLon : 0;
+  const maxLon = hasRoute ? route.maxLon : 1;
   const latPad = Math.max((maxLat - minLat) * 0.12, maxLat === minLat ? 0.001 : 0);
   const lonPad = Math.max((maxLon - minLon) * 0.12, maxLon === minLon ? 0.001 : 0);
   const yMin = minLat - latPad;
@@ -716,11 +800,11 @@ function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
 
   const x = (lon: number) => 16 + ((lon - xMin) / (xMax - xMin)) * 288;
   const y = (lat: number) => 164 - ((lat - yMin) / (yMax - yMin)) * 148;
-  const path = routePoints
+  const path = route.points
     .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.lon).toFixed(2)} ${y(point.lat).toFixed(2)}`)
     .join(" ");
-  const start = routePoints[0];
-  const end = routePoints.at(-1);
+  const start = route.start;
+  const end = route.end;
 
   return (
     <section className="voltflow-card p-5">
@@ -728,7 +812,7 @@ function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
         <div>
           <h2 className="font-heading text-2xl font-semibold tracking-tight">Route</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {routePoints.length} GPS points in the selected trip
+            {route.totalPoints} GPS points in the selected trip
           </p>
         </div>
         {start && end ? (
@@ -738,7 +822,7 @@ function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
         ) : null}
       </div>
 
-      {routePoints.length === 0 ? (
+      {route.totalPoints === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
           No GPS points in this trip. Check location permission in CloudEV Gateway.
         </p>
@@ -751,7 +835,7 @@ function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
               </pattern>
             </defs>
             <rect width="320" height="180" fill="url(#route-grid)" />
-            {routePoints.length > 1 ? (
+            {route.points.length > 1 ? (
               <path d={path} fill="none" stroke="var(--voltflow-cyan)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             ) : null}
             {start ? (
