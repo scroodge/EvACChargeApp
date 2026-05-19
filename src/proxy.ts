@@ -23,6 +23,7 @@ export async function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith("/api/bydmate/") ||
+    (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/")) ||
     PUBLIC_METADATA_PATHS.has(pathname) ||
     pathname.startsWith("/icons/") ||
     pathname.endsWith(".webmanifest")

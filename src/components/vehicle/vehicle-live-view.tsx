@@ -288,6 +288,7 @@ type TripSegment = {
 
 const TRIP_GAP_MS = 5 * 60 * 1000;
 const MAX_CHART_POINTS = 240;
+const MAX_CHART_MARKERS = 80;
 const MAX_ROUTE_POINTS = 400;
 const EMPTY_TELEMETRY_POINTS: BydmateTelemetryPointRow[] = [];
 
@@ -625,7 +626,7 @@ function prepareTelemetryHistory(points: BydmateTelemetryPointRow[]) {
   };
 }
 
-function TelemetryHistoryCharts({
+export function TelemetryHistoryCharts({
   points,
   isLoading,
   hasError,
@@ -729,12 +730,13 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
           const d = item.points
             .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(point.value).toFixed(2)}`)
             .join(" ");
+          const markers = item.points.length <= MAX_CHART_MARKERS ? item.points : [];
           return (
             <g key={item.label}>
               {item.points.length > 1 ? (
                 <path d={d} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               ) : null}
-              {item.points.map((point, index) => (
+              {markers.map((point, index) => (
                 <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color} />
               ))}
             </g>
@@ -784,7 +786,7 @@ function prepareRoute(points: BydmateTelemetryPointRow[]) {
   };
 }
 
-function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
+export function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
   const route = useMemo(() => prepareRoute(points), [points]);
   const hasRoute = route.totalPoints > 0;
   const minLat = hasRoute ? route.minLat : 0;
