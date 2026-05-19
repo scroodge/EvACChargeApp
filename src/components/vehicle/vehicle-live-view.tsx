@@ -329,6 +329,9 @@ type RoutePoint = {
   lat: number;
   lon: number;
   time: number;
+  powerKw: number | null;
+  speedKmh: number | null;
+  soc: number | null;
 };
 
 type MapTile = {
@@ -341,6 +344,15 @@ type MapTile = {
 type MapPan = {
   x: number;
   y: number;
+};
+
+type RouteLayer = "route" | "power" | "speed" | "soc";
+
+type RouteSegment = {
+  key: string;
+  path: string;
+  color: string;
+  opacity: number;
 };
 
 type ChartSeries = {
@@ -388,6 +400,16 @@ const DEFAULT_MAP_ZOOM = 15;
 const WEB_MERCATOR_MAX_LAT = 85.05112878;
 const MAX_MAP_ZOOM_OFFSET = 3;
 const MIN_MAP_ZOOM_OFFSET = -3;
+const ROUTE_LAYER_OPTIONS: Array<{
+  id: RouteLayer;
+  label: string;
+  color: string;
+}> = [
+  { id: "route", label: "Route", color: "var(--voltflow-cyan)" },
+  { id: "power", label: "Power", color: "#ef4444" },
+  { id: "speed", label: "Speed", color: "#22c55e" },
+  { id: "soc", label: "SOC", color: "#facc15" },
+];
 
 function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -954,7 +976,14 @@ function prepareRoute(points: BydmateTelemetryPointRow[]) {
     const time = pointTimeMs(point);
     if (lat == null || lon == null || !Number.isFinite(time)) continue;
 
-    routePoints.push({ lat, lon, time });
+    routePoints.push({
+      lat,
+      lon,
+      time,
+      powerKw: validNumber(point.telemetry.power_kw),
+      speedKmh: validNumber(point.telemetry.speed_kmh),
+      soc: validNumber(point.telemetry.soc),
+    });
     if (routePoints.length === 1) {
       minLat = lat;
       maxLat = lat;
@@ -1068,6 +1097,68 @@ function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: num
   };
 }
 
+function routeLayerValue(point: RoutePoint, layer: RouteLayer) {
+  if (layer === "power") return point.powerKw == null ? null : Math.abs(point.powerKw);
+  if (layer === "speed") return point.speedKmh;
+  if (layer === "soc") return point.soc;
+  return null;
+}
+
+function routeLayerColor(layer: RouteLayer) {
+  return ROUTE_LAYER_OPTIONS.find((option) => option.id === layer)?.color ?? "var(--voltflow-cyan)";
+}
+
+function routeLayerSegmentColor(layer: RouteLayer, normalized: number) {
+  const intensity = Math.max(0, Math.min(1, normalized));
+
+  if (layer === "power") {
+    return `hsl(0 84% ${34 + intensity * 30}%)`;
+  }
+
+  if (layer === "speed") {
+    return `hsl(142 72% ${30 + intensity * 30}%)`;
+  }
+
+  if (layer === "soc") {
+    return `hsl(48 96% ${28 + intensity * 34}%)`;
+  }
+
+  return routeLayerColor(layer);
+}
+
+function buildRouteSegments(
+  route: ReturnType<typeof prepareRoute>,
+  routeMap: ReturnType<typeof prepareRouteMap>,
+  selectedLayer: RouteLayer,
+) {
+  if (route.points.length < 2) return [];
+
+  const values =
+    selectedLayer === "route"
+      ? []
+      : route.points
+          .map((point) => routeLayerValue(point, selectedLayer))
+          .filter((value): value is number => value != null);
+  const minValue = values.length ? Math.min(...values) : 0;
+  const maxValue = values.length ? Math.max(...values) : 1;
+
+  return route.points.slice(1).map((point, index): RouteSegment => {
+    const previous = route.points[index];
+    const mappedPrevious = routeMap.mapPoint(previous);
+    const mappedPoint = routeMap.mapPoint(point);
+    const value = routeLayerValue(point, selectedLayer);
+    const normalized =
+      value == null || maxValue === minValue ? 1 : (value - minValue) / (maxValue - minValue);
+
+    return {
+      key: `${selectedLayer}-${previous.time}-${point.time}-${index}`,
+      path: `M ${mappedPrevious.x.toFixed(2)} ${mappedPrevious.y.toFixed(2)} L ${mappedPoint.x.toFixed(2)} ${mappedPoint.y.toFixed(2)}`,
+      color: routeLayerSegmentColor(selectedLayer, normalized),
+      opacity: value == null && selectedLayer !== "route" ? 0.35 : 1,
+    };
+  });
+}
+
 export function RouteMap({
   points,
   embedded = false,
@@ -1081,6 +1172,7 @@ export function RouteMap({
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("route");
 
   const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
   const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
@@ -1120,6 +1212,8 @@ export function RouteMap({
             onZoomOut={zoomOut}
             onResetView={resetView}
             onOpenFullscreen={() => setIsFullscreenOpen(true)}
+            selectedLayer={selectedLayer}
+            onLayerChange={setSelectedLayer}
             className="h-64"
           />
           <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
@@ -1148,6 +1242,8 @@ export function RouteMap({
                 onZoomIn={zoomIn}
                 onZoomOut={zoomOut}
                 onResetView={resetView}
+                selectedLayer={selectedLayer}
+                onLayerChange={setSelectedLayer}
                 className="min-h-0 flex-1 rounded-lg"
                 isFullscreen
               />
@@ -1179,6 +1275,8 @@ function InteractiveRouteCanvas({
   onZoomOut,
   onResetView,
   onOpenFullscreen,
+  selectedLayer,
+  onLayerChange,
   className = "h-64",
   isFullscreen = false,
 }: {
@@ -1190,17 +1288,17 @@ function InteractiveRouteCanvas({
   onZoomOut: () => void;
   onResetView: () => void;
   onOpenFullscreen?: () => void;
+  selectedLayer: RouteLayer;
+  onLayerChange: (layer: RouteLayer) => void;
   className?: string;
   isFullscreen?: boolean;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
-  const path = route.points
-    .map((point, index) => {
-      const mapped = routeMap.mapPoint(point);
-      return `${index === 0 ? "M" : "L"} ${mapped.x.toFixed(2)} ${mapped.y.toFixed(2)}`;
-    })
-    .join(" ");
+  const routeSegments = useMemo(
+    () => buildRouteSegments(route, routeMap, selectedLayer),
+    [route, routeMap, selectedLayer],
+  );
   const mappedStart = route.start ? routeMap.mapPoint(route.start) : null;
   const mappedEnd = route.end ? routeMap.mapPoint(route.end) : null;
 
@@ -1217,6 +1315,29 @@ function InteractiveRouteCanvas({
 
   return (
     <div className={`relative overflow-hidden bg-background ${className}`}>
+      <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-7rem)] flex-wrap gap-1 rounded-full border border-border bg-background/85 p-1 shadow-sm backdrop-blur">
+        {ROUTE_LAYER_OPTIONS.map((option) => {
+          const selected = option.id === selectedLayer;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onLayerChange(option.id)}
+              className={
+                "inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition " +
+                (selected
+                  ? "bg-primary/15 text-foreground"
+                  : "text-muted-foreground hover:bg-white/10 hover:text-foreground")
+              }
+              aria-pressed={selected}
+            >
+              <span className="size-2 rounded-full" style={{ backgroundColor: option.color }} />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
       <div className="absolute right-3 top-3 z-10 flex gap-2">
         <MapIconButton label="Zoom in" onClick={onZoomIn}>
           <Plus className="size-4" aria-hidden />
@@ -1276,11 +1397,25 @@ function InteractiveRouteCanvas({
           />
         ))}
         <rect width="320" height="180" fill="rgba(5,10,15,0.16)" />
-        {route.points.length > 1 ? (
+        {routeSegments.length > 0 ? (
+          routeSegments.map((segment) => (
+            <path
+              key={segment.key}
+              d={segment.path}
+              fill="none"
+              stroke={segment.color}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={segment.opacity}
+              filter="url(#route-line-shadow)"
+            />
+          ))
+        ) : route.points.length > 1 ? (
           <path
-            d={path}
+            d={routeSegments.map((segment) => segment.path).join(" ")}
             fill="none"
-            stroke="var(--voltflow-cyan)"
+            stroke={routeLayerColor(selectedLayer)}
             strokeWidth="4"
             strokeLinecap="round"
             strokeLinejoin="round"
