@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { VehicleLiveView } from "@/components/vehicle/vehicle-live-view";
 
 export const metadata: Metadata = {
-  title: "Vehicle",
+  title: "Авто",
 };
 
 export default function VehiclePage() {

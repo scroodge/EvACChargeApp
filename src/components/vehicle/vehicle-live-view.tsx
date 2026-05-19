@@ -28,6 +28,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useBydmateTelemetryPointsQuery } from "@/hooks/use-bydmate-telemetry-points-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
+import { useTranslation } from "@/hooks/use-translation";
+import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
   BydmateLiveSnapshotRow,
   BydmateTelemetry,
@@ -38,9 +40,9 @@ function fmt(value: number | null | undefined, digits = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
-function fmtBool(value: boolean | null | undefined) {
+function fmtBool(value: boolean | null | undefined, t: Translator) {
   if (value == null) return "—";
-  return value ? "Yes" : "No";
+  return value ? t("common.yes") : t("common.no");
 }
 
 function fmtTemp(value: number | null | undefined, digits = 1) {
@@ -50,16 +52,24 @@ function fmtTemp(value: number | null | undefined, digits = 1) {
   return `${value.toFixed(digits)} °C`;
 }
 
-function timeAgo(iso: string, nowMs: number) {
+type Translator = (key: TranslationKey, values?: Record<string, string | number>) => string;
+
+function localeCode(locale: Locale) {
+  return locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US";
+}
+
+function timeAgo(iso: string, nowMs: number, t: Translator) {
   const seconds = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return t("vehicle.timeAgoSeconds", { value: seconds });
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("vehicle.timeAgoMinutes", { value: minutes });
   const hours = Math.round(minutes / 60);
-  return `${hours}h ago`;
+  return t("vehicle.timeAgoHours", { value: hours });
 }
 
 export function VehicleLiveView() {
+  const { t } = useTranslation();
+  const tx = t as Translator;
   const { data, isLoading, error } = useBydmateLiveQuery();
   const {
     data: points,
@@ -89,7 +99,7 @@ export function VehicleLiveView() {
         <Header />
         <Card className="voltflow-card border-border bg-transparent">
           <CardContent className="p-6 text-muted-foreground">
-            Could not load BYDMate telemetry.
+            {tx("vehicle.errors.live")}
           </CardContent>
         </Card>
       </div>
@@ -192,10 +202,15 @@ function VehicleLiveContent({
 }
 
 function Header() {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+
   return (
     <header className="flex items-center justify-between gap-4">
       <LogoFull />
-      <BrandBadge className="hidden min-[380px]:inline-flex">BYDMate live</BrandBadge>
+      <BrandBadge className="hidden min-[380px]:inline-flex">
+        {tx("vehicle.badge")}
+      </BrandBadge>
     </header>
   );
 }
@@ -209,7 +224,9 @@ function Hero({
   nowMs: number;
   isStale: boolean;
 }) {
-  const t = snapshot.telemetry;
+  const { t: translate } = useTranslation();
+  const t = translate as Translator;
+  const telemetry = snapshot.telemetry;
 
   return (
     <section className="voltflow-card overflow-hidden p-5">
@@ -219,11 +236,11 @@ function Hero({
             {snapshot.vehicle_id}
           </p>
           <h1 className="mt-3 font-heading text-5xl font-bold tracking-normal tabular-nums">
-            {fmt(t.soc)}
+            {fmt(telemetry.soc)}
             <span className="text-2xl text-muted-foreground">%</span>
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Last update {timeAgo(snapshot.received_at, nowMs)}
+            {t("vehicle.lastUpdate", { value: timeAgo(snapshot.received_at, nowMs, t) })}
           </p>
         </div>
         <span
@@ -234,14 +251,14 @@ function Hero({
               : "border-primary/25 bg-primary/10 text-primary")
           }
         >
-          {isStale ? "stale" : "live"}
+          {isStale ? t("vehicle.status.stale") : t("vehicle.status.live")}
         </span>
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <HeroMetric icon={Gauge} label="Speed" value={`${fmt(t.speed_kmh, 0)} km/h`} />
-        <HeroMetric icon={Zap} label="Power" value={`${fmt(t.power_kw, 1)} kW`} />
-        <HeroMetric icon={Route} label="Range" value={`${fmt(t.range_est_km, 0)} km`} />
+        <HeroMetric icon={Gauge} label={t("vehicle.metrics.speed")} value={`${fmt(telemetry.speed_kmh, 0)} km/h`} />
+        <HeroMetric icon={Zap} label={t("vehicle.metrics.power")} value={`${fmt(telemetry.power_kw, 1)} kW`} />
+        <HeroMetric icon={Route} label={t("vehicle.metrics.range")} value={`${fmt(telemetry.range_est_km, 0)} km`} />
       </div>
     </section>
   );
@@ -266,15 +283,17 @@ function HeroMetric({
 }
 
 function StaleTelemetryNotice() {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+
   return (
     <Card className="border-yellow-300/20 bg-yellow-300/[0.06]">
       <CardContent className="p-5">
         <p className="font-heading text-lg font-semibold tracking-tight text-yellow-100">
-          Car data hidden
+          {tx("vehicle.staleTitle")}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          The latest vehicle snapshot is stale, so live car values are hidden until fresh telemetry
-          arrives.
+          {tx("vehicle.staleBody")}
         </p>
       </CardContent>
     </Card>
@@ -282,23 +301,25 @@ function StaleTelemetryNotice() {
 }
 
 function TelemetryGrid({ telemetry }: { telemetry: BydmateTelemetry }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
   const items = [
-    { icon: BatteryCharging, label: "Charging", value: fmtBool(telemetry.is_charging) },
-    { icon: Zap, label: "Charge power", value: `${fmt(telemetry.charge_power_kw, 1)} kW` },
-    { icon: Activity, label: "Charge type", value: telemetry.charge_type ?? "—" },
-    { icon: Thermometer, label: "Battery temp", value: fmtTemp(telemetry.battery_temp_c) },
-    { icon: Thermometer, label: "Cabin temp", value: fmtTemp(telemetry.cabin_temp_c) },
-    { icon: Thermometer, label: "Outside temp", value: fmtTemp(telemetry.outside_temp_c) },
-    { icon: Activity, label: "Odometer", value: `${fmt(telemetry.odometer_km, 1)} km` },
-    { icon: Activity, label: "SoH", value: `${fmt(telemetry.soh_percent, 1)}%` },
-    { icon: Zap, label: "12V battery", value: `${fmt(telemetry.aux_voltage_v, 1)} V` },
-    { icon: Route, label: "Trip distance", value: `${fmt(telemetry.current_trip_distance_km, 1)} km` },
+    { icon: BatteryCharging, label: tx("vehicle.telemetry.charging"), value: fmtBool(telemetry.is_charging, tx) },
+    { icon: Zap, label: tx("vehicle.telemetry.chargePower"), value: `${fmt(telemetry.charge_power_kw, 1)} kW` },
+    { icon: Activity, label: tx("vehicle.telemetry.chargeType"), value: telemetry.charge_type ?? "—" },
+    { icon: Thermometer, label: tx("vehicle.telemetry.batteryTemp"), value: fmtTemp(telemetry.battery_temp_c) },
+    { icon: Thermometer, label: tx("vehicle.telemetry.cabinTemp"), value: fmtTemp(telemetry.cabin_temp_c) },
+    { icon: Thermometer, label: tx("vehicle.telemetry.outsideTemp"), value: fmtTemp(telemetry.outside_temp_c) },
+    { icon: Activity, label: tx("vehicle.telemetry.odometer"), value: `${fmt(telemetry.odometer_km, 1)} km` },
+    { icon: Activity, label: tx("vehicle.telemetry.soh"), value: `${fmt(telemetry.soh_percent, 1)}%` },
+    { icon: Zap, label: tx("vehicle.telemetry.auxBattery"), value: `${fmt(telemetry.aux_voltage_v, 1)} V` },
+    { icon: Route, label: tx("vehicle.telemetry.tripDistance"), value: `${fmt(telemetry.current_trip_distance_km, 1)} km` },
     {
       icon: Gauge,
-      label: "Trip consumption",
+      label: tx("vehicle.telemetry.tripConsumption"),
       value: `${fmt(telemetry.current_trip_consumption_kwh_100km, 1)} kWh/100`,
     },
-    { icon: BatteryCharging, label: "kWh charged", value: `${fmt(telemetry.kwh_charged, 2)} kWh` },
+    { icon: BatteryCharging, label: tx("vehicle.telemetry.kwhCharged"), value: `${fmt(telemetry.kwh_charged, 2)} kWh` },
   ];
 
   return (
@@ -551,6 +572,8 @@ function TripBrowser({
   isLoading: boolean;
   hasError: boolean;
 }) {
+  const { locale, t } = useTranslation();
+  const tx = t as Translator;
   const totalDistance = trips.reduce((sum, trip) => sum + (trip.distanceKm ?? 0), 0);
   const avgConsumption = averageTripConsumption(trips);
 
@@ -558,13 +581,15 @@ function TripBrowser({
     <section className="voltflow-card p-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-heading text-2xl font-semibold tracking-tight">Trips</h2>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">
+            {tx("vehicle.trips.title")}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Trips are split when telemetry is silent for more than 5 minutes.
+            {tx("vehicle.trips.subtitle")}
           </p>
         </div>
         <label className="grid gap-1 text-sm text-muted-foreground">
-          Date
+          {tx("vehicle.trips.date")}
           <Input
             type="date"
             value={selectedDate}
@@ -590,10 +615,10 @@ function TripBrowser({
                     ? "border-primary bg-primary/15 text-primary"
                     : "border-border bg-white/[0.03] text-muted-foreground hover:border-primary/50 hover:text-foreground")
                 }
-                title={`Telemetry data exists on ${dateKey}`}
+                title={tx("vehicle.trips.dateHasTelemetry", { date: dateKey })}
               >
                 <span className="font-heading font-semibold">
-                  {date.toLocaleDateString([], { month: "short", day: "numeric" })}
+                  {date.toLocaleDateString(localeCode(locale), { month: "short", day: "numeric" })}
                 </span>
               </button>
             );
@@ -602,27 +627,27 @@ function TripBrowser({
       ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
-        <SummaryPill label="Trips" value={isLoading ? "…" : String(trips.length)} />
-        <SummaryPill label="Distance" value={`${fmt(totalDistance, 1)} km`} />
-        <SummaryPill label="Consumption" value={`${fmt(avgConsumption, 1)} kWh/100`} />
+        <SummaryPill label={tx("vehicle.trips.count")} value={isLoading ? "…" : String(trips.length)} />
+        <SummaryPill label={tx("vehicle.trips.distance")} value={`${fmt(totalDistance, 1)} km`} />
+        <SummaryPill label={tx("vehicle.trips.consumption")} value={`${fmt(avgConsumption, 1)} kWh/100`} />
         <SummaryPill
-          label="Points"
+          label={tx("vehicle.trips.points")}
           value={String(trips.reduce((sum, trip) => sum + trip.points.length, 0))}
         />
       </div>
 
       {hasError ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          Could not load trip history.
+          {tx("vehicle.errors.trips")}
         </p>
       ) : trips.length === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          No telemetry trips for this date yet.
+          {tx("vehicle.trips.empty")}
         </p>
       ) : (
         <div className="mt-5 grid gap-3">
           {trips.map((trip, index) => {
-            const tripLabel = `Trip ${trips.length - index}`;
+            const tripLabel = tx("vehicle.trips.tripLabel", { value: trips.length - index });
             const expanded = trip.id === selectedTripId;
 
             return (
@@ -664,6 +689,9 @@ function TripListItem({
   expanded: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+
   if (!expanded) {
     return (
       <button
@@ -683,7 +711,9 @@ function TripListItem({
         </div>
         <div className="flex shrink-0 items-center gap-3 text-sm tabular-nums text-muted-foreground">
           <span>{fmt(trip.distanceKm, 1)} km</span>
-          <span className="hidden min-[430px]:inline">{trip.points.length} pts</span>
+          <span className="hidden min-[430px]:inline">
+            {tx("vehicle.trips.pointShort", { value: trip.points.length })}
+          </span>
         </div>
       </button>
     );
@@ -709,15 +739,15 @@ function TripListItem({
           </div>
         </div>
         <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          {trip.points.length} pts
+          {tx("vehicle.trips.pointShort", { value: trip.points.length })}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))]">
-        <MiniStat label="Distance" value={`${fmt(trip.distanceKm, 1)} km`} />
+        <MiniStat label={tx("vehicle.trips.distance")} value={`${fmt(trip.distanceKm, 1)} km`} />
         <MiniStat label="SOC" value={`${fmt(trip.socStart)}% -> ${fmt(trip.socEnd)}%`} />
-        <MiniStat label="Consumption" value={`${fmt(trip.avgConsumptionKwh100Km, 1)} kWh/100`} />
-        <MiniStat label="Max speed" value={`${fmt(trip.maxSpeed)} km/h`} />
-        <MiniStat label="Avg speed" value={`${fmt(trip.avgSpeed)} km/h`} />
+        <MiniStat label={tx("vehicle.trips.consumption")} value={`${fmt(trip.avgConsumptionKwh100Km, 1)} kWh/100`} />
+        <MiniStat label={tx("vehicle.trips.maxSpeed")} value={`${fmt(trip.maxSpeed)} km/h`} />
+        <MiniStat label={tx("vehicle.trips.avgSpeed")} value={`${fmt(trip.avgSpeed)} km/h`} />
       </div>
     </button>
   );
@@ -788,20 +818,20 @@ function addChartPoint(chart: TelemetryChart, seriesIndex: number, time: number,
   chart.hasData = true;
 }
 
-function prepareTelemetryHistory(points: BydmateTelemetryPointRow[]) {
-  const socChart = createChart("SOC", "%", [
+function prepareTelemetryHistory(points: BydmateTelemetryPointRow[], t: Translator) {
+  const socChart = createChart(t("vehicle.charts.soc"), "%", [
     { label: "SOC", color: "var(--voltflow-cyan)", points: [] },
   ]);
-  const speedChart = createChart("Speed", "km/h", [
-    { label: "Speed", color: "#7dd3fc", points: [] },
+  const speedChart = createChart(t("vehicle.metrics.speed"), "km/h", [
+    { label: t("vehicle.metrics.speed"), color: "#7dd3fc", points: [] },
   ]);
-  const powerChart = createChart("Power", "kW", [
-    { label: "Power", color: "#facc15", points: [] },
+  const powerChart = createChart(t("vehicle.metrics.power"), "kW", [
+    { label: t("vehicle.metrics.power"), color: "#facc15", points: [] },
   ]);
-  const temperatureChart = createChart("Temperatures", "°C", [
-    { label: "Battery", color: "#22c55e", points: [] },
-    { label: "Outside", color: "#38bdf8", points: [] },
-    { label: "Cabin", color: "#fb7185", points: [] },
+  const temperatureChart = createChart(t("vehicle.charts.temperatures"), "°C", [
+    { label: t("vehicle.charts.battery"), color: "#22c55e", points: [] },
+    { label: t("vehicle.charts.outside"), color: "#38bdf8", points: [] },
+    { label: t("vehicle.charts.cabin"), color: "#fb7185", points: [] },
   ]);
 
   let visiblePointCount = 0;
@@ -851,22 +881,24 @@ export function TelemetryHistoryCharts({
   hasError: boolean;
   embedded?: boolean;
 }) {
-  const history = useMemo(() => prepareTelemetryHistory(points), [points]);
+  const { locale, t } = useTranslation();
+  const tx = t as Translator;
+  const history = useMemo(() => prepareTelemetryHistory(points, tx), [points, tx]);
 
   return (
     <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-2xl font-semibold tracking-tight">
-            Trip charts
+            {tx("vehicle.charts.title")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {history.visiblePointCount} cloud points
-            {history.start && history.end ? ` · ${new Date(history.start).toLocaleTimeString()} - ${new Date(history.end).toLocaleTimeString()}` : ""}
+            {tx("vehicle.charts.cloudPoints", { value: history.visiblePointCount })}
+            {history.start && history.end ? ` · ${new Date(history.start).toLocaleTimeString(localeCode(locale))} - ${new Date(history.end).toLocaleTimeString(localeCode(locale))}` : ""}
           </p>
         </div>
         <span className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          15s refresh
+          {tx("vehicle.charts.refresh")}
         </span>
       </div>
 
@@ -878,17 +910,17 @@ export function TelemetryHistoryCharts({
         </div>
       ) : hasError ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          Could not load telemetry history.
+          {tx("vehicle.errors.history")}
         </p>
       ) : history.visiblePointCount === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          History will appear after CloudEV Mate sends telemetry points.
+          {tx("vehicle.charts.empty")}
         </p>
       ) : (
         <>
           {history.visiblePointCount < 2 ? (
             <p className="mt-5 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary">
-              One point received. Charts will turn into lines after the next cloud payload.
+              {tx("vehicle.charts.onePoint")}
             </p>
           ) : null}
           <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -906,6 +938,8 @@ export function TelemetryHistoryCharts({
 }
 
 function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
   const { title, unit, series, hasData, minValue, maxValue, minTime, maxTime } = chart;
   const valuePad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
   const yMin = minValue - valuePad;
@@ -926,7 +960,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         <div>
           <h3 className="font-heading text-lg font-semibold tracking-tight">{title}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {hasData ? `${fmt(minValue, 1)}-${fmt(maxValue, 1)} ${unit}` : "No values"}
+            {hasData ? `${fmt(minValue, 1)}-${fmt(maxValue, 1)} ${unit}` : tx("vehicle.charts.noValues")}
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -939,7 +973,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         </div>
       </div>
 
-      <svg className="mt-4 h-36 w-full overflow-visible" viewBox="0 0 320 128" role="img" aria-label={`${title} history chart`}>
+      <svg className="mt-4 h-36 w-full overflow-visible" viewBox="0 0 320 128" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
         <line x1="18" x2="302" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
         <line x1="18" x2="302" y1="16" y2="16" stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
         {series.map((item) => {
@@ -1166,6 +1200,8 @@ export function RouteMap({
   points: BydmateTelemetryPointRow[];
   embedded?: boolean;
 }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
   const route = useMemo(() => prepareRoute(points), [points]);
   const start = route.start;
   const end = route.end;
@@ -1185,9 +1221,11 @@ export function RouteMap({
     <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-heading text-2xl font-semibold tracking-tight">Route</h2>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">
+            {tx("vehicle.route.title")}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {route.totalPoints} GPS points in the selected trip
+            {tx("vehicle.route.gpsPoints", { value: route.totalPoints })}
           </p>
         </div>
         {start && end ? (
@@ -1199,7 +1237,7 @@ export function RouteMap({
 
       {route.totalPoints === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          No GPS points in this trip. Check location permission in CloudEV Gateway.
+          {tx("vehicle.route.empty")}
         </p>
       ) : (
         <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-background">
@@ -1217,7 +1255,7 @@ export function RouteMap({
             className="h-64"
           />
           <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-            Map data &copy;{" "}
+            {tx("vehicle.route.mapData")} &copy;{" "}
             <a
               href="https://www.openstreetmap.org/copyright"
               target="_blank"
@@ -1228,12 +1266,12 @@ export function RouteMap({
             </a>
           </div>
           <div className="grid grid-cols-2 gap-3 border-t border-border p-4 text-sm">
-            <MiniStat label="Start" value={start ? `${start.lat.toFixed(5)}, ${start.lon.toFixed(5)}` : "—"} />
-            <MiniStat label="End" value={end ? `${end.lat.toFixed(5)}, ${end.lon.toFixed(5)}` : "—"} />
+            <MiniStat label={tx("vehicle.route.start")} value={start ? `${start.lat.toFixed(5)}, ${start.lon.toFixed(5)}` : "—"} />
+            <MiniStat label={tx("vehicle.route.end")} value={end ? `${end.lat.toFixed(5)}, ${end.lon.toFixed(5)}` : "—"} />
           </div>
           <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
             <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
-              <DialogTitle className="sr-only">Trip route map</DialogTitle>
+              <DialogTitle className="sr-only">{tx("vehicle.route.dialogTitle")}</DialogTitle>
               <InteractiveRouteCanvas
                 route={route}
                 zoomOffset={zoomOffset}
@@ -1248,7 +1286,7 @@ export function RouteMap({
                 isFullscreen
               />
               <div className="text-[11px] text-muted-foreground">
-                Map data &copy;{" "}
+                {tx("vehicle.route.mapData")} &copy;{" "}
                 <a
                   href="https://www.openstreetmap.org/copyright"
                   target="_blank"
@@ -1293,6 +1331,8 @@ function InteractiveRouteCanvas({
   className?: string;
   isFullscreen?: boolean;
 }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
   const routeSegments = useMemo(
@@ -1318,6 +1358,7 @@ function InteractiveRouteCanvas({
       <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-7rem)] flex-wrap gap-1 rounded-full border border-border bg-background/85 p-1 shadow-sm backdrop-blur">
         {ROUTE_LAYER_OPTIONS.map((option) => {
           const selected = option.id === selectedLayer;
+          const label = tx(`vehicle.route.layers.${option.id}` as TranslationKey);
 
           return (
             <button
@@ -1333,23 +1374,23 @@ function InteractiveRouteCanvas({
               aria-pressed={selected}
             >
               <span className="size-2 rounded-full" style={{ backgroundColor: option.color }} />
-              {option.label}
+              {label}
             </button>
           );
         })}
       </div>
       <div className="absolute right-3 top-3 z-10 flex gap-2">
-        <MapIconButton label="Zoom in" onClick={onZoomIn}>
+        <MapIconButton label={tx("vehicle.route.zoomIn")} onClick={onZoomIn}>
           <Plus className="size-4" aria-hidden />
         </MapIconButton>
-        <MapIconButton label="Zoom out" onClick={onZoomOut}>
+        <MapIconButton label={tx("vehicle.route.zoomOut")} onClick={onZoomOut}>
           <Minus className="size-4" aria-hidden />
         </MapIconButton>
-        <MapIconButton label="Reset map" onClick={onResetView}>
+        <MapIconButton label={tx("vehicle.route.resetMap")} onClick={onResetView}>
           <MapPin className="size-4" aria-hidden />
         </MapIconButton>
         {!isFullscreen && onOpenFullscreen ? (
-          <MapIconButton label="Open fullscreen map" onClick={onOpenFullscreen}>
+          <MapIconButton label={tx("vehicle.route.fullscreen")} onClick={onOpenFullscreen}>
             <Maximize2 className="size-4" aria-hidden />
           </MapIconButton>
         ) : null}
@@ -1358,7 +1399,7 @@ function InteractiveRouteCanvas({
         className="size-full touch-none cursor-grab active:cursor-grabbing"
         viewBox="0 0 320 180"
         role="img"
-        aria-label="Selected trip route"
+        aria-label={tx("vehicle.route.aria")}
         onPointerDown={(event) => {
           dragRef.current = { x: event.clientX, y: event.clientY };
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -1424,12 +1465,12 @@ function InteractiveRouteCanvas({
         ) : null}
         {mappedStart ? (
           <circle cx={mappedStart.x} cy={mappedStart.y} r="5" fill="#22c55e" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
-            <title>Start</title>
+            <title>{tx("vehicle.route.start")}</title>
           </circle>
         ) : null}
         {mappedEnd ? (
           <circle cx={mappedEnd.x} cy={mappedEnd.y} r="5" fill="#facc15" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
-            <title>End</title>
+            <title>{tx("vehicle.route.end")}</title>
           </circle>
         ) : null}
       </svg>
@@ -1460,6 +1501,8 @@ function MapIconButton({
 }
 
 function LocationCard({ snapshot }: { snapshot: BydmateLiveSnapshotRow }) {
+  const { locale, t } = useTranslation();
+  const tx = t as Translator;
   const loc = snapshot.location;
   const hasLocation = typeof loc.lat === "number" && typeof loc.lon === "number";
 
@@ -1468,24 +1511,24 @@ function LocationCard({ snapshot }: { snapshot: BydmateLiveSnapshotRow }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-3 text-xl tracking-tight">
           <MapPin className="size-5 text-primary" aria-hidden />
-          Location
+          {tx("vehicle.location.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-base">
         {hasLocation ? (
           <>
-            <Row label="Latitude" value={fmt(loc.lat, 6)} />
-            <Row label="Longitude" value={fmt(loc.lon, 6)} />
-            <Row label="Accuracy" value={`${fmt(loc.accuracy_m, 1)} m`} />
-            <Row label="Bearing" value={`${fmt(loc.bearing_deg, 0)}°`} />
+            <Row label={tx("vehicle.location.latitude")} value={fmt(loc.lat, 6)} />
+            <Row label={tx("vehicle.location.longitude")} value={fmt(loc.lon, 6)} />
+            <Row label={tx("vehicle.location.accuracy")} value={`${fmt(loc.accuracy_m, 1)} m`} />
+            <Row label={tx("vehicle.location.bearing")} value={`${fmt(loc.bearing_deg, 0)}°`} />
           </>
         ) : (
           <p className="text-muted-foreground">
-            No GPS in the latest payload. BYDMate sends location only when Android location permission is granted.
+            {tx("vehicle.location.empty")}
           </p>
         )}
-        <Row label="Device time" value={new Date(snapshot.device_time).toLocaleString()} />
-        <Row label="Received" value={new Date(snapshot.received_at).toLocaleString()} />
+        <Row label={tx("vehicle.location.deviceTime")} value={new Date(snapshot.device_time).toLocaleString(localeCode(locale))} />
+        <Row label={tx("vehicle.location.received")} value={new Date(snapshot.received_at).toLocaleString(localeCode(locale))} />
       </CardContent>
     </Card>
   );
@@ -1501,22 +1544,26 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function EmptyVehicleState() {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+
   return (
     <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
       <Header />
       <section className="voltflow-card p-6">
         <CarFront className="size-10 text-primary" aria-hidden />
         <h1 className="mt-5 font-heading text-3xl font-bold tracking-normal">
-          No car data yet
+          {tx("vehicle.empty.title")}
         </h1>
         <p className="mt-3 text-muted-foreground leading-7">
-          Generate a BYDMate key in Settings, paste it into the Android app, and set
-          the endpoint to <span className="font-mono">/api/bydmate/telemetry</span>.
-          The first accepted payload will appear here.
+          {tx("vehicle.empty.beforeEndpoint")}{" "}
+          <span className="font-mono">/api/bydmate/telemetry</span>.
+          {" "}
+          {tx("vehicle.empty.afterEndpoint")}
         </p>
         <div className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
           <Clock3 className="mb-2 size-4 text-primary" aria-hidden />
-          The page refreshes every 5 seconds while open.
+          {tx("vehicle.empty.refresh")}
         </div>
       </section>
     </div>
