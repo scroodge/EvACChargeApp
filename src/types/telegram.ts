@@ -31,6 +31,7 @@ export type FAQItem = {
   category: string;
   categorySlug: string;
   tags: string[];
+  modelGenerations?: CarGeneration[];
   relatedIds?: string[];
 };
 

@@ -267,6 +267,10 @@ function parseFAQForm(formData: FormData): FAQInput | AdminFormState {
     answer: stringValue(formData, "answer"),
     category_id: stringValue(formData, "category_id"),
     tags: listValue(formData, "tags"),
+    model_generations: formData
+      .getAll("model_generations")
+      .map(String)
+      .filter(isCarGeneration),
     status: statusValue(formData),
     sort_order: numberValue(formData, "sort_order"),
   };
@@ -275,6 +279,9 @@ function parseFAQForm(formData: FormData): FAQInput | AdminFormState {
   if (!input.question) errors.question = "Вопрос обязателен.";
   if (!input.answer) errors.answer = "Ответ обязателен.";
   if (!input.category_id) errors.category_id = "Раздел обязателен.";
+  if (!input.model_generations.length) {
+    errors.model_generations = "Выберите хотя бы одно поколение.";
+  }
   if (!statuses.includes(input.status)) errors.status = "Выберите корректный статус.";
   return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
 }

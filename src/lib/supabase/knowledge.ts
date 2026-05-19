@@ -39,7 +39,8 @@ type RawArticle = Omit<
   knowledge_categories?: CategoryRelation;
 };
 
-type RawFAQ = Omit<FAQItem, "category"> & {
+type RawFAQ = Omit<FAQItem, "category" | "model_generations"> & {
+  model_generations?: unknown;
   knowledge_categories?: CategoryRelation;
 };
 
@@ -551,7 +552,7 @@ async function upsertFAQKnowledgeItem(id: string, input: FAQInput) {
     source_type: "faq",
     source_url: "/telegram?tab=faq",
     tags: input.tags,
-    model_generations: ["gen1_2024", "gen2_2025"],
+    model_generations: input.model_generations,
     is_published: input.status === "published",
   });
 }
@@ -675,6 +676,7 @@ function mapFAQ(row: RawFAQ): FAQItem {
     ...row,
     category: firstRelation(row.knowledge_categories),
     tags: row.tags ?? [],
+    model_generations: parseModelGenerations(row.model_generations),
   };
 }
 
@@ -796,6 +798,7 @@ function toTelegramFAQ(item: FAQItem): TelegramFAQItem {
     category: item.category?.title ?? "FAQ",
     categorySlug: item.category?.slug ?? "faq",
     tags: item.tags,
+    modelGenerations: item.model_generations,
   };
 }
 

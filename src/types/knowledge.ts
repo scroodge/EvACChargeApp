@@ -62,6 +62,7 @@ export type FAQItem = {
   category_id: string | null;
   category?: KnowledgeCategory | null;
   tags: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   sort_order: number;
   created_at: string;
@@ -130,6 +131,7 @@ export type FAQInput = {
   answer: string;
   category_id: string;
   tags: string[];
+  model_generations: CarGeneration[];
   status: ArticleStatus;
   sort_order: number;
 };

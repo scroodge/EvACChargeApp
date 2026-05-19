@@ -12,6 +12,7 @@ import { faqCategories } from "@/data/telegram/categories";
 import { faqItems } from "@/data/telegram/faq";
 import { useSemanticKnowledgeSearch } from "@/hooks/use-semantic-knowledge-search";
 import type { CarGeneration } from "@/lib/car-generations";
+import { articleMatchesGeneration } from "@/lib/telegram/generation";
 import { cn } from "@/lib/utils";
 import type { FAQItem } from "@/types/telegram";
 
@@ -58,9 +59,9 @@ export function SmartFAQ({
   const filteredItems = useMemo(() => {
     return sourceItems.filter((item) => {
       const matchesCategory = category === "All" || item.category === category;
-      return matchesCategory;
+      return matchesCategory && articleMatchesGeneration(item, generation);
     });
-  }, [category, sourceItems]);
+  }, [category, generation, sourceItems]);
 
   useEffect(() => {
     const q = searchParams.get("q");
