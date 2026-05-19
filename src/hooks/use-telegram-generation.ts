@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { isCarGeneration, type CarGeneration } from "@/lib/car-generations";
 import {
@@ -9,31 +9,26 @@ import {
   writeStoredTelegramGeneration,
 } from "@/lib/telegram/generation";
 
+const TELEGRAM_GENERATION_CHANGE_EVENT = "voltflow:telegram-generation-change";
+
 export function useTelegramGeneration() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlGeneration = searchParams.get("gen");
-  const [generation, setGeneration] = useState<CarGeneration>(() => {
-    if (isCarGeneration(urlGeneration)) return urlGeneration;
-    return "gen1_2024";
-  });
-
-  useEffect(() => {
-    const stored = readStoredTelegramGeneration();
-    if (stored) {
-      setGeneration(stored);
-      return;
-    }
-    if (isCarGeneration(urlGeneration)) {
-      setGeneration(urlGeneration);
-    }
-  }, [urlGeneration]);
+  const storedGeneration = useSyncExternalStore(
+    subscribeToTelegramGeneration,
+    getStoredTelegramGenerationSnapshot,
+    getServerTelegramGenerationSnapshot,
+  );
+  const generation = isCarGeneration(urlGeneration)
+    ? urlGeneration
+    : storedGeneration ?? "gen1_2024";
 
   const setTelegramGeneration = useCallback(
     (value: CarGeneration) => {
-      setGeneration(value);
       writeStoredTelegramGeneration(value);
+      window.dispatchEvent(new Event(TELEGRAM_GENERATION_CHANGE_EVENT));
 
       const params = new URLSearchParams(searchParams.toString());
       params.set("gen", value);
@@ -44,4 +39,24 @@ export function useTelegramGeneration() {
   );
 
   return [generation, setTelegramGeneration] as const;
+}
+
+function subscribeToTelegramGeneration(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(TELEGRAM_GENERATION_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(TELEGRAM_GENERATION_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function getStoredTelegramGenerationSnapshot() {
+  return readStoredTelegramGeneration();
+}
+
+function getServerTelegramGenerationSnapshot() {
+  return null;
 }

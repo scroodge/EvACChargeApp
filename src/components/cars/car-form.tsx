@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,32 +40,26 @@ export function CarForm({
   onSubmit,
 }: CarFormProps) {
   const { t } = useTranslation();
+  const initialGeneration = car?.model_generation ?? "gen1_2024";
+  const initialPreset = carGenerationPresets[initialGeneration];
   const [generation, setGeneration] = useState<CarGeneration>(
-    car?.model_generation ?? "gen1_2024",
+    initialGeneration,
   );
   const [battery, setBattery] = useState(
-    String(car?.battery_capacity_kwh ?? carGenerationPresets.gen1_2024.battery_capacity_kwh),
+    String(car?.battery_capacity_kwh ?? initialPreset.battery_capacity_kwh),
   );
   const [chargerPower, setChargerPower] = useState(
     String(
       car?.default_charger_power_kw ??
-        carGenerationPresets.gen1_2024.default_charger_power_kw,
+        initialPreset.default_charger_power_kw,
     ),
   );
   const [efficiency, setEfficiency] = useState(
     String(
       car?.default_efficiency_percent ??
-        carGenerationPresets.gen1_2024.default_efficiency_percent,
+        initialPreset.default_efficiency_percent,
     ),
   );
-
-  useEffect(() => {
-    if (mode !== "create" || car) return;
-    const preset = carGenerationPresets[generation];
-    setBattery(String(preset.battery_capacity_kwh));
-    setChargerPower(String(preset.default_charger_power_kw));
-    setEfficiency(String(preset.default_efficiency_percent));
-  }, [car, generation, mode]);
 
   const generationItems = carGenerations.map((value) => ({
     value,
@@ -90,7 +84,17 @@ export function CarForm({
             <Select
               value={generation}
               onValueChange={(value) => {
-                if (value) setGeneration(value as CarGeneration);
+                if (!value) return;
+
+                const nextGeneration = value as CarGeneration;
+                setGeneration(nextGeneration);
+
+                if (mode === "create" && !car) {
+                  const preset = carGenerationPresets[nextGeneration];
+                  setBattery(String(preset.battery_capacity_kwh));
+                  setChargerPower(String(preset.default_charger_power_kw));
+                  setEfficiency(String(preset.default_efficiency_percent));
+                }
               }}
               items={generationItems}
             >
