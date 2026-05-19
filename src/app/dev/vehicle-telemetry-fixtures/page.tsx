@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import {
   RouteMap,
   TelemetryHistoryCharts,
+  VehicleLiveFixtureView,
 } from "@/components/vehicle/vehicle-live-view";
 import type {
+  BydmateLiveSnapshotRow,
   BydmateLocation,
   BydmateTelemetry,
   BydmateTelemetryPointRow,
@@ -41,6 +43,27 @@ export default function VehicleTelemetryFixturesPage() {
     intervalMs: 15_000,
     gps: "missing",
   });
+  const vehiclePageTrips = [
+    ...makeTelemetryPoints(48, {
+      idPrefix: "mock-morning",
+      startMs: BASE_TIME_MS - 90 * 60_000,
+      intervalMs: 15_000,
+      gps: "normal",
+    }),
+    ...makeTelemetryPoints(36, {
+      idPrefix: "mock-lunch",
+      startMs: BASE_TIME_MS + 45 * 60_000,
+      intervalMs: 15_000,
+      gps: "normal",
+    }),
+    ...makeTelemetryPoints(52, {
+      idPrefix: "mock-evening",
+      startMs: BASE_TIME_MS + 3 * 60 * 60_000,
+      intervalMs: 15_000,
+      gps: "normal",
+    }),
+  ];
+  const liveSnapshot = makeLiveSnapshot(vehiclePageTrips.at(-1) ?? denseTrip[0]);
 
   return (
     <main className="safe-bottom mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-8 pt-5">
@@ -56,6 +79,19 @@ export default function VehicleTelemetryFixturesPage() {
           available outside production.
         </p>
       </header>
+
+      <section className="grid gap-4">
+        <div>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">
+            Full vehicle page mock
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Auth-free fixture with three same-day trips, live car data, charts, route and the
+            expandable trip list.
+          </p>
+        </div>
+        <VehicleLiveFixtureView snapshot={liveSnapshot} points={vehiclePageTrips} />
+      </section>
 
       <FixtureSection
         title="Dense trip"
@@ -142,6 +178,26 @@ function makeTelemetryPoints(
       raw_payload: null,
     };
   });
+}
+
+function makeLiveSnapshot(point: BydmateTelemetryPointRow): BydmateLiveSnapshotRow {
+  return {
+    ...point,
+    id: "fixture-live-snapshot",
+    vehicle_id: "fixture-car-live",
+    received_at: new Date().toISOString(),
+    telemetry: {
+      ...point.telemetry,
+      is_charging: false,
+      charge_power_kw: 0,
+      charge_type: "AC",
+      battery_voltage_v: 382,
+      aux_voltage_v: 12.7,
+      soh_percent: 99.1,
+      kwh_charged: 11.42,
+    },
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function makeLocation(index: number, gps: "normal" | "missing"): BydmateLocation {

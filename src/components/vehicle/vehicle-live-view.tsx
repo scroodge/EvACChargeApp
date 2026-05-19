@@ -5,6 +5,8 @@ import {
   Activity,
   BatteryCharging,
   CarFront,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   Gauge,
   MapPin,
@@ -61,23 +63,6 @@ export function VehicleLiveView() {
   } = useBydmateTelemetryPointsQuery();
   const nowMs = useTickingClock(true);
   const snapshot = data?.[0] ?? null;
-  const allPoints = useMemo(() => points ?? [], [points]);
-  const availableDateKeys = useMemo(() => {
-    return Array.from(new Set(allPoints.map((point) => localDateKey(pointTimeMs(point)))))
-      .filter((key) => key !== "1970-01-01")
-      .sort()
-      .reverse();
-  }, [allPoints]);
-  const [fallbackDate] = useState(() => localDateKey(Date.now()));
-  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
-  const selectedDate = selectedDateOverride ?? availableDateKeys[0] ?? fallbackDate;
-  const dayPoints = useMemo(() => {
-    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
-  }, [allPoints, selectedDate]);
-  const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
-  const selectedTripPoints = selectedTrip?.points ?? EMPTY_TELEMETRY_POINTS;
 
   if (isLoading) {
     return (
@@ -111,10 +96,73 @@ export function VehicleLiveView() {
   }
 
   return (
+    <VehicleLiveContent
+      snapshot={snapshot}
+      points={points ?? EMPTY_TELEMETRY_POINTS}
+      isHistoryLoading={isHistoryLoading}
+      hasHistoryError={Boolean(historyError)}
+      nowMs={nowMs}
+    />
+  );
+}
+
+export function VehicleLiveFixtureView({
+  snapshot,
+  points,
+}: {
+  snapshot: BydmateLiveSnapshotRow;
+  points: BydmateTelemetryPointRow[];
+}) {
+  const nowMs = useTickingClock(true);
+
+  return (
+    <VehicleLiveContent
+      snapshot={snapshot}
+      points={points}
+      isHistoryLoading={false}
+      hasHistoryError={false}
+      nowMs={nowMs}
+    />
+  );
+}
+
+function VehicleLiveContent({
+  snapshot,
+  points,
+  isHistoryLoading,
+  hasHistoryError,
+  nowMs,
+}: {
+  snapshot: BydmateLiveSnapshotRow;
+  points: BydmateTelemetryPointRow[];
+  isHistoryLoading: boolean;
+  hasHistoryError: boolean;
+  nowMs: number;
+}) {
+  const allPoints = useMemo(() => points, [points]);
+  const availableDateKeys = useMemo(() => {
+    return Array.from(new Set(allPoints.map((point) => localDateKey(pointTimeMs(point)))))
+      .filter((key) => key !== "1970-01-01")
+      .sort()
+      .reverse();
+  }, [allPoints]);
+  const [fallbackDate] = useState(() => localDateKey(Date.now()));
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
+  const selectedDate = selectedDateOverride ?? availableDateKeys[0] ?? fallbackDate;
+  const dayPoints = useMemo(() => {
+    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
+  }, [allPoints, selectedDate]);
+  const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
+  const selectedTripPoints = selectedTrip?.points ?? EMPTY_TELEMETRY_POINTS;
+  const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
+
+  return (
     <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
       <Header />
-      <Hero snapshot={snapshot} nowMs={nowMs} />
-      <TelemetryGrid telemetry={snapshot.telemetry} />
+      <Hero snapshot={snapshot} nowMs={nowMs} isStale={isStale} />
+      {isStale ? <StaleTelemetryNotice /> : <TelemetryGrid telemetry={snapshot.telemetry} />}
       <TripBrowser
         selectedDate={selectedDate}
         availableDateKeys={availableDateKeys}
@@ -126,12 +174,12 @@ export function VehicleLiveView() {
         selectedTripId={selectedTrip?.id ?? null}
         onSelectTrip={setSelectedTripId}
         isLoading={isHistoryLoading}
-        hasError={Boolean(historyError)}
+        hasError={hasHistoryError}
       />
       <TelemetryHistoryCharts
         points={selectedTripPoints}
         isLoading={isHistoryLoading}
-        hasError={Boolean(historyError)}
+        hasError={hasHistoryError}
       />
       <RouteMap points={selectedTripPoints} />
       <LocationCard snapshot={snapshot} />
@@ -148,9 +196,16 @@ function Header() {
   );
 }
 
-function Hero({ snapshot, nowMs }: { snapshot: BydmateLiveSnapshotRow; nowMs: number }) {
+function Hero({
+  snapshot,
+  nowMs,
+  isStale,
+}: {
+  snapshot: BydmateLiveSnapshotRow;
+  nowMs: number;
+  isStale: boolean;
+}) {
   const t = snapshot.telemetry;
-  const stale = nowMs - Date.parse(snapshot.received_at) > 90_000;
 
   return (
     <section className="voltflow-card overflow-hidden p-5">
@@ -170,12 +225,12 @@ function Hero({ snapshot, nowMs }: { snapshot: BydmateLiveSnapshotRow; nowMs: nu
         <span
           className={
             "rounded-full border px-4 py-2 font-heading text-xs font-semibold uppercase tracking-[0.2em] " +
-            (stale
+            (isStale
               ? "border-yellow-300/25 bg-yellow-300/10 text-yellow-200"
               : "border-primary/25 bg-primary/10 text-primary")
           }
         >
-          {stale ? "stale" : "live"}
+          {isStale ? "stale" : "live"}
         </span>
       </div>
 
@@ -203,6 +258,22 @@ function HeroMetric({
       <p className="text-muted-foreground text-[11px] uppercase tracking-[0.18em]">{label}</p>
       <p className="mt-1 font-heading text-lg font-semibold tabular-nums">{value}</p>
     </div>
+  );
+}
+
+function StaleTelemetryNotice() {
+  return (
+    <Card className="border-yellow-300/20 bg-yellow-300/[0.06]">
+      <CardContent className="p-5">
+        <p className="font-heading text-lg font-semibold tracking-tight text-yellow-100">
+          Car data hidden
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The latest vehicle snapshot is stale, so live car values are hidden until fresh telemetry
+          arrives.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -470,42 +541,92 @@ function TripBrowser({
         </p>
       ) : (
         <div className="mt-5 grid gap-3">
-          {trips.map((trip, index) => (
-            <button
-              key={trip.id}
-              type="button"
-              onClick={() => onSelectTrip(trip.id)}
-              className={
-                "rounded-2xl border p-4 text-left transition " +
-                (trip.id === selectedTripId
-                  ? "border-primary bg-primary/10"
-                  : "border-border bg-white/[0.02] hover:border-primary/50")
-              }
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-heading text-lg font-semibold tracking-tight">
-                    Trip {trips.length - index}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
-                  </p>
-                </div>
-                <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  {trip.points.length} pts
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
-                <MiniStat label="Distance" value={`${fmt(trip.distanceKm, 1)} km`} />
-                <MiniStat label="SOC" value={`${fmt(trip.socStart)}% → ${fmt(trip.socEnd)}%`} />
-                <MiniStat label="Max speed" value={`${fmt(trip.maxSpeed)} km/h`} />
-                <MiniStat label="Avg speed" value={`${fmt(trip.avgSpeed)} km/h`} />
-              </div>
-            </button>
-          ))}
+          {trips.map((trip, index) => {
+            const tripLabel = `Trip ${trips.length - index}`;
+            const expanded = trip.id === selectedTripId;
+
+            return (
+              <TripListItem
+                key={trip.id}
+                trip={trip}
+                tripLabel={tripLabel}
+                expanded={expanded}
+                onSelect={() => onSelectTrip(trip.id)}
+              />
+            );
+          })}
         </div>
       )}
     </section>
+  );
+}
+
+function TripListItem({
+  trip,
+  tripLabel,
+  expanded,
+  onSelect,
+}: {
+  trip: TripSegment;
+  tripLabel: string;
+  expanded: boolean;
+  onSelect: () => void;
+}) {
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-expanded={false}
+        className="grid min-h-14 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-border bg-white/[0.02] px-4 py-3 text-left transition hover:border-primary/50 hover:bg-white/[0.04]"
+      >
+        <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+        <div className="min-w-0">
+          <p className="truncate font-heading text-base font-semibold tracking-tight">
+            {tripLabel}
+          </p>
+          <p className="truncate text-sm text-muted-foreground">
+            {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 text-sm tabular-nums text-muted-foreground">
+          <span>{fmt(trip.distanceKm, 1)} km</span>
+          <span className="hidden min-[430px]:inline">{trip.points.length} pts</span>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-expanded
+      className="rounded-2xl border border-primary bg-primary/10 p-4 text-left transition"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <ChevronDown className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
+          <div>
+            <p className="font-heading text-lg font-semibold tracking-tight">
+              {tripLabel}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
+            </p>
+          </div>
+        </div>
+        <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          {trip.points.length} pts
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
+        <MiniStat label="Distance" value={`${fmt(trip.distanceKm, 1)} km`} />
+        <MiniStat label="SOC" value={`${fmt(trip.socStart)}% -> ${fmt(trip.socEnd)}%`} />
+        <MiniStat label="Max speed" value={`${fmt(trip.maxSpeed)} km/h`} />
+        <MiniStat label="Avg speed" value={`${fmt(trip.avgSpeed)} km/h`} />
+      </div>
+    </button>
   );
 }
 
