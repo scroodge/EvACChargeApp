@@ -162,6 +162,7 @@ function makeTelemetryPoints(
       cabin_temp_c: 21 + Math.cos(index / 30) * 2,
       odometer_km: 12_400 + index * 0.12,
       current_trip_distance_km: index * 0.12,
+      current_trip_consumption_kwh_100km: 15.8 + wave * 1.4 + fastWave * 0.7,
       range_est_km: 360 - index * 0.04,
     };
 

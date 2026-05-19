@@ -153,9 +153,9 @@ function VehicleLiveContent({
     return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
   }, [allPoints, selectedDate]);
   const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const selectedTrip = trips.find((trip) => trip.id === selectedTripId) ?? trips[0] ?? null;
-  const selectedTripPoints = selectedTrip?.points ?? EMPTY_TELEMETRY_POINTS;
+  const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
+  const defaultTripId = trips[0]?.id ?? null;
+  const expandedTripId = selectedTripId === undefined ? defaultTripId : selectedTripId;
   const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
 
   return (
@@ -168,20 +168,19 @@ function VehicleLiveContent({
         availableDateKeys={availableDateKeys}
         onDateChange={(value) => {
           setSelectedDateOverride(value);
-          setSelectedTripId(null);
+          setSelectedTripId(undefined);
         }}
         trips={trips}
-        selectedTripId={selectedTrip?.id ?? null}
-        onSelectTrip={setSelectedTripId}
+        selectedTripId={expandedTripId}
+        onSelectTrip={(tripId) => {
+          setSelectedTripId((currentTripId) => {
+            const currentExpandedTripId = currentTripId === undefined ? defaultTripId : currentTripId;
+            return currentExpandedTripId === tripId ? null : tripId;
+          });
+        }}
         isLoading={isHistoryLoading}
         hasError={hasHistoryError}
       />
-      <TelemetryHistoryCharts
-        points={selectedTripPoints}
-        isLoading={isHistoryLoading}
-        hasError={hasHistoryError}
-      />
-      <RouteMap points={selectedTripPoints} />
       <LocationCard snapshot={snapshot} />
     </div>
   );
@@ -355,6 +354,7 @@ type TripSegment = {
   socEnd: number | null;
   maxSpeed: number | null;
   avgSpeed: number | null;
+  avgConsumptionKwh100Km: number | null;
 };
 
 const TRIP_GAP_MS = 5 * 60 * 1000;
@@ -422,6 +422,9 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
     const speeds = tripPoints
       .map((point) => validNumber(point.telemetry.speed_kmh))
       .filter((value): value is number => value != null);
+    const consumptionValues = tripPoints
+      .map((point) => validNumber(point.telemetry.current_trip_consumption_kwh_100km))
+      .filter((value): value is number => value != null && value >= 0);
     const odometerValues = tripPoints
       .map((point) => validNumber(point.telemetry.odometer_km))
       .filter((value): value is number => value != null);
@@ -450,6 +453,9 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
       socEnd: validNumber(tripPoints.at(-1)?.telemetry.soc),
       maxSpeed: speeds.length ? Math.max(...speeds) : null,
       avgSpeed: speeds.length ? speeds.reduce((sum, value) => sum + value, 0) / speeds.length : null,
+      avgConsumptionKwh100Km: consumptionValues.length
+        ? consumptionValues.reduce((sum, value) => sum + value, 0) / consumptionValues.length
+        : null,
     };
   }).reverse();
 }
@@ -546,13 +552,25 @@ function TripBrowser({
             const expanded = trip.id === selectedTripId;
 
             return (
-              <TripListItem
-                key={trip.id}
-                trip={trip}
-                tripLabel={tripLabel}
-                expanded={expanded}
-                onSelect={() => onSelectTrip(trip.id)}
-              />
+              <div key={trip.id} className="grid gap-3">
+                <TripListItem
+                  trip={trip}
+                  tripLabel={tripLabel}
+                  expanded={expanded}
+                  onSelect={() => onSelectTrip(trip.id)}
+                />
+                {expanded ? (
+                  <>
+                    <TelemetryHistoryCharts
+                      points={trip.points}
+                      isLoading={isLoading}
+                      hasError={hasError}
+                      embedded
+                    />
+                    <RouteMap points={trip.points} embedded />
+                  </>
+                ) : null}
+              </div>
             );
           })}
         </div>
@@ -620,9 +638,10 @@ function TripListItem({
           {trip.points.length} pts
         </span>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))]">
         <MiniStat label="Distance" value={`${fmt(trip.distanceKm, 1)} km`} />
         <MiniStat label="SOC" value={`${fmt(trip.socStart)}% -> ${fmt(trip.socEnd)}%`} />
+        <MiniStat label="Consumption" value={`${fmt(trip.avgConsumptionKwh100Km, 1)} kWh/100`} />
         <MiniStat label="Max speed" value={`${fmt(trip.maxSpeed)} km/h`} />
         <MiniStat label="Avg speed" value={`${fmt(trip.avgSpeed)} km/h`} />
       </div>
@@ -751,15 +770,17 @@ export function TelemetryHistoryCharts({
   points,
   isLoading,
   hasError,
+  embedded = false,
 }: {
   points: BydmateTelemetryPointRow[];
   isLoading: boolean;
   hasError: boolean;
+  embedded?: boolean;
 }) {
   const history = useMemo(() => prepareTelemetryHistory(points), [points]);
 
   return (
-    <section className="voltflow-card p-5">
+    <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-2xl font-semibold tracking-tight">
@@ -907,7 +928,13 @@ function prepareRoute(points: BydmateTelemetryPointRow[]) {
   };
 }
 
-export function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
+export function RouteMap({
+  points,
+  embedded = false,
+}: {
+  points: BydmateTelemetryPointRow[];
+  embedded?: boolean;
+}) {
   const route = useMemo(() => prepareRoute(points), [points]);
   const hasRoute = route.totalPoints > 0;
   const minLat = hasRoute ? route.minLat : 0;
@@ -930,7 +957,7 @@ export function RouteMap({ points }: { points: BydmateTelemetryPointRow[] }) {
   const end = route.end;
 
   return (
-    <section className="voltflow-card p-5">
+    <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-2xl font-semibold tracking-tight">Route</h2>
