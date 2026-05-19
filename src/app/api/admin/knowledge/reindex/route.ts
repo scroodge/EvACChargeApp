@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { buildKnowledgeEmbeddingText, createEmbedding } from "@/lib/embeddings";
+import { invalidateKnowledgeSearchCache } from "@/lib/knowledge-search";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/knowledge";
 
@@ -59,6 +60,9 @@ export async function POST(request: NextRequest) {
     const results = await mapWithConcurrency(items, concurrency, reindexKnowledgeItem);
     const failures = results.flatMap((result) => result.ok ? [] : [result.failure]);
     const count = results.length - failures.length;
+    if (count > 0) {
+      invalidateKnowledgeSearchCache();
+    }
 
     return NextResponse.json(
       {

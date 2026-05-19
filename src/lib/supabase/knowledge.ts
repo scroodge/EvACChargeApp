@@ -1,5 +1,6 @@
 import { isCarGeneration, type CarGeneration } from "@/lib/car-generations";
 import { buildKnowledgeEmbeddingText, createEmbedding } from "@/lib/embeddings";
+import { invalidateKnowledgeSearchCache } from "@/lib/knowledge-search";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeModelGenerations } from "@/lib/telegram/generation";
@@ -633,11 +634,13 @@ async function upsertKnowledgeItem(item: {
   });
 
   if (error) throw error;
+  invalidateKnowledgeSearchCache();
 }
 
 async function deleteKnowledgeItem(id: string) {
   const { error } = await supabaseAdmin.from("knowledge_items").delete().eq("id", id);
   if (error) throw error;
+  invalidateKnowledgeSearchCache();
 }
 
 async function getCategorySlug(categoryId: string | null) {
