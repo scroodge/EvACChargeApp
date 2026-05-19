@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Activity,
   BatteryCharging,
@@ -9,7 +10,10 @@ import {
   ChevronRight,
   Clock3,
   Gauge,
+  Maximize2,
+  Minus,
   MapPin,
+  Plus,
   Route,
   Thermometer,
   Zap,
@@ -18,6 +22,7 @@ import {
 import { BrandBadge } from "@/components/brand/BrandBadge";
 import { LogoFull } from "@/components/brand/LogoFull";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
@@ -326,6 +331,18 @@ type RoutePoint = {
   time: number;
 };
 
+type MapTile = {
+  key: string;
+  url: string;
+  x: number;
+  y: number;
+};
+
+type MapPan = {
+  x: number;
+  y: number;
+};
+
 type ChartSeries = {
   label: string;
   color: string;
@@ -362,6 +379,15 @@ const MAX_CHART_POINTS = 240;
 const MAX_CHART_MARKERS = 80;
 const MAX_ROUTE_POINTS = 400;
 const EMPTY_TELEMETRY_POINTS: BydmateTelemetryPointRow[] = [];
+const MAP_VIEW_WIDTH = 320;
+const MAP_VIEW_HEIGHT = 180;
+const MAP_TILE_SIZE = 256;
+const MAX_MAP_ZOOM = 18;
+const MIN_MAP_ZOOM = 2;
+const DEFAULT_MAP_ZOOM = 15;
+const WEB_MERCATOR_MAX_LAT = 85.05112878;
+const MAX_MAP_ZOOM_OFFSET = 3;
+const MIN_MAP_ZOOM_OFFSET = -3;
 
 function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -460,6 +486,30 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
   }).reverse();
 }
 
+function averageTripConsumption(trips: TripSegment[]) {
+  let weightedConsumption = 0;
+  let weightedDistance = 0;
+  let sampleConsumption = 0;
+  let sampleCount = 0;
+
+  for (const trip of trips) {
+    const consumption = trip.avgConsumptionKwh100Km;
+    if (consumption == null) continue;
+
+    sampleConsumption += consumption;
+    sampleCount += 1;
+
+    const distance = trip.distanceKm;
+    if (distance != null && distance > 0) {
+      weightedConsumption += consumption * distance;
+      weightedDistance += distance;
+    }
+  }
+
+  if (weightedDistance > 0) return weightedConsumption / weightedDistance;
+  return sampleCount > 0 ? sampleConsumption / sampleCount : null;
+}
+
 function TripBrowser({
   selectedDate,
   availableDateKeys,
@@ -480,6 +530,7 @@ function TripBrowser({
   hasError: boolean;
 }) {
   const totalDistance = trips.reduce((sum, trip) => sum + (trip.distanceKm ?? 0), 0);
+  const avgConsumption = averageTripConsumption(trips);
 
   return (
     <section className="voltflow-card p-5">
@@ -528,9 +579,10 @@ function TripBrowser({
         </div>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
+      <div className="mt-5 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
         <SummaryPill label="Trips" value={isLoading ? "…" : String(trips.length)} />
         <SummaryPill label="Distance" value={`${fmt(totalDistance, 1)} km`} />
+        <SummaryPill label="Consumption" value={`${fmt(avgConsumption, 1)} kWh/100`} />
         <SummaryPill
           label="Points"
           value={String(trips.reduce((sum, trip) => sum + trip.points.length, 0))}
@@ -928,6 +980,94 @@ function prepareRoute(points: BydmateTelemetryPointRow[]) {
   };
 }
 
+function clampLatitude(value: number) {
+  return Math.min(WEB_MERCATOR_MAX_LAT, Math.max(-WEB_MERCATOR_MAX_LAT, value));
+}
+
+function projectMercator(lat: number, lon: number, zoom: number) {
+  const scale = MAP_TILE_SIZE * 2 ** zoom;
+  const clampedLat = clampLatitude(lat);
+  const sinLat = Math.sin((clampedLat * Math.PI) / 180);
+
+  return {
+    x: ((lon + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale,
+  };
+}
+
+function routeBoundsAtZoom(route: ReturnType<typeof prepareRoute>, zoom: number) {
+  const topLeft = projectMercator(route.maxLat, route.minLon, zoom);
+  const bottomRight = projectMercator(route.minLat, route.maxLon, zoom);
+
+  return {
+    minX: topLeft.x,
+    maxX: bottomRight.x,
+    minY: topLeft.y,
+    maxY: bottomRight.y,
+    width: Math.max(1, bottomRight.x - topLeft.x),
+    height: Math.max(1, bottomRight.y - topLeft.y),
+  };
+}
+
+function chooseRouteZoom(route: ReturnType<typeof prepareRoute>) {
+  if (!route.start || !route.end || route.totalPoints < 2) return DEFAULT_MAP_ZOOM;
+
+  for (let zoom = MAX_MAP_ZOOM; zoom >= MIN_MAP_ZOOM; zoom -= 1) {
+    const bounds = routeBoundsAtZoom(route, zoom);
+    if (bounds.width <= 288 && bounds.height <= 132) {
+      return zoom;
+    }
+  }
+
+  return MIN_MAP_ZOOM;
+}
+
+function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: number, pan: MapPan) {
+  const zoom = Math.max(
+    MIN_MAP_ZOOM,
+    Math.min(MAX_MAP_ZOOM, chooseRouteZoom(route) + zoomOffset),
+  );
+  const bounds = routeBoundsAtZoom(route, zoom);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const topLeftX = centerX - MAP_VIEW_WIDTH / 2 - pan.x;
+  const topLeftY = centerY - MAP_VIEW_HEIGHT / 2 - pan.y;
+  const minTileX = Math.floor(topLeftX / MAP_TILE_SIZE);
+  const maxTileX = Math.floor((topLeftX + MAP_VIEW_WIDTH) / MAP_TILE_SIZE);
+  const minTileY = Math.floor(topLeftY / MAP_TILE_SIZE);
+  const maxTileY = Math.floor((topLeftY + MAP_VIEW_HEIGHT) / MAP_TILE_SIZE);
+  const tileCount = 2 ** zoom;
+  const tiles: MapTile[] = [];
+
+  for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+    if (tileY < 0 || tileY >= tileCount) continue;
+
+    for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+      const wrappedTileX = ((tileX % tileCount) + tileCount) % tileCount;
+      tiles.push({
+        key: `${zoom}-${wrappedTileX}-${tileY}-${tileX}`,
+        url: `https://tile.openstreetmap.org/${zoom}/${wrappedTileX}/${tileY}.png`,
+        x: tileX * MAP_TILE_SIZE - topLeftX,
+        y: tileY * MAP_TILE_SIZE - topLeftY,
+      });
+    }
+  }
+
+  const mapPoint = (point: RoutePoint) => {
+    const projected = projectMercator(point.lat, point.lon, zoom);
+    return {
+      x: 16 + ((projected.x - topLeftX - 16) / (MAP_VIEW_WIDTH - 32)) * (MAP_VIEW_WIDTH - 32),
+      y: 8 + ((projected.y - topLeftY - 8) / (MAP_VIEW_HEIGHT - 24)) * (MAP_VIEW_HEIGHT - 24),
+    };
+  };
+
+  return {
+    zoom,
+    tiles,
+    mapPoint,
+  };
+}
+
 export function RouteMap({
   points,
   embedded = false,
@@ -936,25 +1076,18 @@ export function RouteMap({
   embedded?: boolean;
 }) {
   const route = useMemo(() => prepareRoute(points), [points]);
-  const hasRoute = route.totalPoints > 0;
-  const minLat = hasRoute ? route.minLat : 0;
-  const maxLat = hasRoute ? route.maxLat : 1;
-  const minLon = hasRoute ? route.minLon : 0;
-  const maxLon = hasRoute ? route.maxLon : 1;
-  const latPad = Math.max((maxLat - minLat) * 0.12, maxLat === minLat ? 0.001 : 0);
-  const lonPad = Math.max((maxLon - minLon) * 0.12, maxLon === minLon ? 0.001 : 0);
-  const yMin = minLat - latPad;
-  const yMax = maxLat + latPad;
-  const xMin = minLon - lonPad;
-  const xMax = maxLon + lonPad;
-
-  const x = (lon: number) => 16 + ((lon - xMin) / (xMax - xMin)) * 288;
-  const y = (lat: number) => 164 - ((lat - yMin) / (yMax - yMin)) * 148;
-  const path = route.points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.lon).toFixed(2)} ${y(point.lat).toFixed(2)}`)
-    .join(" ");
   const start = route.start;
   const end = route.end;
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+
+  const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
+  const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
+  const resetView = () => {
+    setZoomOffset(0);
+    setPan({ x: 0, y: 0 });
+  };
 
   return (
     <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
@@ -977,35 +1110,217 @@ export function RouteMap({
           No GPS points in this trip. Check location permission in CloudEV Gateway.
         </p>
       ) : (
-        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]">
-          <svg className="h-64 w-full" viewBox="0 0 320 180" role="img" aria-label="Selected trip route">
-            <defs>
-              <pattern id="route-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                <path d="M24 0H0V24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="320" height="180" fill="url(#route-grid)" />
-            {route.points.length > 1 ? (
-              <path d={path} fill="none" stroke="var(--voltflow-cyan)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            ) : null}
-            {start ? (
-              <circle cx={x(start.lon)} cy={y(start.lat)} r="5" fill="#22c55e">
-                <title>Start</title>
-              </circle>
-            ) : null}
-            {end ? (
-              <circle cx={x(end.lon)} cy={y(end.lat)} r="5" fill="#facc15">
-                <title>End</title>
-              </circle>
-            ) : null}
-          </svg>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-background">
+          <InteractiveRouteCanvas
+            route={route}
+            zoomOffset={zoomOffset}
+            pan={pan}
+            onPanChange={setPan}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onResetView={resetView}
+            onOpenFullscreen={() => setIsFullscreenOpen(true)}
+            className="h-64"
+          />
+          <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+            Map data &copy;{" "}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              OpenStreetMap contributors
+            </a>
+          </div>
           <div className="grid grid-cols-2 gap-3 border-t border-border p-4 text-sm">
             <MiniStat label="Start" value={start ? `${start.lat.toFixed(5)}, ${start.lon.toFixed(5)}` : "—"} />
             <MiniStat label="End" value={end ? `${end.lat.toFixed(5)}, ${end.lon.toFixed(5)}` : "—"} />
           </div>
+          <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+            <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
+              <DialogTitle className="sr-only">Trip route map</DialogTitle>
+              <InteractiveRouteCanvas
+                route={route}
+                zoomOffset={zoomOffset}
+                pan={pan}
+                onPanChange={setPan}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onResetView={resetView}
+                className="min-h-0 flex-1 rounded-lg"
+                isFullscreen
+              />
+              <div className="text-[11px] text-muted-foreground">
+                Map data &copy;{" "}
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  OpenStreetMap contributors
+                </a>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </section>
+  );
+}
+
+function InteractiveRouteCanvas({
+  route,
+  zoomOffset,
+  pan,
+  onPanChange,
+  onZoomIn,
+  onZoomOut,
+  onResetView,
+  onOpenFullscreen,
+  className = "h-64",
+  isFullscreen = false,
+}: {
+  route: ReturnType<typeof prepareRoute>;
+  zoomOffset: number;
+  pan: MapPan;
+  onPanChange: (pan: MapPan | ((current: MapPan) => MapPan)) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetView: () => void;
+  onOpenFullscreen?: () => void;
+  className?: string;
+  isFullscreen?: boolean;
+}) {
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
+  const path = route.points
+    .map((point, index) => {
+      const mapped = routeMap.mapPoint(point);
+      return `${index === 0 ? "M" : "L"} ${mapped.x.toFixed(2)} ${mapped.y.toFixed(2)}`;
+    })
+    .join(" ");
+  const mappedStart = route.start ? routeMap.mapPoint(route.start) : null;
+  const mappedEnd = route.end ? routeMap.mapPoint(route.end) : null;
+
+  const dragMap = (clientX: number, clientY: number, element: SVGSVGElement) => {
+    const previous = dragRef.current;
+    if (!previous) return;
+
+    const rect = element.getBoundingClientRect();
+    const deltaX = ((clientX - previous.x) * MAP_VIEW_WIDTH) / rect.width;
+    const deltaY = ((clientY - previous.y) * MAP_VIEW_HEIGHT) / rect.height;
+    onPanChange((current) => ({ x: current.x + deltaX, y: current.y + deltaY }));
+    dragRef.current = { x: clientX, y: clientY };
+  };
+
+  return (
+    <div className={`relative overflow-hidden bg-background ${className}`}>
+      <div className="absolute right-3 top-3 z-10 flex gap-2">
+        <MapIconButton label="Zoom in" onClick={onZoomIn}>
+          <Plus className="size-4" aria-hidden />
+        </MapIconButton>
+        <MapIconButton label="Zoom out" onClick={onZoomOut}>
+          <Minus className="size-4" aria-hidden />
+        </MapIconButton>
+        <MapIconButton label="Reset map" onClick={onResetView}>
+          <MapPin className="size-4" aria-hidden />
+        </MapIconButton>
+        {!isFullscreen && onOpenFullscreen ? (
+          <MapIconButton label="Open fullscreen map" onClick={onOpenFullscreen}>
+            <Maximize2 className="size-4" aria-hidden />
+          </MapIconButton>
+        ) : null}
+      </div>
+      <svg
+        className="size-full touch-none cursor-grab active:cursor-grabbing"
+        viewBox="0 0 320 180"
+        role="img"
+        aria-label="Selected trip route"
+        onPointerDown={(event) => {
+          dragRef.current = { x: event.clientX, y: event.clientY };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => dragMap(event.clientX, event.clientY, event.currentTarget)}
+        onPointerUp={(event) => {
+          dragRef.current = null;
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+        onWheel={(event) => {
+          event.preventDefault();
+          if (event.deltaY < 0) {
+            onZoomIn();
+          } else if (event.deltaY > 0) {
+            onZoomOut();
+          }
+        }}
+      >
+        <defs>
+          <filter id="route-line-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="rgba(0,0,0,0.5)" />
+          </filter>
+        </defs>
+        {routeMap.tiles.map((tile) => (
+          <image
+            key={tile.key}
+            href={tile.url}
+            x={tile.x}
+            y={tile.y}
+            width={MAP_TILE_SIZE}
+            height={MAP_TILE_SIZE}
+            preserveAspectRatio="none"
+          />
+        ))}
+        <rect width="320" height="180" fill="rgba(5,10,15,0.16)" />
+        {route.points.length > 1 ? (
+          <path
+            d={path}
+            fill="none"
+            stroke="var(--voltflow-cyan)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#route-line-shadow)"
+          />
+        ) : null}
+        {mappedStart ? (
+          <circle cx={mappedStart.x} cy={mappedStart.y} r="5" fill="#22c55e" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
+            <title>Start</title>
+          </circle>
+        ) : null}
+        {mappedEnd ? (
+          <circle cx={mappedEnd.x} cy={mappedEnd.y} r="5" fill="#facc15" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
+            <title>End</title>
+          </circle>
+        ) : null}
+      </svg>
+    </div>
+  );
+}
+
+function MapIconButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:border-primary/50 hover:text-primary"
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </button>
   );
 }
 
