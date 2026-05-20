@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useCarsQuery } from "@/hooks/use-cars-query";
 import { fetchSessions } from "@/hooks/use-sessions-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
@@ -107,10 +108,17 @@ async function ensurePushSubscription() {
   });
 }
 
+function liveStationarySoc(soc: number | null | undefined, speedKmh: number | null | undefined) {
+  if (speedKmh !== 0 || typeof soc !== "number" || !Number.isFinite(soc)) return null;
+  if (soc < 0 || soc >= 100) return null;
+  return String(Math.round(soc));
+}
+
 export function DashboardView() {
   const router = useRouter();
   const qc = useQueryClient();
   const { data: cars, isLoading } = useCarsQuery();
+  const { data: bydmateLive = [] } = useBydmateLiveQuery();
   const selectedCarId = useAppPreferences((s) => s.selectedCarId);
   const setSelectedCarId = useAppPreferences((s) => s.setSelectedCarId);
   const defaultPrice = useAppPreferences((s) => s.defaultPricePerKwh);
@@ -129,6 +137,11 @@ export function DashboardView() {
   const activeSession = useMemo(
     () => sessions?.find((s) => s.status === "charging") ?? null,
     [sessions],
+  );
+  const latestBydmateSnapshot = bydmateLive[0] ?? null;
+  const stationaryLiveStartPct = liveStationarySoc(
+    latestBydmateSnapshot?.telemetry.soc,
+    latestBydmateSnapshot?.telemetry.speed_kmh,
   );
   const latestSession = sessions?.[0] ?? null;
   const nowMs = useTickingClock(Boolean(activeSession));
@@ -252,6 +265,7 @@ export function DashboardView() {
   const handleMainAction = async () => {
     if (!activeSession) {
       if (canStartSession) {
+        if (stationaryLiveStartPct !== null) setStartPct(stationaryLiveStartPct);
         setPrice(String(defaultPrice));
         setDialogOpen(true);
       }
