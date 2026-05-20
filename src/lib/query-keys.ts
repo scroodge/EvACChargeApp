@@ -5,4 +5,10 @@ export const queryKeys = {
   profile: ["profile"] as const,
   bydmateLive: ["bydmate-live"] as const,
   bydmateTelemetryPoints: ["bydmate-telemetry-points"] as const,
+  bydmateTrips: (date: string, vehicleId: string | null) =>
+    ["bydmate-trips", date, vehicleId] as const,
+  bydmateTripSamples: (tripId: string) => ["bydmate-trip-samples", tripId] as const,
+  bydmateTripTrack: (tripId: string) => ["bydmate-trip-track", tripId] as const,
+  bydmateTelemetryHistory: (range: string, date: string, vehicleId: string | null) =>
+    ["bydmate-telemetry-history", range, date, vehicleId] as const,
 };

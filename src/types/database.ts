@@ -109,3 +109,43 @@ export type BydmateLiveSnapshotRow = {
 export type BydmateTelemetryPointRow = Omit<BydmateLiveSnapshotRow, "updated_at"> & {
   id: string;
 };
+
+export type BydmateTelemetrySampleRow = {
+  id: string;
+  vehicle_id: string;
+  user_id: string;
+  device_time: string;
+  received_at: string;
+  telemetry: BydmateTelemetry;
+};
+
+export type BydmateTripRow = {
+  id: string;
+  user_id: string;
+  vehicle_id: string;
+  started_at: string;
+  ended_at: string | null;
+  last_device_time: string;
+  sample_count: number;
+  track_point_count: number;
+  distance_km: number | null;
+  soc_start: number | null;
+  soc_end: number | null;
+  max_speed_kmh: number | null;
+  avg_speed_kmh: number | null;
+  avg_consumption_kwh_100km: number | null;
+};
+
+export type BydmateTripTrackPointRow = {
+  id?: string;
+  trip_id?: string;
+  user_id?: string;
+  device_time: string;
+  lat: number;
+  lon: number;
+  accuracy_m: number | null;
+  bearing_deg: number | null;
+  speed_kmh: number | null;
+  power_kw: number | null;
+  soc: number | null;
+};

@@ -26,14 +26,19 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
-import { useBydmateTelemetryPointsQuery } from "@/hooks/use-bydmate-telemetry-points-query";
+import { useBydmateTripSamplesQuery } from "@/hooks/use-bydmate-trip-samples-query";
+import { useBydmateTripTrackQuery } from "@/hooks/use-bydmate-trip-track-query";
+import { useBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
   BydmateLiveSnapshotRow,
+  BydmateLocation,
   BydmateTelemetry,
   BydmateTelemetryPointRow,
+  BydmateTripRow,
+  BydmateTripTrackPointRow,
 } from "@/types/database";
 
 function fmt(value: number | null | undefined, digits = 0) {
@@ -71,11 +76,6 @@ export function VehicleLiveView() {
   const { t } = useTranslation();
   const tx = t as Translator;
   const { data, isLoading, error } = useBydmateLiveQuery();
-  const {
-    data: points,
-    isLoading: isHistoryLoading,
-    error: historyError,
-  } = useBydmateTelemetryPointsQuery();
   const nowMs = useTickingClock(true);
   const snapshot = data?.[0] ?? null;
 
@@ -111,13 +111,7 @@ export function VehicleLiveView() {
   }
 
   return (
-    <VehicleLiveContent
-      snapshot={snapshot}
-      points={points ?? EMPTY_TELEMETRY_POINTS}
-      isHistoryLoading={isHistoryLoading}
-      hasHistoryError={Boolean(historyError)}
-      nowMs={nowMs}
-    />
+    <VehicleLiveContent snapshot={snapshot} nowMs={nowMs} />
   );
 }
 
@@ -130,47 +124,50 @@ export function VehicleLiveFixtureView({
 }) {
   const nowMs = useTickingClock(true);
 
-  return (
-    <VehicleLiveContent
-      snapshot={snapshot}
-      points={points}
-      isHistoryLoading={false}
-      hasHistoryError={false}
-      nowMs={nowMs}
-    />
-  );
+  return <VehicleLiveContent snapshot={snapshot} nowMs={nowMs} fixturePoints={points} />;
 }
 
 function VehicleLiveContent({
   snapshot,
-  points,
-  isHistoryLoading,
-  hasHistoryError,
   nowMs,
+  fixturePoints,
 }: {
   snapshot: BydmateLiveSnapshotRow;
-  points: BydmateTelemetryPointRow[];
-  isHistoryLoading: boolean;
-  hasHistoryError: boolean;
   nowMs: number;
+  fixturePoints?: BydmateTelemetryPointRow[];
 }) {
-  const allPoints = useMemo(() => points, [points]);
-  const availableDateKeys = useMemo(() => {
-    return Array.from(new Set(allPoints.map((point) => localDateKey(pointTimeMs(point)))))
+  const [fallbackDate] = useState(() => localDateKey(Date.now()));
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
+  const fixtureDateKeys = useMemo(() => {
+    if (!fixturePoints?.length) return [];
+    return Array.from(new Set(fixturePoints.map((point) => localDateKey(pointTimeMs(point)))))
       .filter((key) => key !== "1970-01-01")
       .sort()
       .reverse();
-  }, [allPoints]);
-  const [fallbackDate] = useState(() => localDateKey(Date.now()));
-  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
-  const selectedDate = selectedDateOverride ?? availableDateKeys[0] ?? fallbackDate;
-  const dayPoints = useMemo(() => {
-    return allPoints.filter((point) => localDateKey(pointTimeMs(point)) === selectedDate);
-  }, [allPoints, selectedDate]);
-  const trips = useMemo(() => buildTrips(dayPoints), [dayPoints]);
+  }, [fixturePoints]);
+  const selectedDate = selectedDateOverride ?? fixtureDateKeys[0] ?? fallbackDate;
+  const fixtureTripSegments = useMemo(() => {
+    if (!fixturePoints) return null;
+    const dayPoints = fixturePoints.filter(
+      (point) => localDateKey(pointTimeMs(point)) === selectedDate,
+    );
+    return buildTrips(dayPoints);
+  }, [fixturePoints, selectedDate]);
+  const fixtureTrips = useMemo(
+    () => fixtureTripSegments?.map((trip) => tripRowFromFixture(trip, snapshot.vehicle_id)) ?? null,
+    [fixtureTripSegments, snapshot.vehicle_id],
+  );
+  const {
+    data: apiTrips = [],
+    isLoading: isTripsLoading,
+    error: tripsError,
+  } = useBydmateTripsQuery(selectedDate, fixturePoints ? null : snapshot.vehicle_id);
+  const trips = fixtureTrips ?? apiTrips;
   const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
   const defaultTripId = trips[0]?.id ?? null;
   const expandedTripId = selectedTripId === undefined ? defaultTripId : selectedTripId;
+  const expandedFixtureTrip =
+    fixtureTripSegments?.find((trip) => trip.id === expandedTripId) ?? null;
   const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
 
   return (
@@ -180,7 +177,7 @@ function VehicleLiveContent({
       {isStale ? <StaleTelemetryNotice /> : <TelemetryGrid telemetry={snapshot.telemetry} />}
       <TripBrowser
         selectedDate={selectedDate}
-        availableDateKeys={availableDateKeys}
+        availableDateKeys={fixtureDateKeys}
         onDateChange={(value) => {
           setSelectedDateOverride(value);
           setSelectedTripId(undefined);
@@ -193,8 +190,9 @@ function VehicleLiveContent({
             return currentExpandedTripId === tripId ? null : tripId;
           });
         }}
-        isLoading={isHistoryLoading}
-        hasError={hasHistoryError}
+        isLoading={isTripsLoading}
+        hasError={Boolean(tripsError)}
+        expandedFixtureTrip={expandedFixtureTrip}
       />
       <LocationCard snapshot={snapshot} />
     </div>
@@ -441,12 +439,19 @@ function validTempNumber(value: number | null | undefined) {
   return n != null && n >= -50 && n <= 90 ? n : null;
 }
 
-function pointTimeMs(point: BydmateTelemetryPointRow) {
+function pointTimeMs(point: { device_time: string; received_at?: string }) {
   const deviceMs = Date.parse(point.device_time);
   if (Number.isFinite(deviceMs)) return deviceMs;
-  const receivedMs = Date.parse(point.received_at);
+  const receivedMs = point.received_at ? Date.parse(point.received_at) : Number.NaN;
   return Number.isFinite(receivedMs) ? receivedMs : 0;
 }
+
+type TelemetryChartSource = {
+  device_time: string;
+  received_at?: string;
+  telemetry: BydmateTelemetry;
+  location?: BydmateLocation;
+};
 
 function pad2(value: number) {
   return value.toString().padStart(2, "0");
@@ -529,20 +534,41 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
   }).reverse();
 }
 
-function averageTripConsumption(trips: TripSegment[]) {
+function tripRowFromFixture(trip: TripSegment, vehicleId: string): BydmateTripRow {
+  return {
+    id: trip.id,
+    user_id: "fixture",
+    vehicle_id: vehicleId,
+    started_at: new Date(trip.startMs).toISOString(),
+    ended_at: new Date(trip.endMs).toISOString(),
+    last_device_time: new Date(trip.endMs).toISOString(),
+    sample_count: trip.points.length,
+    track_point_count: trip.points.filter(
+      (point) => typeof point.location.lat === "number" && typeof point.location.lon === "number",
+    ).length,
+    distance_km: trip.distanceKm,
+    soc_start: trip.socStart,
+    soc_end: trip.socEnd,
+    max_speed_kmh: trip.maxSpeed,
+    avg_speed_kmh: trip.avgSpeed,
+    avg_consumption_kwh_100km: trip.avgConsumptionKwh100Km,
+  };
+}
+
+function averageTripConsumption(trips: BydmateTripRow[]) {
   let weightedConsumption = 0;
   let weightedDistance = 0;
   let sampleConsumption = 0;
   let sampleCount = 0;
 
   for (const trip of trips) {
-    const consumption = trip.avgConsumptionKwh100Km;
+    const consumption = trip.avg_consumption_kwh_100km;
     if (consumption == null) continue;
 
     sampleConsumption += consumption;
     sampleCount += 1;
 
-    const distance = trip.distanceKm;
+    const distance = trip.distance_km;
     if (distance != null && distance > 0) {
       weightedConsumption += consumption * distance;
       weightedDistance += distance;
@@ -553,28 +579,55 @@ function averageTripConsumption(trips: TripSegment[]) {
   return sampleCount > 0 ? sampleConsumption / sampleCount : null;
 }
 
+function ExpandedTripPanel({ tripId }: { tripId: string }) {
+  const {
+    data: samples = [],
+    isLoading: isSamplesLoading,
+    error: samplesError,
+  } = useBydmateTripSamplesQuery(tripId);
+  const {
+    data: track = [],
+    isLoading: isTrackLoading,
+    error: trackError,
+  } = useBydmateTripTrackQuery(tripId);
+
+  return (
+    <>
+      <TelemetryHistoryCharts
+        points={samples}
+        isLoading={isSamplesLoading}
+        hasError={Boolean(samplesError)}
+        embedded
+      />
+      <RouteMap trackPoints={track} isLoading={isTrackLoading} hasError={Boolean(trackError)} embedded />
+    </>
+  );
+}
+
 function TripBrowser({
   selectedDate,
-  availableDateKeys,
+  availableDateKeys = [],
   onDateChange,
   trips,
   selectedTripId,
   onSelectTrip,
   isLoading,
   hasError,
+  expandedFixtureTrip,
 }: {
   selectedDate: string;
-  availableDateKeys: string[];
+  availableDateKeys?: string[];
   onDateChange: (value: string) => void;
-  trips: TripSegment[];
+  trips: BydmateTripRow[];
   selectedTripId: string | null;
   onSelectTrip: (id: string) => void;
   isLoading: boolean;
   hasError: boolean;
+  expandedFixtureTrip: TripSegment | null;
 }) {
   const { locale, t } = useTranslation();
   const tx = t as Translator;
-  const totalDistance = trips.reduce((sum, trip) => sum + (trip.distanceKm ?? 0), 0);
+  const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance_km ?? 0), 0);
   const avgConsumption = averageTripConsumption(trips);
 
   return (
@@ -632,7 +685,7 @@ function TripBrowser({
         <SummaryPill label={tx("vehicle.trips.consumption")} value={`${fmt(avgConsumption, 1)} kWh/100`} />
         <SummaryPill
           label={tx("vehicle.trips.points")}
-          value={String(trips.reduce((sum, trip) => sum + trip.points.length, 0))}
+          value={String(trips.reduce((sum, trip) => sum + trip.sample_count, 0))}
         />
       </div>
 
@@ -659,15 +712,19 @@ function TripBrowser({
                   onSelect={() => onSelectTrip(trip.id)}
                 />
                 {expanded ? (
-                  <>
-                    <TelemetryHistoryCharts
-                      points={trip.points}
-                      isLoading={isLoading}
-                      hasError={hasError}
-                      embedded
-                    />
-                    <RouteMap points={trip.points} embedded />
-                  </>
+                  expandedFixtureTrip && expandedFixtureTrip.id === trip.id ? (
+                    <>
+                      <TelemetryHistoryCharts
+                        points={expandedFixtureTrip.points}
+                        isLoading={false}
+                        hasError={false}
+                        embedded
+                      />
+                      <RouteMap points={expandedFixtureTrip.points} embedded />
+                    </>
+                  ) : (
+                    <ExpandedTripPanel tripId={trip.id} />
+                  )
                 ) : null}
               </div>
             );
@@ -684,11 +741,14 @@ function TripListItem({
   expanded,
   onSelect,
 }: {
-  trip: TripSegment;
+  trip: BydmateTripRow;
   tripLabel: string;
   expanded: boolean;
   onSelect: () => void;
 }) {
+  const startMs = Date.parse(trip.started_at);
+  const endMs = Date.parse(trip.ended_at ?? trip.last_device_time);
+  const durationMs = Math.max(0, endMs - startMs);
   const { t } = useTranslation();
   const tx = t as Translator;
 
@@ -706,13 +766,13 @@ function TripListItem({
             {tripLabel}
           </p>
           <p className="truncate text-sm text-muted-foreground">
-            {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
+            {formatClock(startMs)} - {formatClock(endMs)} · {formatDuration(durationMs)}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 text-sm tabular-nums text-muted-foreground">
-          <span>{fmt(trip.distanceKm, 1)} km</span>
+          <span>{fmt(trip.distance_km, 1)} km</span>
           <span className="hidden min-[430px]:inline">
-            {tx("vehicle.trips.pointShort", { value: trip.points.length })}
+            {tx("vehicle.trips.pointShort", { value: trip.sample_count })}
           </span>
         </div>
       </button>
@@ -734,20 +794,23 @@ function TripListItem({
               {tripLabel}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatClock(trip.startMs)} - {formatClock(trip.endMs)} · {formatDuration(trip.durationMs)}
+              {formatClock(startMs)} - {formatClock(endMs)} · {formatDuration(durationMs)}
             </p>
           </div>
         </div>
         <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          {tx("vehicle.trips.pointShort", { value: trip.points.length })}
+          {tx("vehicle.trips.pointShort", { value: trip.sample_count })}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))]">
-        <MiniStat label={tx("vehicle.trips.distance")} value={`${fmt(trip.distanceKm, 1)} km`} />
-        <MiniStat label="SOC" value={`${fmt(trip.socStart)}% -> ${fmt(trip.socEnd)}%`} />
-        <MiniStat label={tx("vehicle.trips.consumption")} value={`${fmt(trip.avgConsumptionKwh100Km, 1)} kWh/100`} />
-        <MiniStat label={tx("vehicle.trips.maxSpeed")} value={`${fmt(trip.maxSpeed)} km/h`} />
-        <MiniStat label={tx("vehicle.trips.avgSpeed")} value={`${fmt(trip.avgSpeed)} km/h`} />
+        <MiniStat label={tx("vehicle.trips.distance")} value={`${fmt(trip.distance_km, 1)} km`} />
+        <MiniStat label="SOC" value={`${fmt(trip.soc_start)}% -> ${fmt(trip.soc_end)}%`} />
+        <MiniStat
+          label={tx("vehicle.trips.consumption")}
+          value={`${fmt(trip.avg_consumption_kwh_100km, 1)} kWh/100`}
+        />
+        <MiniStat label={tx("vehicle.trips.maxSpeed")} value={`${fmt(trip.max_speed_kmh)} km/h`} />
+        <MiniStat label={tx("vehicle.trips.avgSpeed")} value={`${fmt(trip.avg_speed_kmh)} km/h`} />
       </div>
     </button>
   );
@@ -818,7 +881,7 @@ function addChartPoint(chart: TelemetryChart, seriesIndex: number, time: number,
   chart.hasData = true;
 }
 
-function prepareTelemetryHistory(points: BydmateTelemetryPointRow[], t: Translator) {
+function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) {
   const socChart = createChart(t("vehicle.charts.soc"), "%", [
     { label: "SOC", color: "var(--voltflow-cyan)", points: [] },
   ]);
@@ -842,10 +905,10 @@ function prepareTelemetryHistory(points: BydmateTelemetryPointRow[], t: Translat
     if (!point.telemetry) continue;
 
     visiblePointCount += 1;
-    start ??= point.received_at;
-    end = point.received_at;
+    start ??= point.device_time;
+    end = point.device_time;
 
-    const time = Date.parse(point.received_at);
+    const time = pointTimeMs(point);
     addChartPoint(socChart, 0, time, validNumber(point.telemetry.soc));
     addChartPoint(speedChart, 0, time, validNumber(point.telemetry.speed_kmh));
     addChartPoint(powerChart, 0, time, validNumber(point.telemetry.power_kw));
@@ -876,7 +939,7 @@ export function TelemetryHistoryCharts({
   hasError,
   embedded = false,
 }: {
-  points: BydmateTelemetryPointRow[];
+  points: TelemetryChartSource[];
   isLoading: boolean;
   hasError: boolean;
   embedded?: boolean;
@@ -997,6 +1060,52 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
   );
 }
 
+function prepareRouteFromTrack(points: BydmateTripTrackPointRow[]) {
+  const routePoints: RoutePoint[] = [];
+  let minLat = 0;
+  let maxLat = 1;
+  let minLon = 0;
+  let maxLon = 1;
+
+  for (const point of points) {
+    const lat = validNumber(point.lat);
+    const lon = validNumber(point.lon);
+    const time = Date.parse(point.device_time);
+    if (lat == null || lon == null || !Number.isFinite(time)) continue;
+
+    routePoints.push({
+      lat,
+      lon,
+      time,
+      powerKw: validNumber(point.power_kw),
+      speedKmh: validNumber(point.speed_kmh),
+      soc: validNumber(point.soc),
+    });
+    if (routePoints.length === 1) {
+      minLat = lat;
+      maxLat = lat;
+      minLon = lon;
+      maxLon = lon;
+    } else {
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+    }
+  }
+
+  return {
+    points: downsamplePoints(routePoints, MAX_ROUTE_POINTS),
+    totalPoints: routePoints.length,
+    start: routePoints[0],
+    end: routePoints.at(-1),
+    minLat,
+    maxLat,
+    minLon,
+    maxLon,
+  };
+}
+
 function prepareRoute(points: BydmateTelemetryPointRow[]) {
   const routePoints: RoutePoint[] = [];
   let minLat = 0;
@@ -1005,8 +1114,8 @@ function prepareRoute(points: BydmateTelemetryPointRow[]) {
   let maxLon = 1;
 
   for (const point of points) {
-    const lat = validNumber(point.location.lat);
-    const lon = validNumber(point.location.lon);
+    const lat = validNumber(point.location?.lat);
+    const lon = validNumber(point.location?.lon);
     const time = pointTimeMs(point);
     if (lat == null || lon == null || !Number.isFinite(time)) continue;
 
@@ -1195,14 +1304,23 @@ function buildRouteSegments(
 
 export function RouteMap({
   points,
+  trackPoints,
+  isLoading = false,
+  hasError = false,
   embedded = false,
 }: {
-  points: BydmateTelemetryPointRow[];
+  points?: BydmateTelemetryPointRow[];
+  trackPoints?: BydmateTripTrackPointRow[];
+  isLoading?: boolean;
+  hasError?: boolean;
   embedded?: boolean;
 }) {
   const { t } = useTranslation();
   const tx = t as Translator;
-  const route = useMemo(() => prepareRoute(points), [points]);
+  const route = useMemo(() => {
+    if (trackPoints) return prepareRouteFromTrack(trackPoints);
+    return prepareRoute(points ?? []);
+  }, [points, trackPoints]);
   const start = route.start;
   const end = route.end;
   const [zoomOffset, setZoomOffset] = useState(0);
@@ -1235,7 +1353,13 @@ export function RouteMap({
         ) : null}
       </div>
 
-      {route.totalPoints === 0 ? (
+      {isLoading ? (
+        <Skeleton className="mt-5 h-64 rounded-2xl" />
+      ) : hasError ? (
+        <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+          {tx("vehicle.errors.history")}
+        </p>
+      ) : route.totalPoints === 0 ? (
         <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
           {tx("vehicle.route.empty")}
         </p>

@@ -95,32 +95,20 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const snapshotRow = {
-      vehicle_id: payload.vehicle_id,
-      user_id: profile.id,
-      source: payload.source,
-      schema_version: payload.schema_version,
-      device_time: deviceTime.toISOString(),
-      received_at: receivedAt,
-      telemetry: payload.telemetry,
-      location: payload.location,
-      raw_payload: payload,
-    };
-
-    const { error: snapshotError } = await supabase
-      .from("bydmate_live_snapshots")
-      .upsert(snapshotRow, { onConflict: "user_id,vehicle_id" });
-
-    if (snapshotError) {
-      return Response.json({ ok: false, error: "Snapshot write failed" }, { status: 500 });
-    }
-
-    const { error: pointError } = await supabase.from("bydmate_telemetry_points").insert({
-      ...snapshotRow,
+    const { error: ingestError } = await supabase.rpc("bydmate_ingest_telemetry", {
+      p_user_id: profile.id,
+      p_vehicle_id: payload.vehicle_id,
+      p_source: payload.source,
+      p_schema_version: payload.schema_version,
+      p_device_time: deviceTime.toISOString(),
+      p_received_at: receivedAt,
+      p_telemetry: payload.telemetry,
+      p_location: payload.location ?? {},
+      p_raw_payload: payload,
     });
 
-    if (pointError) {
-      return Response.json({ ok: false, error: "History write failed" }, { status: 500 });
+    if (ingestError) {
+      return Response.json({ ok: false, error: "Telemetry ingest failed" }, { status: 500 });
     }
 
     return Response.json({ ok: true, vehicle_id: payload.vehicle_id, received_at: receivedAt });

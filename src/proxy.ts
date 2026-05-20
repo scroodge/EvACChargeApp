@@ -16,19 +16,68 @@ const PUBLIC_METADATA_PATHS = new Set([
   "/manifest.webmanifest",
   "/sw.js",
 ]);
+const DEV_AUTH_PREFIXES = [
+  "/admin",
+  "/cars",
+  "/charging",
+  "/dashboard",
+  "/history",
+  "/settings",
+  "/vehicle",
+];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
+  const isDevelopment = process.env.NODE_ENV !== "production";
+
+  const isPublic = PUBLIC_PATHS.has(pathname) || pathname.startsWith("/telegram/");
+  const isDevAuthPath = DEV_AUTH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+
+  if (isDevelopment && pathname.startsWith("/dev/")) {
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = pathname.replace(/^\/dev(?=\/)/, "") || "/";
+
+    const isDevRewriteAuthPath = DEV_AUTH_PREFIXES.some(
+      (prefix) =>
+        rewriteUrl.pathname === prefix || rewriteUrl.pathname.startsWith(`${prefix}/`),
+    );
+
+    if (!isDevRewriteAuthPath) {
+      return response;
+    }
+
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-voltflow-dev-auth-bypass", "1");
+    requestHeaders.set("x-voltflow-dev-path-prefix", "/dev");
+
+    return NextResponse.rewrite(rewriteUrl, {
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
 
   if (
     pathname.startsWith("/api/bydmate/") ||
-    (process.env.NODE_ENV !== "production" && pathname.startsWith("/dev/")) ||
     PUBLIC_METADATA_PATHS.has(pathname) ||
     pathname.startsWith("/icons/") ||
     pathname.endsWith(".webmanifest")
   ) {
     return response;
+  }
+
+  if (isDevelopment && !isPublic && isDevAuthPath) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-voltflow-dev-auth-bypass", "1");
+
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,8 +107,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const isPublic = PUBLIC_PATHS.has(pathname) || pathname.startsWith("/telegram/");
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
