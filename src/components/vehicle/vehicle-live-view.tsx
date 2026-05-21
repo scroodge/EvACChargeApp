@@ -254,11 +254,19 @@ function Hero({
         </span>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <HeroMetric icon={Gauge} label={t("vehicle.metrics.speed")} value={`${fmt(telemetry.speed_kmh, 0)} km/h`} />
-        <HeroMetric icon={Zap} label={t("vehicle.metrics.power")} value={`${fmt(telemetry.power_kw, 1)} kW`} />
-        <HeroMetric icon={Route} label={t("vehicle.metrics.range")} value={`${fmt(telemetry.range_est_km, 0)} km`} />
-      </div>
+      {isStale ? (
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <HeroMetric icon={BatteryCharging} label={t("vehicle.metrics.soc")} value={`${fmt(telemetry.soc, 0)}%`} />
+          <HeroMetric icon={Activity} label={t("vehicle.metrics.soh")} value={`${fmt(telemetry.soh_percent, 1)}%`} />
+          <HeroMetric icon={Route} label={t("vehicle.metrics.range")} value={`${fmt(telemetry.range_est_km, 0)} km`} />
+        </div>
+      ) : (
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <HeroMetric icon={Gauge} label={t("vehicle.metrics.speed")} value={`${fmt(telemetry.speed_kmh, 0)} km/h`} />
+          <HeroMetric icon={Zap} label={t("vehicle.metrics.power")} value={`${fmt(telemetry.power_kw, 1)} kW`} />
+          <HeroMetric icon={Route} label={t("vehicle.metrics.range")} value={`${fmt(telemetry.range_est_km, 0)} km`} />
+        </div>
+      )}
     </section>
   );
 }

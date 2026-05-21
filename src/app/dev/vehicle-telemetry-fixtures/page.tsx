@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import {
   RouteMap,
   TelemetryHistoryCharts,
-  VehicleLiveFixtureView,
 } from "@/components/vehicle/vehicle-live-view";
 import type {
   BydmateLiveSnapshotRow,
@@ -11,6 +10,7 @@ import type {
   BydmateTelemetry,
   BydmateTelemetryPointRow,
 } from "@/types/database";
+import { VehicleFixtureModeSwitch } from "./VehicleFixtureModeSwitch";
 
 const BASE_TIME_MS = Date.UTC(2026, 4, 19, 8, 0, 0);
 
@@ -90,7 +90,7 @@ export default function VehicleTelemetryFixturesPage() {
             expandable trip list.
           </p>
         </div>
-        <VehicleLiveFixtureView snapshot={liveSnapshot} points={vehiclePageTrips} />
+        <VehicleFixtureModeSwitch snapshot={liveSnapshot} points={vehiclePageTrips} />
       </section>
 
       <FixtureSection

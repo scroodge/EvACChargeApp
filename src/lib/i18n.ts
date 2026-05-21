@@ -287,6 +287,8 @@ export const dictionaries = {
         stale: "stale",
       },
       metrics: {
+        soc: "SOC",
+        soh: "SOH",
         speed: "Speed",
         power: "Power",
         range: "Range",
@@ -690,6 +692,8 @@ export const dictionaries = {
         stale: "састарэла",
       },
       metrics: {
+        soc: "SOC",
+        soh: "SOH",
         speed: "Хуткасць",
         power: "Магутнасць",
         range: "Запас ходу",
@@ -1092,6 +1096,8 @@ export const dictionaries = {
         stale: "устарело",
       },
       metrics: {
+        soc: "SOC",
+        soh: "SOH",
         speed: "Скорость",
         power: "Мощность",
         range: "Запас хода",
