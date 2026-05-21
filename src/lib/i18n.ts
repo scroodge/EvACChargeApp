@@ -415,6 +415,14 @@ export const dictionaries = {
     },
     settings: {
       eyebrow: "Settings",
+      cloud: {
+        name: "VoltFlow Mate",
+        description: "Generate the API key used by the BYDMate Android app when it posts live telemetry to VoltFlow.",
+        apiKey: "API Key",
+        generateKey: "Generate key",
+        copyKey: "Copy key",
+        endpointURL: "BYDMate endpoint URL",
+      },
       title: "Drive profile",
       subtitle:
         "Local defaults pair with encrypted Supabase auth — realtime sessions always respect your tariff field.",
@@ -820,6 +828,14 @@ export const dictionaries = {
     },
     settings: {
       eyebrow: "Налады",
+      cloud: {
+        "name": "VoltFlow Mate",
+        "description": "Згенеруйце API-ключ, які выкарыстоўваецца Android-праграмай BYDMate для адпраўкі тэлеметрыі ў рэжыме рэальнага часу ў VoltFlow.",
+        "apiKey": "API-ключ",
+        "generateKey": "Згенераваць ключ",
+        "copyKey": "Капіяваць ключ",
+        "endpointURL": "URL-адрас канчатковай кропкі BYDMate"
+      },
       title: "Профіль кіроўцы",
       subtitle:
         "Лакальныя налады працуюць з зашыфраванай аўтарызацыяй Supabase — realtime-сесіі заўсёды ўлічваюць ваш тарыф.",
@@ -1224,6 +1240,14 @@ export const dictionaries = {
     },
     settings: {
       eyebrow: "Настройки",
+      cloud: {
+        "name": "VoltFlow Mate",
+        "description": "Сгенерируйте API-ключ, который используется Android-приложением BYDMate для отправки телеметрии в реальном времени в VoltFlow.",
+        "apiKey": "API-ключ",
+        "generateKey": "Сгенерировать ключ",
+        "copyKey": "Копировать ключ",
+        "endpointURL": "URL-адрес конечной точки BYDMate"
+      },
       title: "Профиль водителя",
       subtitle:
         "Локальные настройки работают с зашифрованной авторизацией Supabase — realtime-сессии всегда учитывают ваш тариф.",

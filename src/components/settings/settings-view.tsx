@@ -272,16 +272,15 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-xl tracking-tight">
             <KeyRound className="size-5" aria-hidden />
-            BYDMate Cloud Sync
+            {t("settings.cloud.name")} 
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-muted-foreground text-base leading-relaxed">
-            Generate the API key used by the BYDMate Android app when it posts live
-            telemetry to VoltFlow.
+          {t("settings.cloud.description")}
           </p>
           <div className="space-y-2">
-            <Label htmlFor="bydmate-api-key">API Key</Label>
+            <Label htmlFor="bydmate-api-key">{t("settings.cloud.apiKey")}</Label>
             <Input
               id="bydmate-api-key"
               value={bydmateCloudApiKey || "No key generated yet"}
@@ -298,7 +297,7 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
               onClick={handleGenerateBydmateKey}
             >
               <RefreshCw className="mr-2 size-4" aria-hidden />
-              Generate key
+              {t("settings.cloud.generateKey")}
             </Button>
             <Button
               type="button"
@@ -309,11 +308,11 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
               onClick={handleCopyBydmateKey}
             >
               <Copy className="mr-2 size-4" aria-hidden />
-              Copy key
+              {t("settings.cloud.copyKey")}
             </Button>
           </div>
           <p className="text-muted-foreground text-sm">
-            BYDMate endpoint URL: <span className="font-mono">/api/bydmate/telemetry</span>
+          {t("settings.cloud.endpointURL")} <span className="font-mono">https://volt-flow-beige.vercel.app/api/bydmate/telemetry</span>
           </p>
         </CardContent>
       </Card>
