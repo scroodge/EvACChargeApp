@@ -85,6 +85,50 @@ export type BydmateTelemetry = {
   current_trip_consumption_kwh_100km?: number | null;
 };
 
+export type BydmateDiplus = {
+  soc?: number | null;
+  speed_kmh?: number | null;
+  mileage_km?: number | null;
+  power_kw?: number | null;
+  charge_gun_state?: string | null;
+  charging_status?: string | null;
+  battery_capacity_kwh?: number | null;
+  total_elec_consumption_kwh?: number | null;
+  voltage_12v?: number | null;
+  max_cell_voltage_v?: number | null;
+  min_cell_voltage_v?: number | null;
+  cell_delta_v?: number | null;
+  avg_battery_temp_c?: number | null;
+  exterior_temp_c?: number | null;
+  gear?: string | null;
+  power_state?: string | null;
+  inside_temp_c?: number | null;
+  ac_status?: string | boolean | null;
+  ac_temp_c?: number | null;
+  fan_level?: number | null;
+  door_fl?: string | boolean | null;
+  door_fr?: string | boolean | null;
+  door_rl?: string | boolean | null;
+  door_rr?: string | boolean | null;
+  window_fl_percent?: number | null;
+  window_fr_percent?: number | null;
+  window_rl_percent?: number | null;
+  window_rr_percent?: number | null;
+  sunroof_percent?: number | null;
+  trunk?: string | boolean | null;
+  hood?: string | boolean | null;
+  tire_press_fl_kpa?: number | null;
+  tire_press_fr_kpa?: number | null;
+  tire_press_rl_kpa?: number | null;
+  tire_press_rr_kpa?: number | null;
+  drive_mode?: string | null;
+  work_mode?: string | null;
+  auto_park?: string | boolean | null;
+  rain?: string | boolean | null;
+  light_low?: string | boolean | null;
+  drl?: string | boolean | null;
+};
+
 export type BydmateLocation = {
   lat?: number | null;
   lon?: number | null;
@@ -101,9 +145,13 @@ export type BydmateLiveSnapshotRow = {
   device_time: string;
   received_at: string;
   telemetry: BydmateTelemetry;
+  diplus?: BydmateDiplus;
   location: BydmateLocation;
   raw_payload: unknown;
   updated_at: string;
+  diplus_min_cell_voltage_v?: number | null;
+  diplus_max_cell_voltage_v?: number | null;
+  diplus_cell_delta_v?: number | null;
 };
 
 export type BydmateTelemetryPointRow = Omit<BydmateLiveSnapshotRow, "updated_at"> & {
@@ -117,6 +165,7 @@ export type BydmateTelemetrySampleRow = {
   device_time: string;
   received_at: string;
   telemetry: BydmateTelemetry;
+  diplus?: BydmateDiplus;
 };
 
 export type BydmateTripRow = {

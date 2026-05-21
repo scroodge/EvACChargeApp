@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock3,
   Gauge,
+  HeartPulse,
   Maximize2,
   Minimize2,
   Minus,
@@ -175,7 +176,12 @@ function VehicleLiveContent({
     <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
       <Header />
       <Hero snapshot={snapshot} nowMs={nowMs} isStale={isStale} />
-      {isStale ? <StaleTelemetryNotice /> : <TelemetryGrid telemetry={snapshot.telemetry} />}
+      <CellHealthCard snapshot={snapshot} />
+      {isStale ? (
+        <StaleTelemetryNotice />
+      ) : (
+        <TelemetryGrid telemetry={snapshot.telemetry} />
+      )}
       <TripBrowser
         selectedDate={selectedDate}
         availableDateKeys={fixtureDateKeys}
@@ -348,6 +354,70 @@ function TelemetryGrid({ telemetry }: { telemetry: BydmateTelemetry }) {
   );
 }
 
+type CellDeltaStatus = "good" | "warning" | "critical" | "unknown";
+
+function diplusNumber(
+  snapshot: BydmateLiveSnapshotRow,
+  columnKey: "diplus_min_cell_voltage_v" | "diplus_max_cell_voltage_v" | "diplus_cell_delta_v",
+  rawKey: "min_cell_voltage_v" | "max_cell_voltage_v" | "cell_delta_v",
+) {
+  const columnValue = snapshot[columnKey];
+  if (typeof columnValue === "number" && Number.isFinite(columnValue)) return columnValue;
+
+  const rawValue = snapshot.diplus?.[rawKey];
+  return typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null;
+}
+
+function cellDeltaStatus(delta: number | null): CellDeltaStatus {
+  if (delta == null) return "unknown";
+  if (delta <= 0.03) return "good";
+  if (delta <= 0.05) return "warning";
+  return "critical";
+}
+
+function cellStatusClasses(status: CellDeltaStatus) {
+  if (status === "good") return "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
+  if (status === "warning") return "border-yellow-300/25 bg-yellow-300/10 text-yellow-100";
+  if (status === "critical") return "border-red-300/25 bg-red-300/10 text-red-100";
+  return "border-border bg-white/[0.03] text-muted-foreground";
+}
+
+function CellHealthCard({ snapshot }: { snapshot: BydmateLiveSnapshotRow }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const minCellVoltage = diplusNumber(snapshot, "diplus_min_cell_voltage_v", "min_cell_voltage_v");
+  const maxCellVoltage = diplusNumber(snapshot, "diplus_max_cell_voltage_v", "max_cell_voltage_v");
+  const cellDelta = diplusNumber(snapshot, "diplus_cell_delta_v", "cell_delta_v");
+  const status = cellDeltaStatus(cellDelta);
+  const items = [
+    { label: tx("vehicle.cellHealth.min"), value: `${fmt(minCellVoltage, 3)} V` },
+    { label: tx("vehicle.cellHealth.max"), value: `${fmt(maxCellVoltage, 3)} V` },
+    { label: tx("vehicle.cellHealth.delta"), value: `${fmt(cellDelta, 3)} V` },
+  ];
+
+  return (
+    <Card className={`border ${cellStatusClasses(status)}`}>
+      <CardHeader className="flex-row items-center justify-between space-y-0 p-4 pb-2">
+        <CardTitle className="flex items-center gap-2 font-heading text-base">
+          <HeartPulse className="size-5" aria-hidden />
+          {tx("vehicle.cellHealth.title")}
+        </CardTitle>
+        <span className="rounded-full border border-current/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+          {tx(`vehicle.cellHealth.status.${status}`)}
+        </span>
+      </CardHeader>
+      <CardContent className="grid grid-cols-3 gap-3 p-4 pt-2">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-2xl border border-current/10 bg-black/10 p-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] opacity-75">{item.label}</p>
+            <p className="mt-1 font-heading text-lg font-semibold tabular-nums">{item.value}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 type ChartPoint = {
   time: number;
   value: number;
@@ -418,7 +488,6 @@ const TRIP_GAP_MS = 5 * 60 * 1000;
 const MAX_CHART_POINTS = 240;
 const MAX_CHART_MARKERS = 80;
 const MAX_ROUTE_POINTS = 400;
-const EMPTY_TELEMETRY_POINTS: BydmateTelemetryPointRow[] = [];
 const MAP_VIEW_WIDTH = 320;
 const MAP_VIEW_HEIGHT = 180;
 const MAP_TILE_SIZE = 256;

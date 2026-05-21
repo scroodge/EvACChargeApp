@@ -310,6 +310,18 @@ export const dictionaries = {
         tripConsumption: "Trip consumption",
         kwhCharged: "kWh charged",
       },
+      cellHealth: {
+        title: "Battery cell health",
+        min: "Min cell",
+        max: "Max cell",
+        delta: "Delta",
+        status: {
+          good: "good",
+          warning: "warning",
+          critical: "critical",
+          unknown: "unknown",
+        },
+      },
       trips: {
         title: "Trips",
         subtitle: "Trips are split when telemetry is silent for more than 5 minutes.",
@@ -723,6 +735,18 @@ export const dictionaries = {
         tripConsumption: "Выдатак паездкі",
         kwhCharged: "Зараджана кВт·г",
       },
+      cellHealth: {
+        title: "Стан ячэек батарэі",
+        min: "Мін. ячэйка",
+        max: "Макс. ячэйка",
+        delta: "Розніца",
+        status: {
+          good: "добра",
+          warning: "увага",
+          critical: "крытычна",
+          unknown: "няма даных",
+        },
+      },
       trips: {
         title: "Паездкі",
         subtitle: "Паездкі падзяляюцца, калі тэлеметрыя маўчыць больш за 5 хвілін.",
@@ -1134,6 +1158,18 @@ export const dictionaries = {
         tripDistance: "Дистанция поездки",
         tripConsumption: "Расход поездки",
         kwhCharged: "Заряжено кВт·ч",
+      },
+      cellHealth: {
+        title: "Состояние ячеек батареи",
+        min: "Мин. ячейка",
+        max: "Макс. ячейка",
+        delta: "Разница",
+        status: {
+          good: "норма",
+          warning: "внимание",
+          critical: "критично",
+          unknown: "нет данных",
+        },
       },
       trips: {
         title: "Поездки",
