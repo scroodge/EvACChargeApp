@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   sanitizeLocation,
   sanitizePayloadLocations,
+  sanitizeTripTrackPoints,
 } from "./telemetry-sanitizer.ts";
 
 const baseLocation = {
@@ -113,4 +114,38 @@ test("counts dropped coordinates in ordered batch sanitizing", () => {
   assert.equal(result.droppedLocations, 1);
   assert.equal(result.payloads[0].location.lat, undefined);
   assert.equal(result.payloads[1].location.lat, 53.92644457);
+});
+
+test("filters persisted trip track points for legacy dirty trips", () => {
+  const result = sanitizeTripTrackPoints([
+    {
+      device_time: "2026-05-21T17:17:28.592Z",
+      lat: 53.92644457,
+      lon: 27.63840415,
+      accuracy_m: 3.7900924682617188,
+      bearing_deg: 105,
+      speed_kmh: 25,
+    },
+    {
+      device_time: "2026-05-21T17:17:29.782Z",
+      lat: 53.927393,
+      lon: 27.639089,
+      accuracy_m: 90.0999984741211,
+      bearing_deg: null,
+      speed_kmh: 27,
+    },
+    {
+      device_time: "2026-05-21T17:17:30.926Z",
+      lat: 53.92642939,
+      lon: 27.63861885,
+      accuracy_m: 3.7900924682617188,
+      bearing_deg: 95.19999694824219,
+      speed_kmh: 30,
+    },
+  ]);
+
+  assert.equal(result.droppedPointCount, 1);
+  assert.equal(result.points.length, 2);
+  assert.equal(result.points[0].device_time, "2026-05-21T17:17:28.592Z");
+  assert.equal(result.points[1].device_time, "2026-05-21T17:17:30.926Z");
 });

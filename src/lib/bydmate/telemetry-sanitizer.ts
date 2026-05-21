@@ -6,6 +6,15 @@ import {
   type TelemetryPayloadData,
 } from "./ingest-payload.ts";
 
+export type TripTrackPointLike = {
+  device_time: string;
+  lat: number;
+  lon: number;
+  accuracy_m: number | null;
+  bearing_deg: number | null;
+  speed_kmh: number | null;
+};
+
 const MAX_ACCEPTED_ACCURACY_M = 100;
 const MAX_LOW_CONFIDENCE_ACCURACY_M = 30;
 const MAX_REASONABLE_GPS_SPEED_KMH = 180;
@@ -289,6 +298,36 @@ export function sanitizePayloadLocations(
   }
 
   return { payloads: sanitized, droppedLocations };
+}
+
+export function sanitizeTripTrackPoints<T extends TripTrackPointLike>(points: T[]) {
+  let droppedPointCount = 0;
+  let previous: AcceptedLocation | undefined;
+  const sanitized: T[] = [];
+
+  for (const point of points) {
+    const deviceTimeMs = Date.parse(point.device_time);
+    const result = sanitizeLocation(
+      {
+        lat: point.lat,
+        lon: point.lon,
+        accuracy_m: point.accuracy_m,
+        bearing_deg: point.bearing_deg,
+      },
+      previous,
+      deviceTimeMs,
+      { speed_kmh: point.speed_kmh },
+    );
+
+    if (result.accepted) {
+      previous = result.accepted;
+      sanitized.push(point);
+    } else {
+      droppedPointCount += 1;
+    }
+  }
+
+  return { points: sanitized, droppedPointCount };
 }
 
 export function sanitizePayloadTelemetry(

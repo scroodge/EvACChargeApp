@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeTripTrackPoints } from "@/lib/bydmate/telemetry-sanitizer";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -36,5 +37,11 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Failed to load trip track" }, { status: 500 });
   }
 
-  return NextResponse.json({ tripId, points: data ?? [] });
+  const track = sanitizeTripTrackPoints(data ?? []);
+
+  return NextResponse.json({
+    tripId,
+    points: track.points,
+    droppedPointCount: track.droppedPointCount,
+  });
 }
