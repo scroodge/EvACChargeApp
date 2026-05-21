@@ -1,0 +1,18 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="44" fill="#12151C"/>
+  <path d="M53 122h86c14.9 0 27-12.1 27-27s-12.1-27-27-27c-3.7 0-7.2.7-10.4 2.1C121.3 54.5 105.5 44 87.8 44 65.8 44 47.4 60.4 44.6 82c-12 3.5-20.6 14.5-20.6 27.4C24 116.4 37 122 53 122Z" fill="#171B24" stroke="url(#cloudStroke)" stroke-width="6"/>
+  <path d="M102 62 70 108h24l-8 46 36-59H98l4-33Z" fill="url(#boltGradient)"/>
+  <path d="M54 137h84" stroke="#273040" stroke-width="6" stroke-linecap="round"/>
+  <path d="M68 153h56" stroke="#00D1FF" stroke-width="6" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="cloudStroke" x1="24" x2="166" y1="44" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00E676"/>
+      <stop offset="1" stop-color="#00D1FF"/>
+    </linearGradient>
+    <linearGradient id="boltGradient" x1="70" x2="122" y1="62" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset=".45" stop-color="#00E676"/>
+      <stop offset="1" stop-color="#00D1FF"/>
+    </linearGradient>
+  </defs>
+</svg>
