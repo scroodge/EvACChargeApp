@@ -1245,7 +1245,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
 function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
   const { t } = useTranslation();
   const tx = t as Translator;
-  const clipId = useId();
+  const [isOpen, setIsOpen] = useState(false);
   const [zoom, setZoom] = useState(0);
   const { points, latest } = chart;
 
@@ -1253,6 +1253,110 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
     return null;
   }
 
+  const zoomOut = () => setZoom((value) => Math.max(0, value - 1));
+  const zoomIn = () => setZoom((value) => Math.min(5, value + 1));
+  const resetZoom = () => setZoom(0);
+  const zoomFactor = 1 + zoom * 0.45;
+
+  return (
+    <article className="mt-3 rounded-2xl border border-border bg-white/[0.02] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-heading text-lg font-semibold tracking-tight">
+            {tx("vehicle.charts.deltaBySoc")}
+          </h3>
+          <p className="mt-1 max-w-[22rem] text-xs leading-5 text-muted-foreground">
+            {tx("vehicle.charts.deltaBySocSubtitle", { value: points.length })}
+          </p>
+        </div>
+        <IconButton label={tx("vehicle.charts.fullscreen")} onClick={() => setIsOpen(true)}>
+          <Maximize2 className="size-4" aria-hidden />
+        </IconButton>
+      </div>
+
+      <div className="mt-4">
+        <DeltaBySocPlot chart={chart} zoom={0} heightClassName="h-44" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <DeltaBySocStat compact label={tx("vehicle.charts.points")} value={points.length.toString()} />
+        <DeltaBySocStat compact label={tx("vehicle.charts.socRange")} value={`${fmt(chart.minSoc, 0)}-${fmt(chart.maxSoc, 0)}%`} />
+        <DeltaBySocStat compact label={tx("vehicle.charts.deltaRange")} value={`${fmt(chart.minDelta, 3)}-${fmt(chart.maxDelta, 3)} V`} />
+        <DeltaBySocStat
+          compact
+          label={tx("vehicle.charts.latestPoint")}
+          value={latest ? `${fmt(latest.soc, 0)}% / ${fmt(latest.delta, 3)} V` : "—"}
+        />
+      </div>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
+          <DialogTitle className="sr-only">{tx("vehicle.charts.deltaBySoc")}</DialogTitle>
+          <div className="flex flex-wrap items-start justify-between gap-3 px-1">
+            <div>
+              <h3 className="font-heading text-xl font-semibold tracking-tight">
+                {tx("vehicle.charts.deltaBySoc")}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tx("vehicle.charts.deltaBySocSubtitle", { value: points.length })}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <IconButton
+                label={tx("vehicle.charts.zoomOut")}
+                onClick={zoomOut}
+                disabled={zoom === 0}
+              >
+                <Minus className="size-4" aria-hidden />
+              </IconButton>
+              <button
+                type="button"
+                onClick={resetZoom}
+                className="h-9 rounded-full border border-border bg-white/[0.03] px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground transition hover:border-primary/50 hover:text-foreground disabled:opacity-45"
+                disabled={zoom === 0}
+                title={tx("vehicle.charts.resetZoom")}
+              >
+                {zoom === 0 ? "1x" : `${fmt(zoomFactor, 1)}x`}
+              </button>
+              <IconButton
+                label={tx("vehicle.charts.zoomIn")}
+                onClick={zoomIn}
+                disabled={zoom === 5}
+              >
+                <Plus className="size-4" aria-hidden />
+              </IconButton>
+            </div>
+          </div>
+          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_15rem]">
+            <DeltaBySocPlot chart={chart} zoom={zoom} heightClassName="h-full min-h-[22rem]" />
+            <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <DeltaBySocStat label={tx("vehicle.charts.points")} value={points.length.toString()} />
+              <DeltaBySocStat label={tx("vehicle.charts.socRange")} value={`${fmt(chart.minSoc, 0)}-${fmt(chart.maxSoc, 0)}%`} />
+              <DeltaBySocStat label={tx("vehicle.charts.deltaRange")} value={`${fmt(chart.minDelta, 3)}-${fmt(chart.maxDelta, 3)} V`} />
+              <DeltaBySocStat
+                label={tx("vehicle.charts.latestPoint")}
+                value={latest ? `${fmt(latest.soc, 0)}% / ${fmt(latest.delta, 3)} V` : "—"}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </article>
+  );
+}
+
+function DeltaBySocPlot({
+  chart,
+  zoom,
+  heightClassName,
+}: {
+  chart: DeltaBySocChartModel;
+  zoom: number;
+  heightClassName: string;
+}) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const clipId = useId();
+  const { points, latest } = chart;
   const zoomFactor = 1 + zoom * 0.45;
   const socSpan = Math.max(chart.maxSoc - chart.minSoc, 10) / zoomFactor;
   const xMax = Math.min(100, chart.maxSoc);
@@ -1281,102 +1385,49 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
     .join(" ");
   const markerPoints = visiblePoints.length <= MAX_CHART_MARKERS ? visiblePoints : [];
 
-  const zoomOut = () => setZoom((value) => Math.max(0, value - 1));
-  const zoomIn = () => setZoom((value) => Math.min(5, value + 1));
-  const resetZoom = () => setZoom(0);
-
   return (
-    <article className="mt-3 rounded-2xl border border-border bg-white/[0.02] p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-heading text-lg font-semibold tracking-tight">
-            {tx("vehicle.charts.deltaBySoc")}
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {tx("vehicle.charts.deltaBySocSubtitle", { value: points.length })}
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <IconButton
-            label={tx("vehicle.charts.zoomOut")}
-            onClick={zoomOut}
-            disabled={zoom === 0}
-          >
-            <Minus className="size-4" aria-hidden />
-          </IconButton>
-          <button
-            type="button"
-            onClick={resetZoom}
-            className="h-9 rounded-full border border-border bg-white/[0.03] px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground transition hover:border-primary/50 hover:text-foreground disabled:opacity-45"
-            disabled={zoom === 0}
-            title={tx("vehicle.charts.resetZoom")}
-          >
-            {zoom === 0 ? "1x" : `${fmt(zoomFactor, 1)}x`}
-          </button>
-          <IconButton
-            label={tx("vehicle.charts.zoomIn")}
-            onClick={zoomIn}
-            disabled={zoom === 5}
-          >
-            <Plus className="size-4" aria-hidden />
-          </IconButton>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_15rem]">
-        <div className="rounded-2xl border border-border bg-background/30 p-3">
-          <svg className="h-72 w-full overflow-hidden" viewBox="0 0 320 142" role="img" aria-label={tx("vehicle.charts.deltaBySoc")}>
-            <defs>
-              <clipPath id={clipId}>
-                <rect x="24" y="18" width="272" height="92" />
-              </clipPath>
-            </defs>
-            <line x1="24" x2="296" y1="110" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
-            <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
-            <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
-            <text x="24" y="132" className="fill-muted-foreground text-[10px]">
-              {fmt(xMin, 0)}% SOC
-            </text>
-            <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">
-              {fmt(xMax, 0)}% SOC
-            </text>
-            <text x="30" y="14" className="fill-muted-foreground text-[10px]">
-              {fmt(yMax, 3)} V
-            </text>
-            <text x="30" y="106" className="fill-muted-foreground text-[10px]">
-              {fmt(yMin, 3)} V
-            </text>
-            <g clipPath={`url(#${clipId})`}>
-              {points.length > 1 ? (
-                <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.72" />
-              ) : null}
-              {markerPoints.map((point, index) => {
-                const isLatest = point === latest;
-                return (
-                  <circle
-                    key={`${point.time}-${index}`}
-                    cx={x(point.soc)}
-                    cy={y(point.delta)}
-                    r={isLatest ? 4.5 : 3}
-                    fill={isLatest ? "#facc15" : "#fb7185"}
-                    opacity={isLatest ? 1 : 0.78}
-                  />
-                );
-              })}
-            </g>
-          </svg>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <DeltaBySocStat label={tx("vehicle.charts.points")} value={points.length.toString()} />
-          <DeltaBySocStat label={tx("vehicle.charts.socRange")} value={`${fmt(chart.minSoc, 0)}-${fmt(chart.maxSoc, 0)}%`} />
-          <DeltaBySocStat label={tx("vehicle.charts.deltaRange")} value={`${fmt(chart.minDelta, 3)}-${fmt(chart.maxDelta, 3)} V`} />
-          <DeltaBySocStat
-            label={tx("vehicle.charts.latestPoint")}
-            value={latest ? `${fmt(latest.soc, 0)}% / ${fmt(latest.delta, 3)} V` : "—"}
-          />
-        </div>
-      </div>
-    </article>
+    <div className="rounded-2xl border border-border bg-background/30 p-3">
+      <svg className={`${heightClassName} w-full overflow-hidden`} viewBox="0 0 320 142" role="img" aria-label={tx("vehicle.charts.deltaBySoc")}>
+        <defs>
+          <clipPath id={clipId}>
+            <rect x="24" y="18" width="272" height="92" />
+          </clipPath>
+        </defs>
+        <line x1="24" x2="296" y1="110" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
+        <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
+        <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
+        <text x="24" y="132" className="fill-muted-foreground text-[10px]">
+          {fmt(xMin, 0)}% SOC
+        </text>
+        <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">
+          {fmt(xMax, 0)}% SOC
+        </text>
+        <text x="30" y="14" className="fill-muted-foreground text-[10px]">
+          {fmt(yMax, 3)} V
+        </text>
+        <text x="30" y="106" className="fill-muted-foreground text-[10px]">
+          {fmt(yMin, 3)} V
+        </text>
+        <g clipPath={`url(#${clipId})`}>
+          {points.length > 1 ? (
+            <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.72" />
+          ) : null}
+          {markerPoints.map((point, index) => {
+            const isLatest = point === latest;
+            return (
+              <circle
+                key={`${point.time}-${index}`}
+                cx={x(point.soc)}
+                cy={y(point.delta)}
+                r={isLatest ? 4.5 : 3}
+                fill={isLatest ? "#facc15" : "#fb7185"}
+                opacity={isLatest ? 1 : 0.78}
+              />
+            );
+          })}
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -1405,9 +1456,9 @@ function IconButton({
   );
 }
 
-function DeltaBySocStat({ label, value }: { label: string; value: string }) {
+function DeltaBySocStat({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="rounded-2xl border border-border bg-background/30 p-3">
+    <div className={`rounded-2xl border border-border bg-background/30 ${compact ? "p-3" : "p-3"}`}>
       <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <p className="mt-2 font-mono text-sm text-foreground">{value}</p>
     </div>
