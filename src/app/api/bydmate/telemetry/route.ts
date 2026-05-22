@@ -8,8 +8,128 @@ import {
   type AcceptedTelemetry,
 } from "@/lib/bydmate/telemetry-sanitizer";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { TelemetryPayload } from "@/lib/bydmate/ingest-payload";
 
 export const runtime = "nodejs";
+
+type PersistedTelemetryRow = {
+  vehicle_id: string;
+  received_at: string;
+  device_time: string;
+  diplus: unknown;
+  raw_payload: unknown;
+  diplus_min_cell_voltage_v: unknown;
+  diplus_max_cell_voltage_v: unknown;
+  diplus_cell_delta_v: unknown;
+};
+
+type PersistedTelemetryResponse = {
+  vehicle_id: string;
+  received_at: string;
+  device_time: string;
+  diplus: unknown;
+  diplus_min_cell_voltage_v: number | null;
+  diplus_max_cell_voltage_v: number | null;
+  diplus_cell_delta_v: number | null;
+};
+
+function finiteNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  return null;
+}
+
+function firstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const n = finiteNumber(value);
+    if (n != null) return n;
+  }
+
+  return null;
+}
+
+function isNonEmptyRecord(value: unknown) {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+  );
+}
+
+function expectedCellVoltage(sample: TelemetryPayload) {
+  const min = firstFiniteNumber(
+    sample.telemetry.diplus_min_cell_voltage_v,
+    sample.telemetry.cell_voltage_min_v,
+    sample.diplus?.min_cell_voltage_v,
+  );
+  const max = firstFiniteNumber(
+    sample.telemetry.diplus_max_cell_voltage_v,
+    sample.telemetry.cell_voltage_max_v,
+    sample.diplus?.max_cell_voltage_v,
+  );
+  const explicitDelta = firstFiniteNumber(
+    sample.telemetry.diplus_cell_delta_v,
+    sample.telemetry.cell_delta_v,
+    sample.diplus?.cell_delta_v,
+  );
+
+  return {
+    min,
+    max,
+    delta: explicitDelta ?? (min != null && max != null ? max - min : null),
+  };
+}
+
+function persistedTelemetry(row: PersistedTelemetryRow): PersistedTelemetryResponse {
+  return {
+    vehicle_id: row.vehicle_id,
+    received_at: row.received_at,
+    device_time: row.device_time,
+    diplus: row.diplus,
+    diplus_min_cell_voltage_v: finiteNumber(row.diplus_min_cell_voltage_v),
+    diplus_max_cell_voltage_v: finiteNumber(row.diplus_max_cell_voltage_v),
+    diplus_cell_delta_v: finiteNumber(row.diplus_cell_delta_v),
+  };
+}
+
+function rawPayloadDiplus(row: PersistedTelemetryRow) {
+  if (!row.raw_payload || typeof row.raw_payload !== "object" || Array.isArray(row.raw_payload)) {
+    return null;
+  }
+
+  return "diplus" in row.raw_payload ? row.raw_payload.diplus : null;
+}
+
+function persistenceError(
+  sample: TelemetryPayload,
+  persisted: PersistedTelemetryResponse | null,
+  persistedRow: PersistedTelemetryRow | null,
+) {
+  if (!persisted || !persistedRow) return "telemetry missing after persist";
+
+  if (isNonEmptyRecord(sample.diplus) && !isNonEmptyRecord(persisted.diplus)) {
+    return "diplus missing after persist";
+  }
+
+  if (isNonEmptyRecord(sample.diplus) && !isNonEmptyRecord(rawPayloadDiplus(persistedRow))) {
+    return "raw payload diplus missing after persist";
+  }
+
+  const expected = expectedCellVoltage(sample);
+  const missingCellVoltage =
+    (expected.min != null && persisted.diplus_min_cell_voltage_v == null) ||
+    (expected.max != null && persisted.diplus_max_cell_voltage_v == null) ||
+    (expected.delta != null && persisted.diplus_cell_delta_v == null);
+
+  if (missingCellVoltage) return "cell voltage missing after persist";
+
+  return null;
+}
 
 export async function POST(request: Request) {
   const apiKey = request.headers.get("x-api-key") ?? "";
@@ -124,8 +244,38 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Telemetry ingest failed" }, { status: 500 });
     }
 
+    const lastSample = samples.at(-1);
+    const { data: persistedRow, error: persistedError } = lastSample
+      ? await supabase
+          .from("bydmate_live_snapshots")
+          .select(
+            "vehicle_id, received_at, device_time, diplus, raw_payload, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v",
+          )
+          .eq("user_id", profile.id)
+          .eq("vehicle_id", lastSample.vehicle_id)
+          .maybeSingle()
+      : { data: null, error: null };
+
+    if (persistedError) {
+      return Response.json({ ok: false, error: "Persisted telemetry lookup failed" }, { status: 500 });
+    }
+
+    const persisted = persistedRow ? persistedTelemetry(persistedRow) : null;
+    const error = lastSample
+      ? persistenceError(lastSample, persisted, persistedRow)
+      : "telemetry missing after persist";
+
+    if (error) {
+      return Response.json({
+        ok: false,
+        error,
+        persisted,
+      });
+    }
+
     return Response.json({
       ok: true,
+      persisted,
       vehicle_id: headerVehicleId,
       sample_count: samples.length,
       dropped_location_count: droppedLocations,
