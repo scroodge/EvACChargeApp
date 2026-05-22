@@ -83,3 +83,37 @@ test("accepts extended BYDMate payload with diplus", () => {
   assert.equal(result.payloads[0].diplus?.cell_delta_v, 0.024);
   assert.equal(result.payloads[0].diplus?.charge_gun_state, "disconnected");
 });
+
+test("accepts numeric BYDMate Di+ states and telemetry cell voltage fields", () => {
+  const result = normalizePayloads({
+    ...basePayload,
+    telemetry: {
+      ...basePayload.telemetry,
+      cell_voltage_min_v: 3.3,
+      cell_voltage_max_v: 3.31,
+      diplus_min_cell_voltage_v: 3.301,
+      diplus_max_cell_voltage_v: 3.312,
+      diplus_cell_delta_v: 0.011,
+    },
+    diplus: {
+      charge_gun_state: 1,
+      charging_status: 0,
+      min_cell_voltage_v: 3.29,
+      max_cell_voltage_v: 3.32,
+      cell_delta_v: 0.03,
+      gear: 1,
+      power_state: 1,
+      ac_status: 0,
+      door_fl: 0,
+      auto_park: 0,
+      rain: 0,
+      light_low: 0,
+      drl: 1,
+    },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.payloads[0].telemetry.diplus_min_cell_voltage_v, 3.301);
+  assert.equal(result.payloads[0].diplus?.charge_gun_state, 1);
+  assert.equal(result.payloads[0].diplus?.drl, 1);
+});

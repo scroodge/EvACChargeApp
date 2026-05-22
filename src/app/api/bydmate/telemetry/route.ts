@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             p_device_time: samples[0].device_time,
             p_received_at: receivedAt,
             p_telemetry: samples[0].telemetry,
-            p_diplus: samples[0].diplus ?? {},
+            p_diplus: samples[0].diplus ?? null,
             p_location: samples[0].location ?? {},
             p_raw_payload: samples[0],
           })

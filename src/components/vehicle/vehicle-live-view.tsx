@@ -360,9 +360,15 @@ function diplusNumber(
   snapshot: BydmateLiveSnapshotRow,
   columnKey: "diplus_min_cell_voltage_v" | "diplus_max_cell_voltage_v" | "diplus_cell_delta_v",
   rawKey: "min_cell_voltage_v" | "max_cell_voltage_v" | "cell_delta_v",
+  telemetryKeys: Array<keyof BydmateTelemetry> = [],
 ) {
   const columnValue = snapshot[columnKey];
   if (typeof columnValue === "number" && Number.isFinite(columnValue)) return columnValue;
+
+  for (const key of telemetryKeys) {
+    const telemetryValue = snapshot.telemetry[key];
+    if (typeof telemetryValue === "number" && Number.isFinite(telemetryValue)) return telemetryValue;
+  }
 
   const rawValue = snapshot.diplus?.[rawKey];
   return typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null;
@@ -385,9 +391,21 @@ function cellStatusClasses(status: CellDeltaStatus) {
 function CellHealthCard({ snapshot }: { snapshot: BydmateLiveSnapshotRow }) {
   const { t } = useTranslation();
   const tx = t as Translator;
-  const minCellVoltage = diplusNumber(snapshot, "diplus_min_cell_voltage_v", "min_cell_voltage_v");
-  const maxCellVoltage = diplusNumber(snapshot, "diplus_max_cell_voltage_v", "max_cell_voltage_v");
-  const cellDelta = diplusNumber(snapshot, "diplus_cell_delta_v", "cell_delta_v");
+  const minCellVoltage = diplusNumber(snapshot, "diplus_min_cell_voltage_v", "min_cell_voltage_v", [
+    "diplus_min_cell_voltage_v",
+    "cell_voltage_min_v",
+  ]);
+  const maxCellVoltage = diplusNumber(snapshot, "diplus_max_cell_voltage_v", "max_cell_voltage_v", [
+    "diplus_max_cell_voltage_v",
+    "cell_voltage_max_v",
+  ]);
+  const storedCellDelta = diplusNumber(snapshot, "diplus_cell_delta_v", "cell_delta_v", [
+    "diplus_cell_delta_v",
+    "cell_delta_v",
+  ]);
+  const cellDelta = storedCellDelta ?? (
+    minCellVoltage != null && maxCellVoltage != null ? maxCellVoltage - minCellVoltage : null
+  );
   const status = cellDeltaStatus(cellDelta);
   const items = [
     { label: tx("vehicle.cellHealth.min"), value: `${fmt(minCellVoltage, 3)} V` },
