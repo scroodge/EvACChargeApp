@@ -191,6 +191,7 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 type DeltaBySocPoint = {
   soc: number;
   delta: number;
+  maxCellVoltage: number | null;
   time: number;
 };
 
@@ -224,6 +225,13 @@ function sampleDelta(sample: ChargingSessionTelemetrySample) {
   return min != null && max != null ? max - min : null;
 }
 
+function sampleMaxCellVoltage(sample: ChargingSessionTelemetrySample) {
+  return validNumber(sample.diplus_max_cell_voltage_v) ??
+    validNumber(sample.telemetry.diplus_max_cell_voltage_v) ??
+    validNumber(sample.telemetry.cell_voltage_max_v) ??
+    validNumber(sample.diplus?.max_cell_voltage_v);
+}
+
 function prepareChargeDeltaPoints(samples: ChargingSessionTelemetrySample[]) {
   return samples
     .flatMap((sample) => {
@@ -231,7 +239,7 @@ function prepareChargeDeltaPoints(samples: ChargingSessionTelemetrySample[]) {
       const delta = sampleDelta(sample);
       const time = Date.parse(sample.device_time);
       return soc != null && delta != null && Number.isFinite(time)
-        ? [{ soc, delta, time }]
+        ? [{ soc, delta, maxCellVoltage: sampleMaxCellVoltage(sample), time }]
         : [];
     })
     .sort((a, b) => a.time - b.time);
@@ -344,13 +352,18 @@ function ChargeDeltaPlot({ points }: { points: DeltaBySocPoint[] }) {
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <DeltaStat label="SOC" value={`${minSoc.toFixed(0)}-${maxSoc.toFixed(0)}%`} />
         <DeltaStat label="Delta" value={`${minDelta.toFixed(3)}-${maxDelta.toFixed(3)} V`} />
         <DeltaStat label="Latest" value={latest ? `${latest.soc.toFixed(0)}% / ${latest.delta.toFixed(3)} V` : "—"} />
+        <DeltaStat label="Latest max cell" value={`${fmtNumber(latest?.maxCellVoltage, 3)} V`} />
       </div>
     </article>
   );
+}
+
+function fmtNumber(value: number | null | undefined, digits = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
 function formatPlotTime(ms: number) {

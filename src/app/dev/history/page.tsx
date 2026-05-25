@@ -42,6 +42,7 @@ type SampleRow = {
 type DeltaPoint = {
   soc: number;
   delta: number;
+  maxCellVoltage: number | null;
   time: string;
 };
 
@@ -227,17 +228,27 @@ function groupChargeWindows(samples: SampleRow[]) {
       windows.push({
         start: sample.device_time,
         end: sample.device_time,
-        points: [{ soc, delta, time: sample.device_time }],
+        points: [{
+          soc,
+          delta,
+          maxCellVoltage: sampleMaxCellVoltage(sample),
+          time: sample.device_time,
+        }],
       });
     } else {
       previous.end = sample.device_time;
-      previous.points.push({ soc, delta, time: sample.device_time });
+      previous.points.push({
+        soc,
+        delta,
+        maxCellVoltage: sampleMaxCellVoltage(sample),
+        time: sample.device_time,
+      });
     }
   }
 
   return windows.map((window) => ({
     ...window,
-    points: window.points.sort((a, b) => a.soc - b.soc || Date.parse(a.time) - Date.parse(b.time)),
+    points: window.points.sort((a, b) => Date.parse(a.time) - Date.parse(b.time)),
   }));
 }
 
@@ -267,7 +278,14 @@ async function fetchSessionDeltaPoints(
     .flatMap((sample) => {
       const soc = sampleSoc(sample);
       const delta = sampleDelta(sample);
-      return soc != null && delta != null ? [{ soc, delta, time: sample.device_time }] : [];
+      return soc != null && delta != null
+        ? [{
+            soc,
+            delta,
+            maxCellVoltage: sampleMaxCellVoltage(sample),
+            time: sample.device_time,
+          }]
+        : [];
     })
     .sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
 }
@@ -350,6 +368,7 @@ function ChargeDeltaPlot({ points }: { points: DeltaPoint[] }) {
         <Metric label="SOC range" value={`${fmt(minSoc)}-${fmt(maxSoc)}%`} />
         <Metric label="Delta range" value={`${fmt(minDelta, 3)}-${fmt(maxDelta, 3)} V`} />
         <Metric label="Latest" value={latest ? `${fmt(latest.soc)}% / ${fmt(latest.delta, 3)} V` : "—"} />
+        <Metric label="Latest max cell" value={`${fmt(latest?.maxCellVoltage, 3)} V`} />
       </div>
     </div>
   );
@@ -394,6 +413,13 @@ function sampleDelta(sample: SampleRow) {
     numberValue(sample.diplus?.max_cell_voltage_v);
 
   return min != null && max != null ? max - min : null;
+}
+
+function sampleMaxCellVoltage(sample: SampleRow) {
+  return numberValue(sample.diplus_max_cell_voltage_v) ??
+    numberValue(sample.telemetry?.diplus_max_cell_voltage_v) ??
+    numberValue(sample.telemetry?.cell_voltage_max_v) ??
+    numberValue(sample.diplus?.max_cell_voltage_v);
 }
 
 function numberValue(value: unknown) {
