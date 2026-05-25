@@ -25,6 +25,12 @@ const DEV_AUTH_PREFIXES = [
   "/settings",
   "/vehicle",
 ];
+const DIRECT_DEV_PATH_PREFIXES = [
+  "/dev/bydmate-diplus",
+  "/dev/history",
+  "/dev/vehicle",
+  "/dev/vehicle-telemetry-fixtures",
+];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -35,6 +41,15 @@ export async function proxy(request: NextRequest) {
   const isDevAuthPath = DEV_AUTH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+
+  if (
+    isDevelopment &&
+    DIRECT_DEV_PATH_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+  ) {
+    return response;
+  }
 
   if (isDevelopment && pathname.startsWith("/dev/")) {
     const rewriteUrl = request.nextUrl.clone();

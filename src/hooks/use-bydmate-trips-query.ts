@@ -16,11 +16,15 @@ async function fetchBydmateTrips(date: string, vehicleId: string | null): Promis
   return payload.trips ?? [];
 }
 
-export function useBydmateTripsQuery(date: string, vehicleId: string | null) {
+export function useBydmateTripsQuery(
+  date: string,
+  vehicleId: string | null,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.bydmateTrips(date, vehicleId),
     queryFn: () => fetchBydmateTrips(date, vehicleId),
-    enabled: Boolean(date),
+    enabled: enabled && Boolean(date),
     refetchInterval: 15000,
   });
 }

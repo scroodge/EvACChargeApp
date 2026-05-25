@@ -164,7 +164,7 @@ function VehicleLiveContent({
     data: apiTrips = [],
     isLoading: isTripsLoading,
     error: tripsError,
-  } = useBydmateTripsQuery(selectedDate, fixturePoints ? null : snapshot.vehicle_id);
+  } = useBydmateTripsQuery(selectedDate, snapshot.vehicle_id, !fixturePoints);
   const trips = fixtureTrips ?? apiTrips;
   const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
   const defaultTripId = trips[0]?.id ?? null;
