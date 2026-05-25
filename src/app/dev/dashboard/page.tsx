@@ -70,8 +70,8 @@ export default function DevDashboardPage() {
         <div className="mt-3 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-4">
           <BatteryRing percent={68} status="Idle" size="compact" />
           <div className="min-w-0 space-y-3">
-            <div className="h-10 rounded-xl border border-border bg-[#12151C]/70 px-3 py-2 text-sm">
-              Yuan Up
+            <div className="rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">
+              Saved vehicle
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-xl border border-border bg-white/[0.03] p-2.5">
@@ -148,21 +148,21 @@ function DashboardSummaryCard({
   return (
     <Link
       href={href}
-      className="grid min-h-[104px] content-between rounded-2xl border border-border bg-white/[0.03] p-3.5 transition hover:border-primary/50 hover:bg-white/[0.05]"
+      className="grid min-h-[92px] grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-border bg-white/[0.03] p-4 transition hover:border-primary/50 hover:bg-white/[0.05]"
     >
-      <span className="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <span>{label}</span>
-        <span className="text-[var(--voltflow-cyan)]">{icon}</span>
-      </span>
-      <span className="mt-3 block">
+      <span className="min-w-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </span>
         <span className="block font-heading text-lg font-bold tracking-normal text-foreground">
           {title}
         </span>
         <span className="mt-1 block text-sm leading-5 text-muted-foreground">{body}</span>
+        <span className="mt-1 block truncate text-xs font-medium text-muted-foreground">
+          {meta}
+        </span>
       </span>
-      <span className="mt-3 block truncate text-xs font-medium text-muted-foreground">
-        {meta}
-      </span>
+      <span className="text-[var(--voltflow-cyan)]">{icon}</span>
     </Link>
   );
 }

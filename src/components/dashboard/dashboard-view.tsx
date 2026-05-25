@@ -14,7 +14,6 @@ import { ChargingBolt } from "@/components/brand/ChargingBolt";
 import { LogoFull } from "@/components/brand/LogoFull";
 import { BatteryRing } from "@/components/charging/BatteryRing";
 import { ChargingActionButton } from "@/components/charging/ChargingActionButton";
-import { ChargingStatsGrid, type ChargingStat } from "@/components/charging/ChargingStatsGrid";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,9 +46,8 @@ import {
 import {
   deriveLiveChargingState,
   findFreshChargingSnapshot,
-  snapshotChargePowerKw,
 } from "@/lib/charging-live";
-import { currencySymbols, formatCurrencyAmount } from "@/lib/i18n";
+import { currencySymbols } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
 import { ensureNotificationsPermission, ensurePushSubscription } from "@/lib/push/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -109,23 +107,23 @@ function DashboardSummaryCard({
   return (
     <Link
       href={href}
-      className="grid min-h-[104px] content-between rounded-2xl border border-border bg-white/[0.03] p-3.5 transition hover:border-primary/50 hover:bg-white/[0.05]"
+      className="grid min-h-[92px] grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-border bg-white/[0.03] p-4 transition hover:border-primary/50 hover:bg-white/[0.05]"
     >
-      <span className="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <span>{label}</span>
-        <span className="text-[var(--voltflow-cyan)]">{icon}</span>
-      </span>
-      <span className="mt-3 block">
+      <span className="min-w-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </span>
         <span className="block font-heading text-lg font-bold tracking-normal text-foreground">
           {title}
         </span>
         <span className="mt-1 block text-sm leading-5 text-muted-foreground">{body}</span>
+        {meta ? (
+          <span className="mt-1 block truncate text-xs font-medium text-muted-foreground">
+            {meta}
+          </span>
+        ) : null}
       </span>
-      {meta ? (
-        <span className="mt-3 block truncate text-xs font-medium text-muted-foreground">
-          {meta}
-        </span>
-      ) : null}
+      <span className="text-[var(--voltflow-cyan)]">{icon}</span>
     </Link>
   );
 }
@@ -230,38 +228,6 @@ export function DashboardView() {
     activeSession?.current_percent ??
     latestSession?.current_percent ??
     Number(startPct);
-  const liveChargePowerKw = activeSession
-    ? snapshotChargePowerKw(liveChargingSnapshot)
-    : null;
-
-  const stats: ChargingStat[] = [
-    {
-      label: t("dashboard.chargedKwh") as string,
-      value: `${(liveActive?.chargedEnergyKwh ?? activeSession?.charged_energy_kwh ?? 0).toFixed(2)}`,
-      accent: "green",
-    },
-    {
-      label: t("dashboard.remainingStat") as string,
-      value: activeSession
-        ? formatDuration(liveActive?.remainingSeconds ?? 0)
-        : "--",
-      accent: "cyan",
-    },
-    {
-      label: t("dashboard.powerStat") as string,
-      value: `${(liveChargePowerKw ?? activeSession?.charger_power_kw ?? selectedCar?.default_charger_power_kw ?? 0).toFixed(1)} kW`,
-      accent: "blue",
-    },
-    {
-      label: t("dashboard.costStat") as string,
-      value: formatCurrencyAmount(
-        currency,
-        liveActive?.estimatedCost ?? activeSession?.estimated_cost ?? 0,
-        locale,
-      ),
-    },
-  ];
-
   const handleStart = async () => {
     if (!selectedCar) return;
     const start = Number(startPct);
@@ -377,7 +343,7 @@ export function DashboardView() {
               <div className="min-w-0 space-y-3">
                 {isLoading ? (
                   <Skeleton className="h-10 w-full rounded-xl" />
-                ) : (
+                ) : cars.length > 1 ? (
                   <Select
                     items={cars.map((car) => ({
                       value: car.id,
@@ -405,7 +371,13 @@ export function DashboardView() {
                       ))}
                     </SelectContent>
                   </Select>
-                )}
+                ) : null}
+
+                {cars.length <= 1 ? (
+                  <div className="rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">
+                    {t("dashboard.singleVehicle") as string}
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border border-border bg-white/[0.03] p-2.5">
@@ -450,7 +422,7 @@ export function DashboardView() {
             </div>
           </section>
 
-          <section className="grid gap-3 min-[520px]:grid-cols-3">
+          <section className="grid gap-3">
             <DashboardSummaryCard
               href="/vehicle"
               icon={<Route className="size-5" aria-hidden />}
@@ -528,8 +500,6 @@ export function DashboardView() {
               }
             />
           </section>
-
-          {activeSession ? <ChargingStatsGrid stats={stats} compact /> : null}
         </>
       ) : null}
 
