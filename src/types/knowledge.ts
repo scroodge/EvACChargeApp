@@ -21,6 +21,7 @@ export type SparePartImage = {
 export type KnowledgeArticleSection = {
   heading: string;
   body: string;
+  images?: SparePartImage[];
 };
 
 export type KnowledgeCategory = {

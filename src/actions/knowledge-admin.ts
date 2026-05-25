@@ -256,6 +256,7 @@ async function parseArticleForm(
 
   const uploadedImages = await uploadArticleImages(formData.getAll("image_files"));
   input.images = [...input.images, ...uploadedImages];
+  input.content = await uploadArticleSectionImages(formData, input.content);
 
   const errors = await validateArticle(input, currentId);
   return Object.keys(errors).length ? { errors, values: formValues(formData) } : input;
@@ -382,6 +383,27 @@ async function uploadSparePartImages(files: FormDataEntryValue[]): Promise<Spare
 
 async function uploadArticleImages(files: FormDataEntryValue[]): Promise<SparePartImage[]> {
   return uploadImageList(files, "knowledge-articles");
+}
+
+async function uploadArticleSectionImages(
+  formData: FormData,
+  sections: KnowledgeArticleSection[],
+): Promise<KnowledgeArticleSection[]> {
+  const nextSections = sections.map((section) => ({
+    ...section,
+    images: [...(section.images ?? [])],
+  }));
+
+  for (const [index, section] of nextSections.entries()) {
+    const uploadedImages = await uploadArticleImages(formData.getAll(`content_image_files_${index}`));
+    if (uploadedImages.length) {
+      section.images = [...(section.images ?? []), ...uploadedImages];
+    }
+  }
+
+  return nextSections.map((section) =>
+    section.images?.length ? section : { heading: section.heading, body: section.body },
+  );
 }
 
 async function uploadImageList(files: FormDataEntryValue[], bucket: string): Promise<SparePartImage[]> {
@@ -534,13 +556,42 @@ function existingImagesValue(formData: FormData): SparePartImage[] {
 function sectionValue(formData: FormData, prefix: string): KnowledgeArticleSection[] {
   const headings = formData.getAll(`${prefix}_heading`).map(String);
   const bodies = formData.getAll(`${prefix}_body`).map(String);
+  const sectionImages = existingSectionImagesValue(formData);
 
   return headings
     .map((heading, index) => ({
       heading: heading.trim(),
       body: (bodies[index] ?? "").trim(),
+      images: sectionImages.get(index) ?? [],
     }))
-    .filter((section) => section.heading || section.body);
+    .filter((section) => section.heading || section.body || section.images.length)
+    .map((section) =>
+      section.images.length
+        ? section
+        : { heading: section.heading, body: section.body },
+    );
+}
+
+function existingSectionImagesValue(formData: FormData) {
+  const indexes = formData.getAll("content_image_section_index").map(String);
+  const urls = formData.getAll("content_image_url").map(String);
+  const alts = formData.getAll("content_image_alt").map(String);
+  const imagesBySection = new Map<number, SparePartImage[]>();
+
+  urls.forEach((url, index) => {
+    const sectionIndex = Number.parseInt(indexes[index] ?? "", 10);
+    const trimmedUrl = url.trim();
+    if (!Number.isFinite(sectionIndex) || !trimmedUrl) return;
+
+    const images = imagesBySection.get(sectionIndex) ?? [];
+    images.push({
+      url: trimmedUrl,
+      alt: alts[index]?.trim() || "",
+    });
+    imagesBySection.set(sectionIndex, images);
+  });
+
+  return imagesBySection;
 }
 
 function statusValue(formData: FormData): ArticleStatus {

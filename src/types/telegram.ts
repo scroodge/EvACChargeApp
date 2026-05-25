@@ -12,6 +12,10 @@ export type KnowledgeArticle = {
   sections: {
     heading: string;
     body: string;
+    images?: {
+      url: string;
+      alt: string;
+    }[];
   }[];
   images?: {
     url: string;

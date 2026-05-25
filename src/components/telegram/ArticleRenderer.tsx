@@ -24,9 +24,17 @@ export function ArticleRenderer({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const images = article.images ?? [];
+  const sectionImages = article.sections.flatMap((section) => section.images ?? []);
+  const galleryImages = [...images];
+
+  for (const image of sectionImages) {
+    if (!galleryImages.some((galleryImage) => galleryImage.url === image.url)) {
+      galleryImages.push(image);
+    }
+  }
 
   function moveImage(delta: number) {
-    setActiveImage((current) => (current + delta + images.length) % images.length);
+    setActiveImage((current) => (current + delta + galleryImages.length) % galleryImages.length);
   }
 
   async function copyLink() {
@@ -157,12 +165,37 @@ export function ArticleRenderer({
       ) : null}
 
       <div className="space-y-3">
-        {article.sections.map((section) => (
-          <section key={section.heading} className="voltflow-card p-5">
+        {article.sections.map((section, sectionIndex) => (
+          <section key={`${section.heading}-${sectionIndex}`} className="voltflow-card p-5">
             <h2 className="font-heading text-xl font-bold">{section.heading}</h2>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">
               {section.body}
             </p>
+            {section.images?.length ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {section.images.map((image, imageIndex) => (
+                  <button
+                    key={`${image.url}-${imageIndex}`}
+                    type="button"
+                    onClick={() => {
+                      const galleryIndex = galleryImages.findIndex((item) => item.url === image.url);
+                      setActiveImage(Math.max(galleryIndex, 0));
+                      setGalleryOpen(true);
+                    }}
+                    className="overflow-hidden rounded-lg border border-border text-left"
+                  >
+                    <Image
+                      src={image.url}
+                      alt={image.alt || section.heading || article.title}
+                      width={640}
+                      height={360}
+                      unoptimized
+                      className="aspect-[16/9] w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </section>
         ))}
       </div>
@@ -220,7 +253,7 @@ export function ArticleRenderer({
         </section>
       ) : null}
 
-      {galleryOpen && images.length ? (
+      {galleryOpen && galleryImages.length ? (
         <div className="fixed inset-0 z-[80] bg-black/80 p-4 backdrop-blur-sm">
           <div className="mx-auto flex h-full max-w-[430px] flex-col justify-center">
             <div className="rounded-lg border border-border bg-card p-3">
@@ -236,14 +269,14 @@ export function ArticleRenderer({
                 </button>
               </div>
               <Image
-                src={images[activeImage].url}
-                alt={images[activeImage].alt || article.title}
+                src={galleryImages[activeImage].url}
+                alt={galleryImages[activeImage].alt || article.title}
                 width={800}
                 height={600}
                 unoptimized
                 className="max-h-[70dvh] w-full rounded-lg object-contain"
               />
-              {images.length > 1 ? (
+              {galleryImages.length > 1 ? (
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <button
                     type="button"
@@ -254,7 +287,7 @@ export function ArticleRenderer({
                     <ChevronLeft className="size-5" aria-hidden />
                   </button>
                   <span className="text-sm font-semibold text-muted-foreground">
-                    {activeImage + 1} / {images.length}
+                    {activeImage + 1} / {galleryImages.length}
                   </span>
                   <button
                     type="button"

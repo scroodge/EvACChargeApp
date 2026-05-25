@@ -536,6 +536,9 @@ async function upsertArticleKnowledgeItem(id: string, input: ArticleInput) {
   const content = [
     input.summary,
     ...input.content.map((section) => `${section.heading}\n${section.body}`),
+    ...input.content.flatMap((section) =>
+      (section.images ?? []).map((image) => image.alt).filter(Boolean),
+    ),
     ...input.tips.map((tip) => `Совет: ${tip}`),
     ...input.warnings.map((warning) => `Важно: ${warning}`),
   ]
@@ -723,19 +726,19 @@ function firstRelation(relation: CategoryRelation | undefined) {
 
 function parseSections(value: unknown): KnowledgeArticleSection[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const section = item as Record<string, unknown>;
-      return {
-        heading: String(section.heading ?? ""),
-        body: String(section.body ?? ""),
-      };
-    })
-    .filter(
-      (item): item is KnowledgeArticleSection =>
-        Boolean(item?.heading.trim()) || Boolean(item?.body.trim()),
-    );
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const section = item as Record<string, unknown>;
+    const parsedSection = {
+      heading: String(section.heading ?? ""),
+      body: String(section.body ?? ""),
+      images: parseImages(section.images),
+    };
+
+    return parsedSection.heading.trim() || parsedSection.body.trim() || parsedSection.images.length
+      ? [parsedSection]
+      : [];
+  });
 }
 
 function parseStringArray(value: unknown) {

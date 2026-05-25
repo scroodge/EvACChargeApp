@@ -69,10 +69,7 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
           <JsonSectionsEditor
             defaultValue={
               state.values
-                ? stateList(state, "content_heading").map((heading, index) => ({
-                    heading,
-                    body: stateList(state, "content_body")[index] ?? "",
-                  }))
+                ? sectionsFromState(state)
                 : article?.content
             }
             error={state.errors?.content}
@@ -226,4 +223,23 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function sectionsFromState(state: AdminFormState) {
+  const imageSectionIndexes = stateList(state, "content_image_section_index");
+  const imageUrls = stateList(state, "content_image_url");
+  const imageAlts = stateList(state, "content_image_alt");
+
+  return stateList(state, "content_heading").map((heading, index) => ({
+    heading,
+    body: stateList(state, "content_body")[index] ?? "",
+    images: imageUrls
+      .map((url, imageIndex) => ({
+        sectionIndex: Number.parseInt(imageSectionIndexes[imageIndex] ?? "", 10),
+        url,
+        alt: imageAlts[imageIndex] ?? "",
+      }))
+      .filter((image) => image.sectionIndex === index && image.url)
+      .map(({ url, alt }) => ({ url, alt })),
+  }));
 }
