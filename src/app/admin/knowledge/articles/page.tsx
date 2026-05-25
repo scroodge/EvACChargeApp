@@ -55,11 +55,9 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
                 <td className="p-3 text-muted-foreground">{article.updated_at.slice(0, 10)}</td>
                 <td className="p-3">
                   <div className="flex justify-end gap-2">
-                    {article.status === "published" ? (
-                    <Link href={`/telegram/article/${article.slug}`} className="grid size-8 place-items-center rounded-lg border border-border" aria-label="Предпросмотр статьи">
+                    <Link href={`/admin/knowledge/articles/${article.id}/preview`} className="grid size-8 place-items-center rounded-lg border border-border" aria-label="Предпросмотр статьи">
                         <ExternalLink className="size-4" aria-hidden />
                       </Link>
-                    ) : null}
                     <Link href={`/admin/knowledge/articles/${article.id}`} className="grid size-8 place-items-center rounded-lg border border-border" aria-label="Редактировать статью">
                       <Edit className="size-4" aria-hidden />
                     </Link>

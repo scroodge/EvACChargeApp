@@ -216,6 +216,11 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
             <button disabled={isSaving} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
               {isPreparing ? "Подготовка фото..." : pending || isDispatching ? "Сохранение..." : "Сохранить"}
             </button>
+            {article ? (
+              <Link href={`/admin/knowledge/articles/${article.id}/preview`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
+                Предпросмотр
+              </Link>
+            ) : null}
             <Link href="/admin/knowledge/articles" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
               Отмена
             </Link>

@@ -787,7 +787,7 @@ function parseModelGenerations(value: unknown) {
   return normalizeModelGenerations(value.filter(isCarGeneration));
 }
 
-function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle {
+export function toTelegramArticle(article: KnowledgeArticle): TelegramKnowledgeArticle {
   return {
     id: article.id,
     slug: article.slug,
