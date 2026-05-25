@@ -224,11 +224,7 @@ export function DashboardView() {
   );
 
   const canStartSession = hasMounted && selectedCar && !activeSession;
-  const dashboardStatus = activeSession
-    ? "charging"
-    : latestSession?.status === "completed"
-      ? "completed"
-      : "idle";
+  const dashboardStatus = activeSession ? "charging" : "idle";
   const statusLabel =
     dashboardStatus === "charging"
       ? (t("dashboard.statusCharging") as string)
@@ -238,6 +234,7 @@ export function DashboardView() {
   const currentPercent =
     liveActive?.currentPercent ??
     activeSession?.current_percent ??
+    latestBydmateSnapshot?.telemetry.soc ??
     latestSession?.current_percent ??
     Number(startPct);
   const rangeEstimate = latestBydmateSnapshot

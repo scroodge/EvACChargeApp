@@ -92,7 +92,9 @@ function estimateConsumptionKwh100Km(
   recentTrips: BydmateTripRow[],
 ) {
   const telemetry = snapshot.telemetry;
-  const estimates: WeightedConsumption[] = [];
+  const estimates: WeightedConsumption[] = [
+    { value: DEFAULT_CONSUMPTION_KWH_100KM, weight: 0.8 },
+  ];
 
   const currentTripConsumption = validNumber(telemetry.current_trip_consumption_kwh_100km);
   const currentTripDistance = validNumber(telemetry.current_trip_distance_km);
@@ -144,10 +146,6 @@ function estimateConsumptionKwh100Km(
     ) {
       estimates.push({ value: reportedConsumption, weight: 0.35 });
     }
-  }
-
-  if (estimates.length === 0) {
-    estimates.push({ value: DEFAULT_CONSUMPTION_KWH_100KM, weight: 1 });
   }
 
   const weightedConsumption =
