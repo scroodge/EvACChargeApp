@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegistrar } from "@/components/sw-register";
+import { hasPersistedLocalePreference } from "@/lib/app-preferences";
 import { createClient } from "@/lib/supabase/client";
 import { isCurrency, isLocale } from "@/lib/i18n";
 import { useAppPreferences } from "@/stores/use-app-preferences";
@@ -54,7 +55,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
 
       const preferredLocale = profile.preferred_locale;
-      if (typeof preferredLocale === "string" && isLocale(preferredLocale)) {
+      const hasLocalLocale =
+        typeof window !== "undefined" &&
+        hasPersistedLocalePreference(window.localStorage);
+      if (
+        typeof preferredLocale === "string" &&
+        isLocale(preferredLocale) &&
+        !hasLocalLocale
+      ) {
         setLocale(preferredLocale);
       }
 

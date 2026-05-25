@@ -12,7 +12,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 
-export function LocaleSwitcher({ className }: { className?: string }) {
+export function LocaleSwitcher({
+  className,
+  onLocaleChange,
+}: {
+  className?: string;
+  onLocaleChange?: (locale: Locale, previousLocale: Locale) => void;
+}) {
   const locale = useAppPreferences((s) => s.locale);
   const setLocale = useAppPreferences((s) => s.setLocale);
   const mounted = useSyncExternalStore(
@@ -42,7 +48,11 @@ export function LocaleSwitcher({ className }: { className?: string }) {
           )}
           aria-label={localeLabels[item]}
           aria-pressed={item === effectiveLocale}
-          onClick={() => setLocale(item as Locale)}
+          onClick={() => {
+            if (item === effectiveLocale) return;
+            setLocale(item);
+            onLocaleChange?.(item, effectiveLocale);
+          }}
         >
           {localeNames[item]}
         </button>

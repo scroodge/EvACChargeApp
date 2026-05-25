@@ -2,13 +2,15 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { create } from "zustand";
 
 import {
-  defaultCurrency,
-  defaultLocale,
   isCurrency,
   isLocale,
   type Currency,
   type Locale,
 } from "@/lib/i18n";
+import {
+  appPreferencesStorageKey,
+  initialAppPreferences,
+} from "@/lib/app-preferences";
 
 type AppPreferencesState = {
   selectedCarId: string | null;
@@ -30,10 +32,7 @@ const noopStorage = {
 export const useAppPreferences = create(
   persist<AppPreferencesState>(
     (set) => ({
-      selectedCarId: null,
-      defaultPricePerKwh: 0.12,
-      currency: defaultCurrency,
-      locale: defaultLocale,
+      ...initialAppPreferences,
       setSelectedCarId: (selectedCarId) => set({ selectedCarId }),
       setDefaultPricePerKwh: (defaultPricePerKwh) =>
         set({ defaultPricePerKwh }),
@@ -41,7 +40,7 @@ export const useAppPreferences = create(
       setLocale: (locale) => set({ locale }),
     }),
     {
-      name: "ev-charge-preferences",
+      name: appPreferencesStorageKey,
       storage: createJSONStorage(() =>
         typeof window === "undefined" ? noopStorage : window.localStorage,
       ),

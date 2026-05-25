@@ -31,7 +31,9 @@ import {
   currencyLabels,
   currencySymbols,
   isCurrency,
+  isLocale,
   type Currency,
+  type Locale,
 } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
 import { useAppPreferences } from "@/stores/use-app-preferences";
@@ -47,6 +49,7 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   const setDefaultPrice = useAppPreferences((s) => s.setDefaultPricePerKwh);
   const currency = useAppPreferences((s) => s.currency);
   const setCurrency = useAppPreferences((s) => s.setCurrency);
+  const setLocale = useAppPreferences((s) => s.setLocale);
   const { t } = useTranslation();
   useEffect(() => {
     let mounted = true;
@@ -146,6 +149,28 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
       });
   };
 
+  const handleLocaleChange = (value: Locale, previous: Locale) => {
+    if (!isLocale(value)) return;
+
+    if (!profileUserId) {
+      toast.success(t("settings.localeSaved") as string);
+      return;
+    }
+
+    void createClient()
+      .from("profiles")
+      .update({ preferred_locale: value })
+      .eq("id", profileUserId)
+      .then(({ error }) => {
+        if (error) {
+          setLocale(previous);
+          toast.error(error.message);
+          return;
+        }
+        toast.success(t("settings.localeSaved") as string);
+      });
+  };
+
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -205,7 +230,7 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
           <CardTitle className="text-xl tracking-tight">{t("locale.label")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LocaleSwitcher />
+          <LocaleSwitcher onLocaleChange={handleLocaleChange} />
           <p className="text-muted-foreground text-sm">{t("locale.helper")}</p>
         </CardContent>
       </Card>

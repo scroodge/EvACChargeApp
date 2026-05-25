@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Gauge, SlidersHorizontal } from "lucide-react";
+import { BatteryCharging, CarFront, Route, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
+import { useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useCarsQuery } from "@/hooks/use-cars-query";
 import { fetchSessions } from "@/hooks/use-sessions-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
@@ -52,12 +54,80 @@ import { parseDecimalInput } from "@/lib/number-input";
 import { ensureNotificationsPermission, ensurePushSubscription } from "@/lib/push/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useAppPreferences } from "@/stores/use-app-preferences";
-import type { ChargingSessionRow } from "@/types/database";
+import type { BydmateTripRow, ChargingSessionRow } from "@/types/database";
 
 function liveStationarySoc(soc: number | null | undefined, speedKmh: number | null | undefined) {
   if (speedKmh !== 0 || typeof soc !== "number" || !Number.isFinite(soc)) return null;
   if (soc < 0 || soc >= 100) return null;
   return String(Math.round(soc));
+}
+
+function localeCode(locale: string) {
+  return locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US";
+}
+
+function fmt(value: number | null | undefined, digits = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
+function formatClockRange(startIso: string | null, endIso: string | null, locale: string) {
+  if (!startIso) return "—";
+  const code = localeCode(locale);
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : null;
+  const date = start.toLocaleDateString(code, { day: "numeric", month: "short" });
+  const startTime = start.toLocaleTimeString(code, { hour: "2-digit", minute: "2-digit" });
+  const endTime = end?.toLocaleTimeString(code, { hour: "2-digit", minute: "2-digit" });
+  return endTime ? `${date}, ${startTime} - ${endTime}` : `${date}, ${startTime}`;
+}
+
+function durationBetween(startIso: string | null, endIso: string | null) {
+  if (!startIso || !endIso) return "—";
+  return formatDuration(Math.max(0, Math.round((Date.parse(endIso) - Date.parse(startIso)) / 1000)));
+}
+
+function tripSoc(trip: BydmateTripRow) {
+  if (typeof trip.soc_start !== "number" || typeof trip.soc_end !== "number") return "—";
+  return `${fmt(trip.soc_start)}% -> ${fmt(trip.soc_end)}%`;
+}
+
+function DashboardSummaryCard({
+  href,
+  icon,
+  label,
+  title,
+  body,
+  meta,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  title: string;
+  body: string;
+  meta?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="grid min-h-36 content-between rounded-2xl border border-border bg-white/[0.03] p-4 transition hover:border-primary/50 hover:bg-white/[0.05]"
+    >
+      <span className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <span>{label}</span>
+        <span className="text-[var(--voltflow-cyan)]">{icon}</span>
+      </span>
+      <span className="mt-4 block">
+        <span className="block font-heading text-xl font-bold tracking-normal text-foreground">
+          {title}
+        </span>
+        <span className="mt-1 block text-sm leading-5 text-muted-foreground">{body}</span>
+      </span>
+      {meta ? (
+        <span className="mt-3 block truncate text-xs font-medium text-muted-foreground">
+          {meta}
+        </span>
+      ) : null}
+    </Link>
+  );
 }
 
 export function DashboardView() {
@@ -90,11 +160,15 @@ export function DashboardView() {
     () => findFreshChargingSnapshot(bydmateLive, nowMs),
     [bydmateLive, nowMs],
   );
+  const { data: latestTrips = [], isLoading: loadingTrips } = useLatestBydmateTripsQuery(
+    latestBydmateSnapshot?.vehicle_id ?? null,
+  );
   const stationaryLiveStartPct = liveStationarySoc(
     latestBydmateSnapshot?.telemetry.soc,
     latestBydmateSnapshot?.telemetry.speed_kmh,
   );
   const latestSession = sessions?.[0] ?? null;
+  const latestTrip = latestTrips[0] ?? null;
 
   const selectedCar =
     cars?.find((c) => c.id === selectedCarId) ?? cars?.[0] ?? null;
@@ -358,6 +432,85 @@ export function DashboardView() {
 
           <ChargingStatsGrid stats={stats} />
 
+          <section className="grid gap-3 min-[520px]:grid-cols-3">
+            <DashboardSummaryCard
+              href="/vehicle"
+              icon={<Route className="size-5" aria-hidden />}
+              label={t("dashboard.latestTrip") as string}
+              title={
+                loadingTrips
+                  ? (t("dashboard.loading") as string)
+                  : latestTrip
+                    ? `${fmt(latestTrip.distance_km, 1)} km`
+                    : (t("dashboard.noTrip") as string)
+              }
+              body={
+                latestTrip
+                  ? formatClockRange(
+                      latestTrip.started_at,
+                      latestTrip.ended_at ?? latestTrip.last_device_time,
+                      locale,
+                    )
+                  : (t("dashboard.openVehicle") as string)
+              }
+              meta={
+                latestTrip
+                  ? `${tripSoc(latestTrip)} · ${fmt(latestTrip.avg_consumption_kwh_100km, 1)} kWh/100`
+                  : undefined
+              }
+            />
+            <DashboardSummaryCard
+              href={latestSession ? "/history" : "/charging"}
+              icon={<BatteryCharging className="size-5" aria-hidden />}
+              label={t("dashboard.latestCharge") as string}
+              title={
+                latestSession
+                  ? `${fmt(latestSession.start_percent)}% -> ${fmt(latestSession.current_percent)}%`
+                  : (t("dashboard.noCharge") as string)
+              }
+              body={
+                latestSession
+                  ? formatClockRange(
+                      latestSession.started_at ?? latestSession.created_at,
+                      latestSession.stopped_at ?? latestSession.updated_at,
+                      locale,
+                    )
+                  : (t("dashboard.startFirstCharge") as string)
+              }
+              meta={
+                latestSession
+                  ? `${fmt(latestSession.charged_energy_kwh, 2)} kWh · ${durationBetween(
+                      latestSession.started_at ?? latestSession.created_at,
+                      latestSession.stopped_at ?? latestSession.updated_at,
+                    )}`
+                  : undefined
+              }
+            />
+            <DashboardSummaryCard
+              href="/vehicle"
+              icon={<CarFront className="size-5" aria-hidden />}
+              label={t("dashboard.liveVehicle") as string}
+              title={
+                latestBydmateSnapshot
+                  ? `${fmt(latestBydmateSnapshot.telemetry.soc)}% SOC`
+                  : (t("dashboard.noLiveData") as string)
+              }
+              body={
+                latestBydmateSnapshot
+                  ? formatClockRange(latestBydmateSnapshot.device_time, null, locale)
+                  : (t("dashboard.openVehicle") as string)
+              }
+              meta={
+                latestBydmateSnapshot
+                  ? `${fmt(latestBydmateSnapshot.telemetry.speed_kmh)} km/h · ${fmt(
+                      latestBydmateSnapshot.telemetry.power_kw,
+                      1,
+                    )} kW`
+                  : undefined
+              }
+            />
+          </section>
+
           <div className="space-y-3">
             <ChargingActionButton
               status={dashboardStatus}
@@ -382,17 +535,6 @@ export function DashboardView() {
               </Link>
             </Button>
           </div>
-
-          <Link
-            href="/history"
-            className="flex items-center justify-between rounded-3xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground"
-          >
-            <span className="inline-flex items-center gap-2">
-              <Gauge className="size-5 text-[var(--voltflow-cyan)]" aria-hidden />
-              {t("dashboard.latestHistory")}
-            </span>
-            <span className="font-semibold text-foreground">{t("dashboard.open")}</span>
-          </Link>
         </>
       ) : null}
 

@@ -12,6 +12,27 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const date = params.get("date");
   const vehicleId = params.get("vehicle_id")?.trim();
+  const limit = Math.min(Math.max(Number(params.get("limit") ?? 1) || 1, 1), 20);
+
+  if (!date) {
+    let latestQuery = supabase
+      .from("bydmate_trips")
+      .select("*")
+      .eq("user_id", userData.user.id)
+      .order("started_at", { ascending: false })
+      .limit(limit);
+
+    if (vehicleId) {
+      latestQuery = latestQuery.eq("vehicle_id", vehicleId);
+    }
+
+    const { data, error } = await latestQuery;
+    if (error) {
+      return NextResponse.json({ error: "Failed to load trips" }, { status: 500 });
+    }
+
+    return NextResponse.json({ trips: data ?? [] });
+  }
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
