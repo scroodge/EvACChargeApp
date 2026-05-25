@@ -152,3 +152,50 @@ export async function fetchTripSamples({
   if (error) throw error;
   return downsampleByIndex((data ?? []) as TelemetryHistoryPoint[], MAX_TELEMETRY_CHART_POINTS);
 }
+
+function isChargingSample(point: TelemetryHistoryPoint) {
+  const telemetry = point.telemetry;
+  const chargePower = telemetry.charge_power_kw ?? telemetry.power_kw;
+  return telemetry.is_charging === true || (typeof chargePower === "number" && chargePower > 0);
+}
+
+export async function fetchChargingSessionSamples({
+  supabase,
+  userId,
+  sessionId,
+  vehicleId = "way",
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  sessionId: string;
+  vehicleId?: string;
+}): Promise<TelemetryHistoryPoint[]> {
+  const { data: session, error: sessionError } = await supabase
+    .from("charging_sessions")
+    .select("id, user_id, status, started_at, stopped_at, updated_at, created_at")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (sessionError) throw sessionError;
+  if (!session?.started_at) return [];
+
+  const endAt =
+    session.stopped_at ??
+    (session.status === "charging" ? new Date().toISOString() : session.updated_at) ??
+    new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("bydmate_telemetry_samples")
+    .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
+    .eq("user_id", userId)
+    .eq("vehicle_id", vehicleId)
+    .gte("device_time", session.started_at)
+    .lte("device_time", endAt)
+    .order("device_time", { ascending: true });
+
+  if (error) throw error;
+
+  const chargingPoints = ((data ?? []) as TelemetryHistoryPoint[]).filter(isChargingSample);
+  return downsampleByIndex(chargingPoints, MAX_TELEMETRY_CHART_POINTS);
+}

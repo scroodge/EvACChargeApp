@@ -503,6 +503,7 @@ type DeltaBySocChartModel = {
   minDelta: number;
   maxDelta: number;
   latest: DeltaBySocPoint | null;
+  socDirection: "charge" | "discharge";
 };
 
 type TripSegment = {
@@ -1030,7 +1031,10 @@ function cellDeltaValue(point: TelemetryChartSource) {
   return min != null && max != null ? max - min : null;
 }
 
-function prepareDeltaBySoc(points: DeltaBySocPoint[]): DeltaBySocChartModel {
+function prepareDeltaBySoc(
+  points: DeltaBySocPoint[],
+  socDirection: DeltaBySocChartModel["socDirection"],
+): DeltaBySocChartModel {
   const sampled = downsamplePoints(points, MAX_DELTA_BY_SOC_POINTS);
   if (sampled.length === 0) {
     return {
@@ -1040,6 +1044,7 @@ function prepareDeltaBySoc(points: DeltaBySocPoint[]): DeltaBySocChartModel {
       minDelta: 0,
       maxDelta: 1,
       latest: null,
+      socDirection,
     };
   }
 
@@ -1050,6 +1055,7 @@ function prepareDeltaBySoc(points: DeltaBySocPoint[]): DeltaBySocChartModel {
     minDelta: Math.min(...sampled.map((point) => point.delta)),
     maxDelta: Math.max(...sampled.map((point) => point.delta)),
     latest: sampled.at(-1) ?? null,
+    socDirection,
   };
 }
 
@@ -1110,7 +1116,7 @@ function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) 
     start,
     end,
     charts,
-    deltaBySoc: prepareDeltaBySoc(deltaBySocPoints),
+    deltaBySoc: prepareDeltaBySoc(deltaBySocPoints, "discharge"),
   };
 }
 
@@ -1358,10 +1364,15 @@ function DeltaBySocPlot({
   const clipId = useId();
   const { points, latest } = chart;
   const zoomFactor = 1 + zoom * 0.45;
-  const socSpan = Math.max(chart.maxSoc - chart.minSoc, 10) / zoomFactor;
-  const xMax = Math.min(100, chart.maxSoc);
-  const xMin = Math.max(0, xMax - socSpan);
-  const xVisiblePoints = points.filter((point) => point.soc >= xMin && point.soc <= xMax);
+  const socSpan = 100 / zoomFactor;
+  const leftSoc = chart.socDirection === "discharge" ? 100 : 0;
+  const rightSoc =
+    chart.socDirection === "discharge"
+      ? Math.max(0, leftSoc - socSpan)
+      : Math.min(100, leftSoc + socSpan);
+  const minVisibleSoc = Math.min(leftSoc, rightSoc);
+  const maxVisibleSoc = Math.max(leftSoc, rightSoc);
+  const xVisiblePoints = points.filter((point) => point.soc >= minVisibleSoc && point.soc <= maxVisibleSoc);
   const ySourcePoints = xVisiblePoints.length > 0 ? xVisiblePoints : points;
   const visibleMinDelta = Math.min(...ySourcePoints.map((point) => point.delta));
   const visibleMaxDelta = Math.max(...ySourcePoints.map((point) => point.delta));
@@ -1370,15 +1381,15 @@ function DeltaBySocPlot({
   const yMax = visibleMaxDelta + deltaPad;
 
   const x = (soc: number) => {
-    if (xMax === xMin) return 160;
-    return 24 + ((soc - xMin) / (xMax - xMin)) * 272;
+    if (leftSoc === rightSoc) return 160;
+    return 24 + ((soc - leftSoc) / (rightSoc - leftSoc)) * 272;
   };
   const y = (delta: number) => {
     if (yMax === yMin) return 72;
     return 110 - ((delta - yMin) / (yMax - yMin)) * 92;
   };
   const inView = (point: DeltaBySocPoint) =>
-    point.soc >= xMin && point.soc <= xMax && point.delta >= yMin && point.delta <= yMax;
+    point.soc >= minVisibleSoc && point.soc <= maxVisibleSoc && point.delta >= yMin && point.delta <= yMax;
   const visiblePoints = points.filter(inView);
   const linePath = points
     .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.soc).toFixed(2)} ${y(point.delta).toFixed(2)}`)
@@ -1397,10 +1408,10 @@ function DeltaBySocPlot({
         <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
         <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
         <text x="24" y="132" className="fill-muted-foreground text-[10px]">
-          {fmt(xMin, 0)}% SOC
+          {fmt(leftSoc, 0)}% SOC
         </text>
         <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">
-          {fmt(xMax, 0)}% SOC
+          {fmt(rightSoc, 0)}% SOC
         </text>
         <text x="30" y="14" className="fill-muted-foreground text-[10px]">
           {fmt(yMax, 3)} V

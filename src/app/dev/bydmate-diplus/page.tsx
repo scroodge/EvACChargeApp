@@ -30,9 +30,20 @@ type DiplusRow = {
   [key: string]: unknown;
 };
 
+type TripWindowRow = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  last_device_time: string;
+  soc_start: number | null;
+  soc_end: number | null;
+  sample_count: number;
+};
+
 const DEFAULT_VEHICLE_ID = "way";
 const SAMPLE_LIMIT = 60;
 const DELTA_BY_SOC_LIMIT = 60;
+const CHARGING_DELTA_LIMIT = 140;
 
 const DIPLUS_KEYS: DiplusKey[] = [
   { key: "soc", column: "diplus_soc", label: "SOC" },
@@ -121,14 +132,43 @@ export default async function BydmateDiplusDebugPage({
     .eq("vehicle_id", vehicleId)
     .order("device_time", { ascending: false })
     .limit(SAMPLE_LIMIT);
+  const latestTripQuery = await supabase
+    .from("bydmate_trips")
+    .select("id, started_at, ended_at, last_device_time, soc_start, soc_end, sample_count")
+    .eq("vehicle_id", vehicleId)
+    .order("started_at", { ascending: false })
+    .limit(1);
+  const latestTrip = ((latestTripQuery.data ?? []) as TripWindowRow[])[0] ?? null;
+  const tripEndAt = latestTrip ? latestTrip.ended_at ?? latestTrip.last_device_time : null;
+  const tripSamplesQuery = latestTrip && tripEndAt
+    ? await supabase
+      .from("bydmate_telemetry_samples")
+      .select(`id, vehicle_id, device_time, received_at, telemetry, diplus, ${DIPLUS_COLUMNS}`)
+      .eq("vehicle_id", vehicleId)
+      .gte("device_time", latestTrip.started_at)
+      .lte("device_time", tripEndAt)
+      .order("device_time", { ascending: true })
+      .limit(DELTA_BY_SOC_LIMIT)
+    : { data: [], error: null };
+  const chargingSamplesQuery = await supabase
+    .from("bydmate_telemetry_samples")
+    .select(`id, vehicle_id, device_time, received_at, telemetry, diplus, ${DIPLUS_COLUMNS}`)
+    .eq("vehicle_id", vehicleId)
+    .eq("telemetry->>is_charging", "true")
+    .order("device_time", { ascending: false })
+    .limit(CHARGING_DELTA_LIMIT);
 
   const live = ((liveQuery.data ?? []) as unknown as DiplusRow[])[0] ?? null;
   const samples = (samplesQuery.data ?? []) as unknown as DiplusRow[];
+  const tripSamples = (tripSamplesQuery.data ?? []) as unknown as DiplusRow[];
+  const chargingSamples = [...((chargingSamplesQuery.data ?? []) as unknown as DiplusRow[])].reverse();
   const latestWithRawDiplus = samples.find((row) => Object.keys(row.diplus ?? {}).length > 0) ?? null;
   const latestWithCellDelta =
     samples.find((row) => cellDeltaValue(row) != null) ??
     null;
-  const deltaBySoc = prepareDeltaBySoc(samples);
+  const deltaBySoc = prepareDeltaBySoc(samples, "charge");
+  const tripDeltaBySoc = prepareDeltaBySoc(tripSamples, "discharge");
+  const chargingDeltaBySoc = prepareDeltaBySoc(chargingSamples, "charge");
 
   return (
     <main className="safe-bottom mx-auto flex max-w-7xl flex-col gap-5 px-4 pb-8 pt-5">
@@ -164,6 +204,34 @@ export default async function BydmateDiplusDebugPage({
           </CardContent>
         </Card>
       )}
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest trip delta by SOC</CardTitle>
+            <CardDescription>
+              Vehicle <span className="font-mono">{vehicleId}</span>. Left to right is
+              discharge: 100% SOC to 0% SOC.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeltaBySocChart chart={tripDeltaBySoc} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Charging delta history</CardTitle>
+            <CardDescription>
+              Vehicle <span className="font-mono">{vehicleId}</span>. Charging samples are drawn
+              left to right from 0% SOC to 100% SOC.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeltaBySocChart chart={chargingDeltaBySoc} />
+          </CardContent>
+        </Card>
+      </section>
 
       <Card>
         <CardHeader>
@@ -337,6 +405,7 @@ type DeltaBySocChartModel = {
   minDelta: number;
   maxDelta: number;
   latest: DeltaBySocPoint | null;
+  direction: "charge" | "discharge";
 };
 
 function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
@@ -346,21 +415,26 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
     return <EmptyState />;
   }
 
-  const xMin = Math.max(0, Math.floor(chart.minSoc / 5) * 5);
-  const xMax = Math.min(100, Math.ceil(chart.maxSoc / 5) * 5);
+  const leftSoc = chart.direction === "discharge" ? 100 : 0;
+  const rightSoc = chart.direction === "discharge" ? 0 : 100;
   const deltaPad = Math.max((chart.maxDelta - chart.minDelta) * 0.14, 0.005);
   const yMin = Math.max(0, chart.minDelta - deltaPad);
   const yMax = chart.maxDelta + deltaPad;
 
   const x = (soc: number) => {
-    if (xMax === xMin) return 160;
-    return 24 + ((soc - xMin) / (xMax - xMin)) * 272;
+    if (rightSoc === leftSoc) return 160;
+    return 24 + ((soc - leftSoc) / (rightSoc - leftSoc)) * 272;
   };
   const y = (delta: number) => {
     if (yMax === yMin) return 72;
     return 110 - ((delta - yMin) / (yMax - yMin)) * 92;
   };
-  const chartPoints = [...points].reverse();
+  const chartPoints = [...points].sort((a, b) =>
+    chart.direction === "discharge" ? b.soc - a.soc : a.soc - b.soc,
+  );
+  const path = chartPoints
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.soc).toFixed(2)} ${y(point.delta).toFixed(2)}`)
+    .join(" ");
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -370,10 +444,10 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
           <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
           <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
           <text x="24" y="132" className="fill-muted-foreground text-[10px]">
-            {xMin}% SOC
+            {leftSoc}% SOC
           </text>
           <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">
-            {xMax}% SOC
+            {rightSoc}% SOC
           </text>
           <text x="30" y="14" className="fill-muted-foreground text-[10px]">
             {formatVoltage(yMax)}
@@ -381,6 +455,9 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
           <text x="30" y="106" className="fill-muted-foreground text-[10px]">
             {formatVoltage(yMin)}
           </text>
+          {chartPoints.length > 1 ? (
+            <path d={path} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.65" />
+          ) : null}
           {chartPoints.map((point, index) => {
             const isLatest = point === latest;
             return (
@@ -465,7 +542,7 @@ function cellDeltaValue(row: DiplusRow) {
   return min != null && max != null ? max - min : null;
 }
 
-function prepareDeltaBySoc(rows: DiplusRow[]): DeltaBySocChartModel {
+function prepareDeltaBySoc(rows: DiplusRow[], direction: DeltaBySocChartModel["direction"]): DeltaBySocChartModel {
   const points = rows.slice(0, DELTA_BY_SOC_LIMIT).flatMap((row) => {
     const soc = socValue(row);
     const delta = cellDeltaValue(row);
@@ -474,11 +551,12 @@ function prepareDeltaBySoc(rows: DiplusRow[]): DeltaBySocChartModel {
 
   return {
     points,
-    minSoc: Math.min(...points.map((point) => point.soc)),
-    maxSoc: Math.max(...points.map((point) => point.soc)),
-    minDelta: Math.min(...points.map((point) => point.delta)),
-    maxDelta: Math.max(...points.map((point) => point.delta)),
+    minSoc: points.length ? Math.min(...points.map((point) => point.soc)) : 0,
+    maxSoc: points.length ? Math.max(...points.map((point) => point.soc)) : 100,
+    minDelta: points.length ? Math.min(...points.map((point) => point.delta)) : 0,
+    maxDelta: points.length ? Math.max(...points.map((point) => point.delta)) : 1,
     latest: points[0] ?? null,
+    direction,
   };
 }
 
