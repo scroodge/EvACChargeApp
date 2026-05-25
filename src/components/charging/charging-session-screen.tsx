@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 import { sendChargeCompletedPush } from "@/actions/push";
+import { ChargingDeltaCard } from "@/components/charging/charging-delta-card";
 import { Button } from "@/components/ui/button";
 import {
   costFromGridEnergy,
@@ -455,6 +456,8 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
         value={`${session.charger_power_kw.toFixed(1)} kW`}
       />
       <CardRow label={t("charging.batteryPack") as string} value={`${session.battery_capacity_kwh} kWh`} />
+
+      <ChargingDeltaCard session={session} />
 
       <div className="mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-40 space-y-3">
         <Button
