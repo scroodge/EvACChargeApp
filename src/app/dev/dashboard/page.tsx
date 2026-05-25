@@ -68,7 +68,7 @@ export default function DevDashboardPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-4">
-          <BatteryRing percent={68} status="Idle" size="compact" />
+          <BatteryRing percent={68} status="Idle" detail="≈ 166 km" size="compact" />
           <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">
               Saved vehicle

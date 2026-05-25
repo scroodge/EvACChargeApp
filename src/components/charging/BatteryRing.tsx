@@ -7,12 +7,14 @@ import { cn } from "@/lib/utils";
 export function BatteryRing({
   percent,
   status,
+  detail,
   charging = false,
   size = "default",
   className,
 }: {
   percent: number;
   status: string;
+  detail?: string | null;
   charging?: boolean;
   size?: "default" | "compact";
   className?: string;
@@ -92,11 +94,21 @@ export function BatteryRing({
         <p
           className={cn(
             "font-semibold uppercase text-muted-foreground",
-            compact ? "mt-1 text-[9px] tracking-[0.18em]" : "mt-3 text-xs tracking-[0.24em]",
+            compact ? "mt-1 text-[9px] tracking-[0.18em]" : "mt-2 text-xs tracking-[0.24em]",
           )}
         >
           {status}
         </p>
+        {detail ? (
+          <p
+            className={cn(
+              "font-heading font-semibold tracking-normal text-[var(--voltflow-cyan)] tabular-nums",
+              compact ? "mt-1 text-sm" : "mt-2 text-lg",
+            )}
+          >
+            {detail}
+          </p>
+        ) : null}
       </div>
     </div>
   );

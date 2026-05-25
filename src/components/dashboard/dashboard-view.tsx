@@ -43,6 +43,7 @@ import {
   formatDuration,
   type ChargingParams,
 } from "@/lib/charging-math";
+import { estimateVehicleRangeKm } from "@/lib/bydmate/range-estimate";
 import {
   deriveLiveChargingState,
   findFreshChargingSnapshot,
@@ -160,6 +161,7 @@ export function DashboardView() {
   );
   const { data: latestTrips = [], isLoading: loadingTrips } = useLatestBydmateTripsQuery(
     latestBydmateSnapshot?.vehicle_id ?? null,
+    8,
   );
   const stationaryLiveStartPct = liveStationarySoc(
     latestBydmateSnapshot?.telemetry.soc,
@@ -228,6 +230,13 @@ export function DashboardView() {
     activeSession?.current_percent ??
     latestSession?.current_percent ??
     Number(startPct);
+  const rangeEstimate = latestBydmateSnapshot
+    ? estimateVehicleRangeKm(latestBydmateSnapshot, latestTrips)
+    : null;
+  const rangeDetail =
+    rangeEstimate?.estimatedRangeKm != null
+      ? `≈ ${fmt(rangeEstimate.estimatedRangeKm)} km`
+      : null;
   const handleStart = async () => {
     if (!selectedCar) return;
     const start = Number(startPct);
@@ -337,6 +346,7 @@ export function DashboardView() {
               <BatteryRing
                 percent={currentPercent}
                 status={loadingSessions ? (t("dashboard.syncing") as string) : statusLabel}
+                detail={rangeDetail}
                 charging={dashboardStatus === "charging"}
                 size="compact"
               />
