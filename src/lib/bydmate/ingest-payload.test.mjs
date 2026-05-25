@@ -29,6 +29,37 @@ test("accepts legacy BYDMate payload without diplus", () => {
   assert.equal(result.payloads[0].telemetry.soc, 72);
 });
 
+test("accepts BYDMate batch sample with null diplus", () => {
+  const result = normalizePayloads({
+    samples: [
+      {
+        ...basePayload,
+        vehicle_id: "test-car",
+        device_time: "2026-05-25T18:00:00Z",
+        telemetry: { soc: 50 },
+        diplus: null,
+        location: {},
+      },
+    ],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.payloads.length, 1);
+  assert.equal(result.payloads[0].vehicle_id, "test-car");
+  assert.equal(result.payloads[0].diplus, undefined);
+  assert.equal(result.payloads[0].telemetry.soc, 50);
+});
+
+test("accepts single BYDMate sample with null diplus", () => {
+  const result = normalizePayloads({
+    ...basePayload,
+    diplus: null,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.payloads[0].diplus, undefined);
+});
+
 test("accepts extended BYDMate payload with diplus", () => {
   const result = normalizePayloads({
     ...basePayload,

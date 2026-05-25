@@ -100,6 +100,11 @@ export const diplusSchema = z
   })
   .passthrough();
 
+const optionalDiplusSchema = z.preprocess(
+  (value) => (value === null ? undefined : value),
+  diplusSchema.optional(),
+);
+
 export const locationSchema = z
   .object({
     lat: numericSchema,
@@ -116,7 +121,7 @@ export const payloadSchema = z
     device_time: z.string().min(1).max(80),
     source: z.literal("BYDMate"),
     telemetry: telemetrySchema,
-    diplus: diplusSchema.optional(),
+    diplus: optionalDiplusSchema,
     location: locationSchema,
   })
   .passthrough();
