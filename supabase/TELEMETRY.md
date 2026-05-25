@@ -1,0 +1,130 @@
+# BYDMate telemetry schema
+
+This document describes the current BYDMate telemetry storage model and the Di+
+fields that the Android app may send.
+
+## Tables
+
+### `bydmate_live_snapshots`
+
+One row per `(user_id, vehicle_id)` with the latest cloud telemetry payload. Use
+this table for live dashboard cards and quick status checks.
+
+Important columns:
+
+- `user_id`, `vehicle_id`
+- `device_time`: timestamp reported by the Android device.
+- `received_at`: timestamp when the cloud endpoint accepted the payload.
+- `telemetry`: normalized VoltFlow telemetry JSON.
+- `location`: latest GPS payload when present.
+- `raw_payload`: last accepted raw payload.
+- `diplus`: raw Di+ object.
+- `diplus_*`: selected Di+ fields materialized for debug screens and simple
+  analytics.
+
+### `bydmate_telemetry_samples`
+
+Append-only telemetry history. This is the source of truth for charts, charging
+history, and trip sample details.
+
+Important columns:
+
+- `user_id`, `vehicle_id`, `device_time`, `received_at`
+- `telemetry`: normalized telemetry JSON.
+- `diplus`: raw Di+ object.
+- `diplus_min_cell_voltage_v`, `diplus_max_cell_voltage_v`,
+  `diplus_cell_delta_v`: materialized cell-voltage values used by the UI.
+- Other `diplus_*` columns are materialized for diagnostics and ad hoc analysis;
+  they are not broadly indexed.
+
+The table is unique on `(user_id, vehicle_id, device_time)` so client retries do
+not create duplicate samples.
+
+### `bydmate_telemetry_hourly`
+
+Hourly rollup for long-range charts. It is updated during ingest and keeps
+sample counts plus selected min/max/last/average metrics.
+
+### `bydmate_trips`
+
+Server-side trip segments inferred from telemetry samples. A trip is closed when
+the next accepted sample arrives more than five minutes after the previous
+sample.
+
+### `bydmate_trip_track_points`
+
+GPS track points linked to `bydmate_trips`. This table exists because
+`bydmate_telemetry_samples` intentionally does not store location history.
+
+The table is unique on `(trip_id, device_time)`.
+
+### Removed legacy table
+
+`bydmate_telemetry_points` was the first BYDMate history table. Its data was
+backfilled into `bydmate_telemetry_samples`; new code should not read it.
+
+## Di+ payload fields
+
+The Android app may send a `diplus` object beside normalized `telemetry`.
+The raw object is stored in `diplus`; selected fields are copied to columns.
+
+| Di+ key | Materialized column | Type | Notes |
+| --- | --- | --- | --- |
+| `soc` | `diplus_soc` | numeric | Battery state of charge. |
+| `speed_kmh` | `diplus_speed_kmh` | numeric | Vehicle speed. |
+| `mileage_km` | `diplus_mileage_km` | numeric | Odometer/mileage. |
+| `power_kw` | `diplus_power_kw` | numeric | Vehicle power. |
+| `charge_gun_state` | `diplus_charge_gun_state` | text | Raw Di+ state code. |
+| `charging_status` | `diplus_charging_status` | text | Raw Di+ status code. |
+| `battery_capacity_kwh` | `diplus_battery_capacity_kwh` | numeric | Reported battery capacity/energy value. |
+| `total_elec_consumption_kwh` | `diplus_total_elec_consumption_kwh` | numeric | Total electric consumption. |
+| `voltage_12v` | `diplus_voltage_12v` | numeric | Auxiliary battery voltage. |
+| `max_cell_voltage_v` | `diplus_max_cell_voltage_v` | numeric | May be overridden by normalized telemetry fallback. |
+| `min_cell_voltage_v` | `diplus_min_cell_voltage_v` | numeric | May be overridden by normalized telemetry fallback. |
+| `cell_delta_v` | `diplus_cell_delta_v` | numeric | Calculated from max/min when missing. |
+| `avg_battery_temp_c` | `diplus_avg_battery_temp_c` | numeric | Average battery temperature. |
+| `exterior_temp_c` | `diplus_exterior_temp_c` | numeric | Exterior temperature. |
+| `gear` | `diplus_gear` | text | Raw Di+ gear code. |
+| `power_state` | `diplus_power_state` | text | Raw Di+ power-state code. |
+| `inside_temp_c` | `diplus_inside_temp_c` | numeric | Cabin temperature; sentinel values may appear. |
+| `ac_status` | `diplus_ac_status` | text | Raw HVAC state. |
+| `ac_temp_c` | `diplus_ac_temp_c` | numeric | HVAC target temperature. |
+| `fan_level` | `diplus_fan_level` | numeric | HVAC fan level. |
+| `door_fl` | `diplus_door_fl` | text | Front-left door state. |
+| `door_fr` | `diplus_door_fr` | text | Front-right door state. |
+| `door_rl` | `diplus_door_rl` | text | Rear-left door state. |
+| `door_rr` | `diplus_door_rr` | text | Rear-right door state. |
+| `window_fl_percent` | `diplus_window_fl_percent` | numeric | Front-left window position. |
+| `window_fr_percent` | `diplus_window_fr_percent` | numeric | Front-right window position. |
+| `window_rl_percent` | `diplus_window_rl_percent` | numeric | Rear-left window position. |
+| `window_rr_percent` | `diplus_window_rr_percent` | numeric | Rear-right window position. |
+| `sunroof_percent` | `diplus_sunroof_percent` | numeric | Sunroof position. |
+| `trunk` | `diplus_trunk` | text | Trunk state. |
+| `hood` | `diplus_hood` | text | Hood state. |
+| `tire_press_fl_kpa` | `diplus_tire_press_fl_kpa` | numeric | Front-left tire pressure. |
+| `tire_press_fr_kpa` | `diplus_tire_press_fr_kpa` | numeric | Front-right tire pressure. |
+| `tire_press_rl_kpa` | `diplus_tire_press_rl_kpa` | numeric | Rear-left tire pressure. |
+| `tire_press_rr_kpa` | `diplus_tire_press_rr_kpa` | numeric | Rear-right tire pressure. |
+| `drive_mode` | `diplus_drive_mode` | text | Raw Di+ drive-mode code. |
+| `work_mode` | `diplus_work_mode` | text | Raw Di+ work-mode code. |
+| `auto_park` | `diplus_auto_park` | text | Auto-park state. |
+| `rain` | `diplus_rain` | text | Rain sensor/state; sentinel values may appear. |
+| `light_low` | `diplus_light_low` | text | Low-beam state. |
+| `drl` | `diplus_drl` | text | Daytime running lights state. |
+
+Additional Di+ keys may remain only inside the raw `diplus` JSON until a UI or
+analytics query needs them.
+
+## Index policy
+
+Keep hot-path indexes small:
+
+- `bydmate_telemetry_samples(user_id, vehicle_id, device_time desc)`
+- `bydmate_telemetry_samples(user_id, device_time desc)`
+- optional charging partial index for charging debug/history views
+- `bydmate_telemetry_hourly(user_id, vehicle_id, hour_start desc)`
+- `bydmate_trips(user_id, vehicle_id, started_at desc)`
+- `bydmate_trip_track_points(trip_id, device_time)`
+
+Avoid per-field indexes for every Di+ column unless a production query actually
+filters or sorts by that field.
