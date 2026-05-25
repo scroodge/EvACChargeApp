@@ -51,6 +51,42 @@ export function estimateVehicleRangeKm(
   };
 }
 
+export function estimateRangeFromSoc({
+  soc,
+  batteryCapacityKwh = DEFAULT_USABLE_BATTERY_KWH,
+  recentTrips,
+}: {
+  soc: number | null | undefined;
+  batteryCapacityKwh?: number | null;
+  recentTrips: BydmateTripRow[];
+}): RangeEstimate {
+  const validSoc = validNumber(soc);
+  if (validSoc == null) return { estimatedRangeKm: null, consumptionKwh100Km: null };
+
+  const tripAverage = averageTripConsumption(
+    recentTrips.filter((trip) => {
+      const consumption = validNumber(trip.avg_consumption_kwh_100km);
+      const distance = validNumber(trip.distance_km);
+      return (
+        consumption != null &&
+        consumption >= MIN_FORECAST_CONSUMPTION_KWH_100KM &&
+        consumption <= MAX_FORECAST_CONSUMPTION_KWH_100KM &&
+        distance != null &&
+        distance >= 1 &&
+        trip.sample_count >= 3
+      );
+    }),
+  );
+  const consumptionKwh100Km = tripAverage ?? DEFAULT_CONSUMPTION_KWH_100KM;
+  const usableBatteryKwh = validNumber(batteryCapacityKwh) ?? DEFAULT_USABLE_BATTERY_KWH;
+  const usableEnergyKwh = usableBatteryKwh * (clamp(validSoc, 0, 100) / 100);
+
+  return {
+    estimatedRangeKm: (usableEnergyKwh / consumptionKwh100Km) * 100,
+    consumptionKwh100Km,
+  };
+}
+
 function estimateConsumptionKwh100Km(
   snapshot: BydmateLiveSnapshotRow,
   recentTrips: BydmateTripRow[],

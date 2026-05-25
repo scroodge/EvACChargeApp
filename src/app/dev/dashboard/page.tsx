@@ -68,7 +68,10 @@ export default function DevDashboardPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-4">
-          <BatteryRing percent={68} status="Idle" detail="≈ 166 km" size="compact" />
+          <div className="relative pb-4">
+            <BatteryRing percent={68} status="Idle" size="compact" />
+            <RangeBadge value="≈ 166 km" />
+          </div>
           <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">
               Saved vehicle
@@ -127,6 +130,14 @@ export default function DevDashboardPage() {
         </Link>
       </nav>
     </main>
+  );
+}
+
+function RangeBadge({ value }: { value: string }) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-10 mx-auto w-fit rounded-full border border-[var(--voltflow-cyan)]/35 bg-[#10151D]/95 px-3 py-1 font-heading text-sm font-bold tracking-normal text-[var(--voltflow-cyan)] shadow-[0_0_18px_rgba(0,209,255,0.18)] tabular-nums">
+      {value}
+    </div>
   );
 }
 

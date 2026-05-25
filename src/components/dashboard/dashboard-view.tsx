@@ -43,7 +43,7 @@ import {
   formatDuration,
   type ChargingParams,
 } from "@/lib/charging-math";
-import { estimateVehicleRangeKm } from "@/lib/bydmate/range-estimate";
+import { estimateRangeFromSoc, estimateVehicleRangeKm } from "@/lib/bydmate/range-estimate";
 import {
   deriveLiveChargingState,
   findFreshChargingSnapshot,
@@ -126,6 +126,16 @@ function DashboardSummaryCard({
       </span>
       <span className="text-[var(--voltflow-cyan)]">{icon}</span>
     </Link>
+  );
+}
+
+function RangeBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-10 mx-auto w-fit rounded-full border border-[var(--voltflow-cyan)]/35 bg-[#10151D]/95 px-3 py-1 font-heading text-sm font-bold tracking-normal text-[var(--voltflow-cyan)] shadow-[0_0_18px_rgba(0,209,255,0.18)] tabular-nums">
+      {value}
+    </div>
   );
 }
 
@@ -232,7 +242,11 @@ export function DashboardView() {
     Number(startPct);
   const rangeEstimate = latestBydmateSnapshot
     ? estimateVehicleRangeKm(latestBydmateSnapshot, latestTrips)
-    : null;
+    : estimateRangeFromSoc({
+        soc: currentPercent,
+        batteryCapacityKwh: selectedCar?.battery_capacity_kwh,
+        recentTrips: latestTrips,
+      });
   const rangeDetail =
     rangeEstimate?.estimatedRangeKm != null
       ? `≈ ${fmt(rangeEstimate.estimatedRangeKm)} km`
@@ -343,13 +357,15 @@ export function DashboardView() {
             </div>
 
             <div className="mt-3 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-4">
-              <BatteryRing
-                percent={currentPercent}
-                status={loadingSessions ? (t("dashboard.syncing") as string) : statusLabel}
-                detail={rangeDetail}
-                charging={dashboardStatus === "charging"}
-                size="compact"
-              />
+              <div className="relative pb-4">
+                <BatteryRing
+                  percent={currentPercent}
+                  status={loadingSessions ? (t("dashboard.syncing") as string) : statusLabel}
+                  charging={dashboardStatus === "charging"}
+                  size="compact"
+                />
+                <RangeBadge value={rangeDetail} />
+              </div>
               <div className="min-w-0 space-y-3">
                 {isLoading ? (
                   <Skeleton className="h-10 w-full rounded-xl" />
