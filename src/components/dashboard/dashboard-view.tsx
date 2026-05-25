@@ -42,6 +42,11 @@ import {
   formatDuration,
   type ChargingParams,
 } from "@/lib/charging-math";
+import {
+  deriveLiveChargingState,
+  isFreshChargingSnapshot,
+  snapshotChargePowerKw,
+} from "@/lib/charging-live";
 import { currencySymbols, formatCurrencyAmount } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
 import { ensureNotificationsPermission, ensurePushSubscription } from "@/lib/push/client";
@@ -106,8 +111,16 @@ export function DashboardView() {
       efficiencyPercent: activeSession.efficiency_percent,
       pricePerKwh: activeSession.price_per_kwh,
     };
-    return deriveChargingState(params, Date.parse(activeSession.started_at), nowMs);
-  }, [activeSession, nowMs]);
+    const startedAtMs = Date.parse(activeSession.started_at);
+    return (
+      deriveLiveChargingState({
+        snapshot: latestBydmateSnapshot,
+        params,
+        startedAtMs,
+        nowMs,
+      }) ?? deriveChargingState(params, startedAtMs, nowMs)
+    );
+  }, [activeSession, latestBydmateSnapshot, nowMs]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [startPct, setStartPct] = useState("42");
@@ -139,6 +152,10 @@ export function DashboardView() {
     activeSession?.current_percent ??
     latestSession?.current_percent ??
     Number(startPct);
+  const liveChargePowerKw = activeSession
+    && isFreshChargingSnapshot(latestBydmateSnapshot, nowMs)
+    ? snapshotChargePowerKw(latestBydmateSnapshot)
+    : null;
 
   const stats: ChargingStat[] = [
     {
@@ -155,7 +172,7 @@ export function DashboardView() {
     },
     {
       label: t("dashboard.powerStat") as string,
-      value: `${(activeSession?.charger_power_kw ?? selectedCar?.default_charger_power_kw ?? 0).toFixed(1)} kW`,
+      value: `${(liveChargePowerKw ?? activeSession?.charger_power_kw ?? selectedCar?.default_charger_power_kw ?? 0).toFixed(1)} kW`,
       accent: "blue",
     },
     {

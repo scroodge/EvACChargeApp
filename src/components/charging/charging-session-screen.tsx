@@ -23,8 +23,10 @@ import { createClient } from "@/lib/supabase/client";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchSessionById, useSessionQuery } from "@/hooks/use-session-query";
+import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
+import { deriveLiveChargingState } from "@/lib/charging-live";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
@@ -89,6 +91,8 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   const { locale, t } = useTranslation();
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
+  const { data: bydmateLive = [] } = useBydmateLiveQuery();
+  const latestBydmateSnapshot = bydmateLive[0] ?? null;
   const completingRef = useRef(false);
   const completionNoticeRef = useRef(false);
 
@@ -158,11 +162,15 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       }
       if (!row || row.status !== "charging" || !row.started_at) return;
 
-      const d = deriveChargingState(
-        toParams(row),
-        Date.parse(row.started_at),
-        now,
-      );
+      const params = toParams(row);
+      const startedAtMs = Date.parse(row.started_at);
+      const d =
+        deriveLiveChargingState({
+          snapshot: latestBydmateSnapshot,
+          params,
+          startedAtMs,
+          nowMs: now,
+        }) ?? deriveChargingState(params, startedAtMs, now);
       setLiveDerived(d);
 
       if (d.isComplete && !completingRef.current) {
@@ -234,6 +242,8 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     sessionId,
     setLiveDerived,
     supabase,
+    latestBydmateSnapshot,
+    t,
   ]);
 
   const clockActive = session?.status === "charging";
@@ -243,10 +253,15 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     if (!session) return null;
     if (session.status === "charging" && liveDerived) return liveDerived;
     if (session.status === "charging" && session.started_at) {
-      return deriveChargingState(
-        toParams(session),
-        Date.parse(session.started_at),
-        nowMs,
+      const params = toParams(session);
+      const startedAtMs = Date.parse(session.started_at);
+      return (
+        deriveLiveChargingState({
+          snapshot: latestBydmateSnapshot,
+          params,
+          startedAtMs,
+          nowMs,
+        }) ?? deriveChargingState(params, startedAtMs, nowMs)
       );
     }
     const startedMs = session.started_at ? Date.parse(session.started_at) : null;
@@ -263,7 +278,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       remainingSeconds: 0,
       isComplete: session.status === "completed",
     } satisfies DerivedChargingState;
-  }, [session, liveDerived, nowMs]);
+  }, [session, liveDerived, nowMs, latestBydmateSnapshot]);
 
   const pctForBar =
     session && derived ? derived.currentPercent : session?.current_percent ?? 0;
@@ -282,11 +297,16 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
 
   const stopSession = useCallback(async () => {
     if (!session?.started_at) return;
-    const d = deriveChargingState(
-      toParams(session),
-      Date.parse(session.started_at),
-      Date.now(),
-    );
+    const now = Date.now();
+    const params = toParams(session);
+    const startedAtMs = Date.parse(session.started_at);
+    const d =
+      deriveLiveChargingState({
+        snapshot: latestBydmateSnapshot,
+        params,
+        startedAtMs,
+        nowMs: now,
+      }) ?? deriveChargingState(params, startedAtMs, now);
 
     const { error: upErr } = await supabase
       .from("charging_sessions")
@@ -314,7 +334,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     });
     qc.invalidateQueries({ queryKey: queryKeys.sessions });
     toast.message(t("charging.saved") as string);
-  }, [qc, session, sessionId, supabase, t]);
+  }, [latestBydmateSnapshot, qc, session, sessionId, supabase, t]);
 
   if (isLoading) {
     return (
