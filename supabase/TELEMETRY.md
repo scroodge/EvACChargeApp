@@ -3,6 +3,85 @@
 This document describes the current BYDMate telemetry storage model and the Di+
 fields that the Android app may send.
 
+## Cloud ingest contract
+
+Endpoint:
+
+```http
+POST /api/bydmate/telemetry
+Content-Type: application/json
+X-API-Key: <profile bydmate_cloud_api_key>
+X-Vehicle-Id: <vehicle id>
+```
+
+`X-Vehicle-Id` must match every sample `vehicle_id`.
+
+The Android app may send either one sample directly:
+
+```json
+{
+  "schema_version": 1,
+  "vehicle_id": "way",
+  "device_time": "2026-05-25T18:00:00Z",
+  "source": "BYDMate",
+  "telemetry": { "soc": 50 },
+  "diplus": null,
+  "location": {}
+}
+```
+
+or a batch:
+
+```json
+{
+  "samples": [
+    {
+      "schema_version": 1,
+      "vehicle_id": "way",
+      "device_time": "2026-05-25T18:00:00Z",
+      "source": "BYDMate",
+      "telemetry": { "soc": 50 },
+      "diplus": null,
+      "location": {}
+    }
+  ]
+}
+```
+
+Important compatibility rules:
+
+- `schema_version` must be `1`.
+- `source` must be `BYDMate`.
+- `telemetry` is required and must be an object; it may contain only a subset of
+  fields, for example `{ "soc": 50 }`.
+- `location` is required and must be an object; `{}` is valid.
+- `diplus` may be an object, `null`, or omitted. VoltFlow normalizes `null` to
+  an empty stored Di+ object.
+- Numeric telemetry, Di+ and location values may arrive as JSON numbers or
+  numeric strings. `is_charging` may arrive as a boolean or `"true"`/`"false"`.
+- Batch payloads are capped at 300 samples.
+
+Current BYDMate-own APK generation, as of the local
+`/Users/way/Dev/BYDMate-own` checkout:
+
+- `CloudTelemetryPayload.build(...)` emits `schema_version`, `vehicle_id`,
+  `device_time`, `source`, `telemetry`, `diplus`, and `location`.
+- `CloudTelemetryPayload.buildBatch(...)` wraps previously built sample JSON
+  objects in `{ "samples": [...] }`.
+- When Di+ data is unavailable, the APK emits `"diplus": null`.
+- When GPS is unavailable, the APK emits `location` with null fields or `{}`.
+
+Future compatibility checklist:
+
+- Any change to `CloudTelemetryPayload` in BYDMate-own must be mirrored by a
+  VoltFlow parser test in `src/lib/bydmate/ingest-payload.test.mjs`.
+- Any change to `src/lib/bydmate/ingest-payload.ts` should keep accepting
+  existing APK payloads, especially batch samples with `diplus: null`.
+- A production smoke test should include a batch payload with `diplus: null`; a
+  valid API key should return `200 {"ok": true, ...}` and an invalid API key
+  should pass payload validation and fail as `401 Unauthorized`, not
+  `400 Invalid payload`.
+
 ## Tables
 
 ### `bydmate_live_snapshots`
