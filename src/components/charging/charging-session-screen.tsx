@@ -26,7 +26,7 @@ import { fetchSessionById, useSessionQuery } from "@/hooks/use-session-query";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
-import { deriveLiveChargingState } from "@/lib/charging-live";
+import { deriveLiveChargingState, findFreshChargingSnapshot } from "@/lib/charging-live";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
@@ -92,7 +92,6 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
   const { data: bydmateLive = [] } = useBydmateLiveQuery();
-  const latestBydmateSnapshot = bydmateLive[0] ?? null;
   const completingRef = useRef(false);
   const completionNoticeRef = useRef(false);
 
@@ -166,7 +165,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       const startedAtMs = Date.parse(row.started_at);
       const d =
         deriveLiveChargingState({
-          snapshot: latestBydmateSnapshot,
+          snapshot: findFreshChargingSnapshot(bydmateLive, now),
           params,
           startedAtMs,
           nowMs: now,
@@ -242,7 +241,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     sessionId,
     setLiveDerived,
     supabase,
-    latestBydmateSnapshot,
+    bydmateLive,
     t,
   ]);
 
@@ -257,7 +256,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       const startedAtMs = Date.parse(session.started_at);
       return (
         deriveLiveChargingState({
-          snapshot: latestBydmateSnapshot,
+          snapshot: findFreshChargingSnapshot(bydmateLive, nowMs),
           params,
           startedAtMs,
           nowMs,
@@ -278,7 +277,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       remainingSeconds: 0,
       isComplete: session.status === "completed",
     } satisfies DerivedChargingState;
-  }, [session, liveDerived, nowMs, latestBydmateSnapshot]);
+  }, [session, liveDerived, nowMs, bydmateLive]);
 
   const pctForBar =
     session && derived ? derived.currentPercent : session?.current_percent ?? 0;
@@ -302,7 +301,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     const startedAtMs = Date.parse(session.started_at);
     const d =
       deriveLiveChargingState({
-        snapshot: latestBydmateSnapshot,
+        snapshot: findFreshChargingSnapshot(bydmateLive, now),
         params,
         startedAtMs,
         nowMs: now,
@@ -334,7 +333,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
     });
     qc.invalidateQueries({ queryKey: queryKeys.sessions });
     toast.message(t("charging.saved") as string);
-  }, [latestBydmateSnapshot, qc, session, sessionId, supabase, t]);
+  }, [bydmateLive, qc, session, sessionId, supabase, t]);
 
   if (isLoading) {
     return (

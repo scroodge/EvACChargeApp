@@ -36,6 +36,13 @@ export function isFreshChargingSnapshot(
   return snapshot.telemetry?.is_charging === true || snapshotChargePowerKw(snapshot) != null;
 }
 
+export function findFreshChargingSnapshot(
+  snapshots: BydmateLiveSnapshotRow[],
+  nowMs: number,
+) {
+  return snapshots.find((snapshot) => isFreshChargingSnapshot(snapshot, nowMs)) ?? null;
+}
+
 export function deriveLiveChargingState({
   snapshot,
   params,

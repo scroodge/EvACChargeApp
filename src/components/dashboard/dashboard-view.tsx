@@ -44,7 +44,7 @@ import {
 } from "@/lib/charging-math";
 import {
   deriveLiveChargingState,
-  isFreshChargingSnapshot,
+  findFreshChargingSnapshot,
   snapshotChargePowerKw,
 } from "@/lib/charging-live";
 import { currencySymbols, formatCurrencyAmount } from "@/lib/i18n";
@@ -84,13 +84,17 @@ export function DashboardView() {
     () => sessions?.find((s) => s.status === "charging") ?? null,
     [sessions],
   );
+  const nowMs = useTickingClock(Boolean(activeSession));
   const latestBydmateSnapshot = bydmateLive[0] ?? null;
+  const liveChargingSnapshot = useMemo(
+    () => findFreshChargingSnapshot(bydmateLive, nowMs),
+    [bydmateLive, nowMs],
+  );
   const stationaryLiveStartPct = liveStationarySoc(
     latestBydmateSnapshot?.telemetry.soc,
     latestBydmateSnapshot?.telemetry.speed_kmh,
   );
   const latestSession = sessions?.[0] ?? null;
-  const nowMs = useTickingClock(Boolean(activeSession));
 
   const selectedCar =
     cars?.find((c) => c.id === selectedCarId) ?? cars?.[0] ?? null;
@@ -114,13 +118,13 @@ export function DashboardView() {
     const startedAtMs = Date.parse(activeSession.started_at);
     return (
       deriveLiveChargingState({
-        snapshot: latestBydmateSnapshot,
+        snapshot: liveChargingSnapshot,
         params,
         startedAtMs,
         nowMs,
       }) ?? deriveChargingState(params, startedAtMs, nowMs)
     );
-  }, [activeSession, latestBydmateSnapshot, nowMs]);
+  }, [activeSession, liveChargingSnapshot, nowMs]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [startPct, setStartPct] = useState("42");
@@ -153,8 +157,7 @@ export function DashboardView() {
     latestSession?.current_percent ??
     Number(startPct);
   const liveChargePowerKw = activeSession
-    && isFreshChargingSnapshot(latestBydmateSnapshot, nowMs)
-    ? snapshotChargePowerKw(latestBydmateSnapshot)
+    ? snapshotChargePowerKw(liveChargingSnapshot)
     : null;
 
   const stats: ChargingStat[] = [
