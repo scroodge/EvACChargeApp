@@ -168,7 +168,7 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Button asChild size="lg" className="h-12 rounded-full font-heading font-semibold">
-            <Link href={`/charging/${session.id}`}>{t("history.detail")}</Link>
+            <Link href={`/history/${session.id}`}>{t("history.detail")}</Link>
           </Button>
           <Button
             asChild

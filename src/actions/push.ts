@@ -55,7 +55,7 @@ export async function sendChargeCompletedPush(sessionId: string) {
   return sendPushToUser(supabase, user.id, {
     title: "Charge complete",
     body: "Battery reached target level.",
-    url: `/charging/${sessionId}`,
+    url: `/history/${sessionId}`,
     tag: `charge-complete:${sessionId}`,
   });
 }

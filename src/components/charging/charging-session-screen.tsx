@@ -56,7 +56,7 @@ async function notifyChargeCompleted(sessionId: string, body: string) {
   if (Notification.permission !== "granted") return;
 
   const title = "Charge complete";
-  const data = { sessionId, url: `/charging/${sessionId}` };
+  const data = { sessionId, url: `/history/${sessionId}` };
 
   if ("serviceWorker" in navigator) {
     try {
@@ -78,11 +78,19 @@ async function notifyChargeCompleted(sessionId: string, body: string) {
   });
   notification.onclick = () => {
     window.focus();
-    window.location.href = `/charging/${sessionId}`;
+    window.location.href = `/history/${sessionId}`;
   };
 }
 
-export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
+type ChargingSessionScreenMode = "charging" | "history";
+
+export function ChargingSessionScreen({
+  sessionId,
+  mode = "charging",
+}: {
+  sessionId: string;
+  mode?: ChargingSessionScreenMode;
+}) {
   const qc = useQueryClient();
   const supabase = useMemo(() => createClient(), []);
   const liveDerived = useChargingUi((s) => s.liveDerived);
@@ -357,6 +365,7 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
   }
 
   const charging = session.status === "charging";
+  const historyMode = mode === "history";
   const costAtFull =
     session.price_per_kwh > 0
       ? costFromGridEnergy(
@@ -377,17 +386,23 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-muted-foreground text-xs uppercase tracking-widest">
-            {t("charging.live")}
+            {historyMode ? t("history.eyebrow") : t("charging.live")}
           </p>
           <h1 className="mt-2 text-xl font-semibold tracking-tight text-balance">
-            {t("charging.session")}
+            {historyMode ? t("history.detail") : t("charging.session")}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {charging ? t("charging.updating") : t("charging.frozen")}
+            {charging && !historyMode
+              ? t("charging.updating")
+              : historyMode
+                ? t("history.subtitle")
+                : t("charging.frozen")}
           </p>
         </div>
         <Button asChild variant="outline" size="lg" className="min-h-[44px]">
-          <Link href="/dashboard">{t("charging.dashboard")}</Link>
+          <Link href={historyMode ? "/history" : "/dashboard"}>
+            {historyMode ? t("history.title") : t("charging.dashboard")}
+          </Link>
         </Button>
       </div>
 
@@ -478,25 +493,27 @@ export function ChargingSessionScreen({ sessionId }: { sessionId: string }) {
 
       <ChargingDeltaCard session={session} />
 
-      <div className="mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-40 space-y-3">
-        <Button
-          type="button"
-          size="lg"
-          variant="destructive"
-          disabled={!charging}
-          className="h-14 w-full rounded-full text-base font-semibold tracking-wide"
-          onClick={() => void stopSession()}
-        >
-          {t("charging.stop")}
-        </Button>
-        {!charging && (
-          <p className="text-muted-foreground text-center text-sm">
-            {session.status === "completed"
-              ? t("charging.complete")
-              : t("charging.paused")}
-          </p>
-        )}
-      </div>
+      {!historyMode && (
+        <div className="mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-40 space-y-3">
+          <Button
+            type="button"
+            size="lg"
+            variant="destructive"
+            disabled={!charging}
+            className="h-14 w-full rounded-full text-base font-semibold tracking-wide"
+            onClick={() => void stopSession()}
+          >
+            {t("charging.stop")}
+          </Button>
+          {!charging && (
+            <p className="text-muted-foreground text-center text-sm">
+              {session.status === "completed"
+                ? t("charging.complete")
+                : t("charging.paused")}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
