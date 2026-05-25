@@ -82,7 +82,7 @@ async function ensurePushSubscription() {
 
   if (Notification.permission !== "granted") return;
 
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPublicKey = await getVapidPublicKey();
   if (!vapidPublicKey) return;
 
   const registration = await navigator.serviceWorker.ready;
@@ -106,6 +106,20 @@ async function ensurePushSubscription() {
       auth: json.keys.auth,
     },
   });
+}
+
+async function getVapidPublicKey() {
+  const configured = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (configured) return configured;
+
+  try {
+    const response = await fetch("/api/push/vapid-public-key", { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { publicKey?: unknown };
+    return typeof payload.publicKey === "string" ? payload.publicKey : null;
+  } catch {
+    return null;
+  }
 }
 
 function liveStationarySoc(soc: number | null | undefined, speedKmh: number | null | undefined) {

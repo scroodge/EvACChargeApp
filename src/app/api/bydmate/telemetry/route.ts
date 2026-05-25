@@ -1,4 +1,5 @@
 import { normalizePayloads } from "@/lib/bydmate/ingest-payload";
+import { processBydmateChargeNotifications } from "@/lib/push/charge-notifications";
 import {
   acceptedLocationFromSnapshot,
   acceptedTelemetryFromSnapshot,
@@ -211,6 +212,7 @@ export async function POST(request: Request) {
       if (telemetry) previousTelemetry.set(telemetry.vehicleId, telemetry.telemetry);
     }
 
+    const previousTelemetryBeforeSanitize = new Map(previousTelemetry);
     const { payloads: locationSanitizedSamples, droppedLocations } = sanitizePayloadLocations(
       normalizedSamples,
       previousLocations,
@@ -273,6 +275,18 @@ export async function POST(request: Request) {
       });
     }
 
+    let chargeNotifications = { sent: 0, thresholds: [] as number[] };
+    try {
+      chargeNotifications = await processBydmateChargeNotifications({
+        supabase,
+        userId: profile.id,
+        samples,
+        previousTelemetry: previousTelemetryBeforeSanitize,
+      });
+    } catch {
+      chargeNotifications = { sent: 0, thresholds: [] };
+    }
+
     return Response.json({
       ok: true,
       persisted,
@@ -280,6 +294,7 @@ export async function POST(request: Request) {
       sample_count: samples.length,
       dropped_location_count: droppedLocations,
       dropped_telemetry_field_count: droppedTelemetryFields,
+      charge_notifications: chargeNotifications,
       received_at: receivedAt,
       ingest: ingestResult,
     });
