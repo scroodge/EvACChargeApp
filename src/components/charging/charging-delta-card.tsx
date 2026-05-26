@@ -1,7 +1,15 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { Maximize2, Minus, Plus } from "lucide-react";
+import type { PointerEvent } from "react";
+import { useId, useMemo, useState } from "react";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateChargingSessionSamplesQuery, type ChargingSessionTelemetrySample } from "@/hooks/use-bydmate-charging-session-samples-query";
 import type { ChargingSessionRow } from "@/types/database";
@@ -12,6 +20,8 @@ type DeltaPoint = {
   maxCellVoltage: number | null;
   time: number;
 };
+
+type DeltaZoomMode = "full" | "top";
 
 function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -125,19 +135,37 @@ export function ChargingDeltaCard({
   return <DeltaPlot points={points} vehicleId={vehicleId} />;
 }
 
-function DeltaPlot({ points, vehicleId }: { points: DeltaPoint[]; vehicleId: string }) {
+function DeltaPlot({
+  points,
+  vehicleId,
+  isFullscreen = false,
+}: {
+  points: DeltaPoint[];
+  vehicleId: string;
+  isFullscreen?: boolean;
+}) {
   const clipId = useId();
-  const smoothedPoints = useMemo(() => smoothDeltaPoints(points), [points]);
-  const latest = points.at(-1) ?? null;
-  const minSoc = Math.min(...points.map((point) => point.soc));
-  const maxSoc = Math.max(...points.map((point) => point.soc));
-  const minDelta = Math.min(...points.map((point) => point.delta));
-  const maxDelta = Math.max(...points.map((point) => point.delta));
-  const minTime = Math.min(...points.map((point) => point.time));
-  const maxTime = Math.max(...points.map((point) => point.time));
+  const [zoomMode, setZoomMode] = useState<DeltaZoomMode>("full");
+  const [hoveredPoint, setHoveredPoint] = useState<DeltaPoint | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const topPoints = useMemo(
+    () => points.filter((point) => point.soc >= 99 && point.soc <= 100),
+    [points],
+  );
+  const plotPoints = zoomMode === "top" && topPoints.length > 0 ? topPoints : points;
+  const smoothedPoints = useMemo(() => smoothDeltaPoints(plotPoints), [plotPoints]);
+  const latest = plotPoints.at(-1) ?? null;
+  const minSoc = Math.min(...plotPoints.map((point) => point.soc));
+  const maxSoc = Math.max(...plotPoints.map((point) => point.soc));
+  const minDelta = Math.min(...plotPoints.map((point) => point.delta));
+  const maxDelta = Math.max(...plotPoints.map((point) => point.delta));
+  const minTime = Math.min(...plotPoints.map((point) => point.time));
+  const maxTime = Math.max(...plotPoints.map((point) => point.time));
   const deltaPad = Math.max((maxDelta - minDelta) * 0.14, 0.005);
   const yMin = Math.max(0, minDelta - deltaPad);
   const yMax = maxDelta + deltaPad;
+  const chartHeightClass = isFullscreen ? "h-[min(68vh,760px)]" : "h-52";
 
   const x = (time: number) => {
     if (maxTime === minTime || !Number.isFinite(time)) return 160;
@@ -154,57 +182,164 @@ function DeltaPlot({ points, vehicleId }: { points: DeltaPoint[]; vehicleId: str
   const deltaPath = smoothedPoints
     .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(point.delta).toFixed(2)}`)
     .join(" ");
-  const socPath = points
+  const socPath = plotPoints
     .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${socY(point.soc).toFixed(2)}`)
     .join(" ");
-  const markers = points.length <= 80 ? points : [];
+  const markers = plotPoints.length <= 160 ? plotPoints : hoveredPoint ? [hoveredPoint] : [];
+  const canZoomTop = topPoints.length > 0;
+
+  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const svgX = ((event.clientX - bounds.left) / bounds.width) * 320;
+    const nearest = plotPoints.reduce<DeltaPoint | null>((closest, point) => {
+      if (!closest) return point;
+      return Math.abs(x(point.time) - svgX) < Math.abs(x(closest.time) - svgX)
+        ? point
+        : closest;
+    }, null);
+    if (!nearest) return;
+    setHoveredPoint(nearest);
+    setTooltipPosition({
+      x: Math.min(92, Math.max(8, (x(nearest.time) / 320) * 100)),
+      y: Math.min(82, Math.max(8, (y(nearest.delta) / 142) * 100)),
+    });
+  };
 
   return (
-    <article className="rounded-3xl border border-border bg-card p-5">
+    <article className={`rounded-3xl border border-border bg-card p-5 ${isFullscreen ? "flex min-h-0 flex-1 flex-col" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-lg font-semibold tracking-tight">Delta by SOC</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{vehicleId} · charge path 0-100% SOC</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {vehicleId} · {zoomMode === "top" && canZoomTop ? "99-100% SOC focus" : "charge path 0-100% SOC"}
+          </p>
         </div>
-        <span className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          {points.length} pts
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            {plotPoints.length} pts
+          </span>
+          {!isFullscreen ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              title="Open full screen"
+              aria-label="Open full screen"
+              onClick={() => setIsFullscreenOpen(true)}
+            >
+              <Maximize2 className="size-4" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-xl border border-border bg-background/30 p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={zoomMode === "full" ? "secondary" : "ghost"}
+            className="h-8 rounded-lg"
+            onClick={() => setZoomMode("full")}
+          >
+            <Minus className="size-3.5" aria-hidden />
+            Full
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={zoomMode === "top" ? "secondary" : "ghost"}
+            className="h-8 rounded-lg"
+            disabled={!canZoomTop}
+            onClick={() => setZoomMode("top")}
+          >
+            <Plus className="size-3.5" aria-hidden />
+            99-100
+          </Button>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {canZoomTop ? `${topPoints.length} pts in 99-100%` : "No 99-100% points"}
         </span>
       </div>
 
-      <svg className="mt-4 h-40 w-full overflow-hidden" viewBox="0 0 320 142" role="img" aria-label="Charging cell delta by SOC">
-        <defs>
-          <clipPath id={clipId}>
-            <rect x="24" y="18" width="272" height="92" />
-          </clipPath>
-        </defs>
-        <line x1="24" x2="296" y1="110" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
-        <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
-        <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
-        <text x="24" y="132" className="fill-muted-foreground text-[10px]">{formatPlotTime(minTime)}</text>
-        <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">{formatPlotTime(maxTime)}</text>
-        <text x="30" y="14" className="fill-muted-foreground text-[10px]">{maxDelta.toFixed(3)} V</text>
-        <text x="30" y="106" className="fill-muted-foreground text-[10px]">{minDelta.toFixed(3)} V</text>
-        <text x="296" y="14" textAnchor="end" className="fill-primary text-[10px]">{maxSoc.toFixed(0)}% SOC</text>
-        <text x="296" y="106" textAnchor="end" className="fill-primary text-[10px]">{minSoc.toFixed(0)}% SOC</text>
-        <g clipPath={`url(#${clipId})`}>
-          {points.length > 1 ? (
-            <path d={socPath} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" strokeDasharray="3 5" />
-          ) : null}
-          {points.length > 1 ? (
-            <path d={deltaPath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" />
-          ) : null}
-          {markers.map((point, index) => (
-            <circle
-              key={`${point.time}-${index}`}
-              cx={x(point.time)}
-              cy={y(point.delta)}
-              r={point === latest ? 4 : 3}
-              fill={point === latest ? "#facc15" : "#fb7185"}
-              opacity={point === latest ? 1 : 0.78}
-            />
-          ))}
-        </g>
-      </svg>
+      <div className={`relative mt-4 ${chartHeightClass}`}>
+        <svg
+          className="h-full w-full overflow-hidden touch-none"
+          viewBox="0 0 320 142"
+          role="img"
+          aria-label="Charging cell delta by SOC"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={() => setHoveredPoint(null)}
+        >
+          <defs>
+            <clipPath id={clipId}>
+              <rect x="24" y="18" width="272" height="92" />
+            </clipPath>
+          </defs>
+          <rect x="24" y="18" width="272" height="92" fill="transparent" />
+          <line x1="24" x2="296" y1="110" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
+          <line x1="24" x2="24" y1="18" y2="110" stroke="currentColor" className="text-border" strokeWidth="1" />
+          <line x1="24" x2="296" y1="64" y2="64" stroke="currentColor" className="text-border/70" strokeWidth="1" strokeDasharray="4 6" />
+          <text x="24" y="132" className="fill-muted-foreground text-[10px]">{formatPlotTime(minTime)}</text>
+          <text x="296" y="132" textAnchor="end" className="fill-muted-foreground text-[10px]">{formatPlotTime(maxTime)}</text>
+          <text x="30" y="14" className="fill-muted-foreground text-[10px]">{maxDelta.toFixed(3)} V</text>
+          <text x="30" y="106" className="fill-muted-foreground text-[10px]">{minDelta.toFixed(3)} V</text>
+          <text x="296" y="14" textAnchor="end" className="fill-primary text-[10px]">{maxSoc.toFixed(0)}% SOC</text>
+          <text x="296" y="106" textAnchor="end" className="fill-primary text-[10px]">{minSoc.toFixed(0)}% SOC</text>
+          <g clipPath={`url(#${clipId})`}>
+            {plotPoints.length > 1 ? (
+              <path d={socPath} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" strokeDasharray="3 5" />
+            ) : null}
+            {plotPoints.length > 1 ? (
+              <path d={deltaPath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" />
+            ) : null}
+            {hoveredPoint ? (
+              <line
+                x1={x(hoveredPoint.time)}
+                x2={x(hoveredPoint.time)}
+                y1="18"
+                y2="110"
+                stroke="#facc15"
+                strokeWidth="1"
+                opacity="0.65"
+                strokeDasharray="3 4"
+              />
+            ) : null}
+            {markers.map((point, index) => (
+              <circle
+                key={`${point.time}-${index}`}
+                cx={x(point.time)}
+                cy={y(point.delta)}
+                r={point === latest || point === hoveredPoint ? 4 : 3}
+                fill={point === hoveredPoint ? "#facc15" : point === latest ? "#facc15" : "#fb7185"}
+                opacity={point === hoveredPoint || point === latest ? 1 : 0.78}
+              />
+            ))}
+          </g>
+        </svg>
+        {hoveredPoint ? (
+          <div
+            className="pointer-events-none absolute z-10 min-w-40 rounded-xl border border-border bg-popover/95 p-3 text-xs text-popover-foreground shadow-xl"
+            style={{
+              left: `${tooltipPosition.x}%`,
+              top: `${tooltipPosition.y}%`,
+              transform: tooltipPosition.x > 62 ? "translate(-100%, -105%)" : "translate(8px, -105%)",
+            }}
+          >
+            <p className="font-heading text-sm font-semibold tabular-nums">
+              {hoveredPoint.soc.toFixed(0)}% SOC
+            </p>
+            <p className="mt-1 text-muted-foreground">{formatPlotTime(hoveredPoint.time)}</p>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              <dt className="text-muted-foreground">Max cell</dt>
+              <dd className="text-right font-mono">{fmtNumber(hoveredPoint.maxCellVoltage, 3)} V</dd>
+              <dt className="text-muted-foreground">Delta</dt>
+              <dd className="text-right font-mono">{hoveredPoint.delta.toFixed(3)} V</dd>
+            </dl>
+          </div>
+        ) : null}
+      </div>
 
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
@@ -223,6 +358,14 @@ function DeltaPlot({ points, vehicleId }: { points: DeltaPoint[]; vehicleId: str
         <DeltaStat label="Latest" value={latest ? `${latest.soc.toFixed(0)}% / ${latest.delta.toFixed(3)} V` : "—"} />
         <DeltaStat label="Latest max cell" value={`${fmtNumber(latest?.maxCellVoltage, 3)} V`} />
       </div>
+      {!isFullscreen ? (
+        <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+          <DialogContent className="flex h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl p-3 sm:max-w-[calc(100vw-2rem)]">
+            <DialogTitle className="sr-only">Delta by SOC full screen</DialogTitle>
+            <DeltaPlot points={points} vehicleId={vehicleId} isFullscreen />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </article>
   );
 }
