@@ -1,8 +1,9 @@
-import { Edit } from "lucide-react";
+import { Edit, Send } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { updateArticleStatusAction } from "@/actions/knowledge-admin";
 import { StatusBadge } from "@/components/admin/knowledge/StatusBadge";
 import { ArticleRenderer } from "@/components/telegram/ArticleRenderer";
 import { getAdminArticle, getAdminArticles, toTelegramArticle } from "@/lib/supabase/knowledge";
@@ -33,6 +34,7 @@ export default async function ArticlePreviewPage({ params }: PageProps) {
   const relatedArticles = (article.related_article_ids ?? [])
     .map((relatedId) => articleById.get(relatedId))
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const updateStatus = updateArticleStatusAction.bind(null, article.id);
 
   return (
     <main className="relative isolate min-h-dvh overflow-hidden bg-background text-foreground">
@@ -51,13 +53,40 @@ export default async function ArticlePreviewPage({ params }: PageProps) {
                 </span>
               </div>
             </div>
-            <Link
-              href={`/admin/knowledge/articles/${article.id}`}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold"
-            >
-              <Edit className="size-4" aria-hidden />
-              Редактировать
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <form action={updateStatus} className="flex flex-wrap gap-2">
+                <select
+                  name="status"
+                  defaultValue={article.status}
+                  className="min-h-10 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                  aria-label="Статус статьи"
+                >
+                  <option value="draft">Черновик</option>
+                  <option value="published">Опубликовано</option>
+                  <option value="archived">Архив</option>
+                </select>
+                <button className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold">
+                  Обновить
+                </button>
+                {article.status === "draft" ? (
+                  <button
+                    name="status"
+                    value="published"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground"
+                  >
+                    <Send className="size-4" aria-hidden />
+                    Опубликовать
+                  </button>
+                ) : null}
+              </form>
+              <Link
+                href={`/admin/knowledge/articles/${article.id}`}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold"
+              >
+                <Edit className="size-4" aria-hidden />
+                Редактировать
+              </Link>
+            </div>
           </div>
         </section>
         <ArticleRenderer

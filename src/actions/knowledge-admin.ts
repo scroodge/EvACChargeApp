@@ -19,6 +19,7 @@ import {
   requireAdmin,
   updateAccessory,
   updateArticle,
+  updateArticleStatus,
   updateCategory,
   updateFAQ,
   updateSparePart,
@@ -83,6 +84,16 @@ export async function deleteArticleAction(formData: FormData) {
 
   await deleteArticle(stringValue(formData, "id"));
   revalidateKnowledge();
+}
+
+export async function updateArticleStatusAction(id: string, formData: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) redirect("/admin/knowledge");
+
+  await updateArticleStatus(id, statusValue(formData));
+  revalidateKnowledge();
+  revalidatePath(`/admin/knowledge/articles/${id}/preview`);
+  redirect(`/admin/knowledge/articles/${id}/preview`);
 }
 
 export async function createFAQAction(

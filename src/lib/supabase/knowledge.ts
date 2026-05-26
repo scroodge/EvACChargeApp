@@ -10,6 +10,7 @@ import type {
   AccessoryExternalLink,
   AccessoryItem,
   ArticleInput,
+  ArticleStatus,
   FAQInput,
   FAQItem,
   KnowledgeArticle,
@@ -199,6 +200,27 @@ export async function updateArticle(id: string, input: ArticleInput) {
   if (error) throw error;
   await replaceArticleRelations(id, input.related_article_ids ?? []);
   await upsertArticleKnowledgeItem(id, input);
+}
+
+export async function updateArticleStatus(id: string, status: ArticleStatus) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("knowledge_articles")
+    .update({
+      status,
+      published_at: status === "published" ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+
+  const { error: knowledgeError } = await supabaseAdmin
+    .from("knowledge_items")
+    .update({ is_published: status === "published" })
+    .eq("id", id);
+
+  if (knowledgeError) throw knowledgeError;
+  invalidateKnowledgeSearchCache();
 }
 
 export async function deleteArticle(id: string) {
