@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/query-keys";
-import type { BydmateDiplus, BydmateTelemetry } from "@/types/database";
+import type { BydmateDiplus, BydmateTelemetry, SessionStatus } from "@/types/database";
 
 export type ChargingSessionTelemetrySample = {
   device_time: string;
@@ -31,10 +31,16 @@ async function fetchChargingSessionSamples(
 export function useBydmateChargingSessionSamplesQuery(
   sessionId: string,
   vehicleId = "way",
+  sessionStatus?: SessionStatus,
 ) {
+  const isActiveChargingSession = sessionStatus === "charging";
+
   return useQuery({
     queryKey: queryKeys.bydmateChargingSessionSamples(sessionId, vehicleId),
     queryFn: () => fetchChargingSessionSamples(sessionId, vehicleId),
-    staleTime: 60_000,
+    staleTime: isActiveChargingSession ? 10_000 : 60_000,
+    refetchInterval: isActiveChargingSession ? 15_000 : false,
+    refetchIntervalInBackground: isActiveChargingSession,
+    refetchOnWindowFocus: "always",
   });
 }

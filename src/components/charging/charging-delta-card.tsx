@@ -71,7 +71,11 @@ export function ChargingDeltaCard({
   session: ChargingSessionRow;
   vehicleId?: string;
 }) {
-  const { data = [], isLoading, error } = useBydmateChargingSessionSamplesQuery(session.id, vehicleId);
+  const { data = [], isLoading, error } = useBydmateChargingSessionSamplesQuery(
+    session.id,
+    vehicleId,
+    session.status,
+  );
   const points = useMemo(() => preparePoints(data), [data]);
 
   if (isLoading) {
