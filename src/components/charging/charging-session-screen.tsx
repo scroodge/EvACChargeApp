@@ -26,7 +26,12 @@ import { fetchSessionById, useSessionQuery } from "@/hooks/use-session-query";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
-import { deriveLiveChargingState, findFreshChargingSnapshot } from "@/lib/charging-live";
+import {
+  deriveLiveChargingState,
+  findFreshChargingSnapshot,
+  findFreshSocSnapshot,
+  snapshotSoc,
+} from "@/lib/charging-live";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
@@ -171,25 +176,39 @@ export function ChargingSessionScreen({
 
       const params = toParams(row);
       const startedAtMs = Date.parse(row.started_at);
-      const d =
+      const hasLiveSocSource = bydmateLive.some((snapshot) => snapshotSoc(snapshot) != null);
+      const liveChargingState =
         deriveLiveChargingState({
           snapshot: findFreshChargingSnapshot(bydmateLive, now),
           params,
           startedAtMs,
           nowMs: now,
-        }) ?? deriveChargingState(params, startedAtMs, now);
+        });
+      const liveCompletionState = hasLiveSocSource
+        ? deriveLiveChargingState({
+            snapshot: findFreshSocSnapshot(bydmateLive, now),
+            params,
+            startedAtMs,
+            nowMs: now,
+            requireCharging: false,
+          })
+        : null;
+      const mathState = deriveChargingState(params, startedAtMs, now);
+      const d = liveChargingState ?? liveCompletionState ?? mathState;
       setLiveDerived(d);
 
-      if (d.isComplete && !completingRef.current) {
+      const completionState = hasLiveSocSource ? liveCompletionState : d;
+      if (completionState?.isComplete && !completingRef.current) {
         completingRef.current = true;
+        const stoppedAt = new Date().toISOString();
         const { error: upErr } = await supabase
           .from("charging_sessions")
           .update({
-            current_percent: d.currentPercent,
-            charged_energy_kwh: d.chargedEnergyKwh,
-            estimated_cost: d.estimatedCost,
+            current_percent: completionState.currentPercent,
+            charged_energy_kwh: completionState.chargedEnergyKwh,
+            estimated_cost: completionState.estimatedCost,
             status: "completed",
-            stopped_at: new Date().toISOString(),
+            stopped_at: stoppedAt,
           })
           .eq("id", sessionId);
 
@@ -205,11 +224,11 @@ export function ChargingSessionScreen({
             old
               ? {
                   ...old,
-                  current_percent: d.currentPercent,
-                  charged_energy_kwh: d.chargedEnergyKwh,
-                  estimated_cost: d.estimatedCost,
+                  current_percent: completionState.currentPercent,
+                  charged_energy_kwh: completionState.chargedEnergyKwh,
+                  estimated_cost: completionState.estimatedCost,
                   status: "completed",
-                  stopped_at: new Date().toISOString(),
+                  stopped_at: stoppedAt,
                 }
               : old,
         );
@@ -226,12 +245,14 @@ export function ChargingSessionScreen({
 
       if (now - lastPush >= 950) {
         lastPush = now;
+        const stateToPersist = liveChargingState ?? liveCompletionState ?? (!hasLiveSocSource ? d : null);
+        if (!stateToPersist) return;
         await supabase
           .from("charging_sessions")
           .update({
-            current_percent: d.currentPercent,
-            charged_energy_kwh: d.chargedEnergyKwh,
-            estimated_cost: d.estimatedCost,
+            current_percent: stateToPersist.currentPercent,
+            charged_energy_kwh: stateToPersist.chargedEnergyKwh,
+            estimated_cost: stateToPersist.estimatedCost,
           })
           .eq("id", sessionId);
       }

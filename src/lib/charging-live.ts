@@ -31,9 +31,18 @@ export function isFreshChargingSnapshot(
   staleMs = LIVE_CHARGING_STALE_MS,
 ) {
   if (!snapshot) return false;
-  const receivedMs = Date.parse(snapshot.received_at);
-  if (!Number.isFinite(receivedMs) || nowMs - receivedMs > staleMs) return false;
+  if (!isFreshLiveSnapshot(snapshot, nowMs, staleMs)) return false;
   return snapshot.telemetry?.is_charging === true || snapshotChargePowerKw(snapshot) != null;
+}
+
+export function isFreshLiveSnapshot(
+  snapshot: BydmateLiveSnapshotRow | null | undefined,
+  nowMs: number,
+  staleMs = LIVE_CHARGING_STALE_MS,
+) {
+  if (!snapshot) return false;
+  const receivedMs = Date.parse(snapshot.received_at);
+  return Number.isFinite(receivedMs) && nowMs - receivedMs <= staleMs;
 }
 
 export function findFreshChargingSnapshot(
@@ -43,18 +52,33 @@ export function findFreshChargingSnapshot(
   return snapshots.find((snapshot) => isFreshChargingSnapshot(snapshot, nowMs)) ?? null;
 }
 
+export function findFreshSocSnapshot(
+  snapshots: BydmateLiveSnapshotRow[],
+  nowMs: number,
+) {
+  return snapshots.find(
+    (snapshot) => isFreshLiveSnapshot(snapshot, nowMs) && snapshotSoc(snapshot) != null,
+  ) ?? null;
+}
+
 export function deriveLiveChargingState({
   snapshot,
   params,
   startedAtMs,
   nowMs,
+  requireCharging = true,
 }: {
   snapshot: BydmateLiveSnapshotRow | null | undefined;
   params: ChargingParams;
   startedAtMs: number;
   nowMs: number;
+  requireCharging?: boolean;
 }): DerivedChargingState | null {
-  if (!isFreshChargingSnapshot(snapshot, nowMs)) return null;
+  if (
+    requireCharging
+      ? !isFreshChargingSnapshot(snapshot, nowMs)
+      : !isFreshLiveSnapshot(snapshot, nowMs)
+  ) return null;
 
   const soc = snapshotSoc(snapshot);
   if (soc == null) return null;
