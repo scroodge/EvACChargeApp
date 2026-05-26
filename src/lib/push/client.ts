@@ -74,3 +74,63 @@ export async function ensurePushSubscription() {
     },
   });
 }
+
+export async function getPushClientStatus() {
+  const supported =
+    typeof window !== "undefined" &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window;
+
+  if (!supported) {
+    return {
+      supported,
+      permission: "unsupported",
+      serviceWorker: "unsupported",
+      hasSubscription: false,
+      endpointHost: null as string | null,
+    };
+  }
+
+  const registration = await navigator.serviceWorker.getRegistration();
+  const subscription = await registration?.pushManager.getSubscription();
+  let endpointHost: string | null = null;
+  if (subscription?.endpoint) {
+    try {
+      endpointHost = new URL(subscription.endpoint).host;
+    } catch {
+      endpointHost = "unknown";
+    }
+  }
+
+  return {
+    supported,
+    permission: Notification.permission,
+    serviceWorker: registration?.active?.state ?? registration?.installing?.state ?? "missing",
+    hasSubscription: Boolean(subscription),
+    endpointHost,
+  };
+}
+
+export async function showLocalTestNotification() {
+  if (
+    typeof window === "undefined" ||
+    !("Notification" in window) ||
+    !("serviceWorker" in navigator)
+  ) {
+    return { ok: false as const, error: "Push is not supported here" };
+  }
+
+  if (Notification.permission !== "granted") {
+    return { ok: false as const, error: `Notification permission is ${Notification.permission}` };
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  await registration.showNotification("VoltFlow local test", {
+    body: "Local notification test on this device.",
+    tag: `local-test:${Date.now()}`,
+    data: { url: "/settings" },
+  });
+
+  return { ok: true as const };
+}

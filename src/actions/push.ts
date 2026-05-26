@@ -59,3 +59,19 @@ export async function sendChargeCompletedPush(sessionId: string) {
     tag: `charge-complete:${sessionId}`,
   });
 }
+
+export async function sendTestPush() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false as const, error: "Unauthorized" };
+
+  return sendPushToUser(supabase, user.id, {
+    title: "VoltFlow test",
+    body: "Server push test for this account.",
+    url: "/settings",
+    tag: `push-test:${Date.now()}`,
+  });
+}

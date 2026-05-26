@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Bell, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Code2, Copy, ExternalLink, KeyRound, MessageCircle, RefreshCw, Scale, ShieldCheck } from "lucide-react";
 import type { FormEvent } from "react";
@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { deleteCar } from "@/actions/cars";
+import { sendTestPush } from "@/actions/push";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,12 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
+import {
+  ensureNotificationsPermission,
+  ensurePushSubscription,
+  getPushClientStatus,
+  showLocalTestNotification,
+} from "@/lib/push/client";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { Car } from "@/types/database";
 
@@ -262,6 +269,8 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
         </CardContent>
       </Card>
 
+      <PushDiagnostics />
+
       {isAdmin ? (
         <Card className="border-white/[0.08]">
           <CardHeader>
@@ -437,6 +446,126 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
 
       <PrivacyNote />
       <AboutSection />
+    </div>
+  );
+}
+
+type PushStatus = Awaited<ReturnType<typeof getPushClientStatus>>;
+
+function PushDiagnostics() {
+  const [status, setStatus] = useState<PushStatus | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const refresh = () => {
+    void getPushClientStatus()
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const handleSync = async () => {
+    setBusy("sync");
+    try {
+      await ensureNotificationsPermission();
+      await ensurePushSubscription();
+      refresh();
+      toast.success("Push status refreshed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not sync push");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleLocalTest = async () => {
+    setBusy("local");
+    try {
+      const result = await showLocalTestNotification();
+      if (!result.ok) throw new Error(result.error);
+      toast.success("Local notification requested");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not show local notification");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleServerTest = async () => {
+    setBusy("server");
+    try {
+      await ensurePushSubscription();
+      const result = await sendTestPush();
+      if (!result.ok) throw new Error(result.error);
+      toast.success(`Server push sent to ${result.sent ?? 0} device(s)`);
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send server push");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card className="border-white/[0.08]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-3 text-xl tracking-tight">
+          <Bell className="size-5" aria-hidden />
+          Push diagnostics
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 text-sm sm:grid-cols-2">
+          <PushStatusRow label="Supported" value={status?.supported ? "yes" : "no"} />
+          <PushStatusRow label="Permission" value={status?.permission ?? "checking"} />
+          <PushStatusRow label="Service worker" value={status?.serviceWorker ?? "checking"} />
+          <PushStatusRow label="Subscription" value={status?.hasSubscription ? "saved on device" : "missing"} />
+          <PushStatusRow label="Endpoint" value={status?.endpointHost ?? "none"} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            className="h-[54px] rounded-full"
+            disabled={busy !== null}
+            onClick={handleSync}
+          >
+            {busy === "sync" ? "Checking..." : "Check push"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-[54px] rounded-full"
+            disabled={busy !== null}
+            onClick={handleLocalTest}
+          >
+            {busy === "local" ? "Sending..." : "Local test"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-[54px] rounded-full"
+            disabled={busy !== null}
+            onClick={handleServerTest}
+          >
+            {busy === "server" ? "Sending..." : "Server test"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PushStatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+      <p className="text-muted-foreground text-xs uppercase tracking-[0.25em]">{label}</p>
+      <p className="mt-2 break-words font-mono text-sm">{value}</p>
     </div>
   );
 }
