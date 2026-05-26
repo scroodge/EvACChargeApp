@@ -192,6 +192,9 @@ export type BydmateTripRow = {
   max_speed_kmh: number | null;
   avg_speed_kmh: number | null;
   avg_consumption_kwh_100km: number | null;
+  regen_energy_kwh?: number | null;
+  traction_energy_kwh?: number | null;
+  power_sample_count?: number;
 };
 
 export type BydmateTripTrackPointRow = {

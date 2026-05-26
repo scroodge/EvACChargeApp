@@ -33,6 +33,7 @@ import { useBydmateTripTrackQuery } from "@/hooks/use-bydmate-trip-track-query";
 import { useBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
+import { calculateCumulativeRegenPoints, calculateTripEnergy } from "@/lib/bydmate/trip-energy";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
   BydmateLiveSnapshotRow,
@@ -988,6 +989,19 @@ function TripBrowser({
   const { locale, t } = useTranslation();
   const tx = t as Translator;
   const totalDistance = trips.reduce((sum, trip) => sum + (trip.distance_km ?? 0), 0);
+  const fixtureTripEnergy = expandedFixtureTrip
+    ? calculateTripEnergy(expandedFixtureTrip.points.map((point) => ({
+        device_time: point.device_time,
+        power_kw: point.telemetry?.power_kw,
+      })))
+    : null;
+  const totalRegenEnergy = trips.reduce((sum, trip) => {
+    const fallbackRegen =
+      fixtureTripEnergy && expandedFixtureTrip?.id === trip.id
+        ? fixtureTripEnergy.regen_energy_kwh
+        : null;
+    return sum + (trip.regen_energy_kwh ?? fallbackRegen ?? 0);
+  }, 0);
   const avgConsumption = averageTripConsumption(trips);
 
   return (
@@ -1042,6 +1056,7 @@ function TripBrowser({
       <div className="mt-5 grid grid-cols-2 gap-3 min-[430px]:grid-cols-4">
         <SummaryPill label={tx("vehicle.trips.count")} value={isLoading ? "…" : String(trips.length)} />
         <SummaryPill label={tx("vehicle.trips.distance")} value={`${fmt(totalDistance, 1)} km`} />
+        <SummaryPill label={tx("vehicle.trips.regen")} value={`${fmt(totalRegenEnergy, 2)} kWh`} />
         <SummaryPill label={tx("vehicle.trips.consumption")} value={`${fmt(avgConsumption, 1)} kWh/100`} />
         <SummaryPill
           label={tx("vehicle.trips.points")}
@@ -1062,11 +1077,18 @@ function TripBrowser({
           {trips.map((trip, index) => {
             const tripLabel = tx("vehicle.trips.tripLabel", { value: trips.length - index });
             const expanded = trip.id === selectedTripId;
+            const displayTrip =
+              fixtureTripEnergy && expandedFixtureTrip?.id === trip.id
+                ? {
+                    ...trip,
+                    ...fixtureTripEnergy,
+                  }
+                : trip;
 
             return (
               <div key={trip.id} className="grid gap-3">
                 <TripListItem
-                  trip={trip}
+                  trip={displayTrip}
                   tripLabel={tripLabel}
                   expanded={expanded}
                   onSelect={() => onSelectTrip(trip.id)}
@@ -1130,6 +1152,7 @@ function TripListItem({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 text-sm tabular-nums text-muted-foreground">
+          <span className="text-emerald-300">{fmt(trip.regen_energy_kwh, 2)} kWh</span>
           <span>{fmt(trip.distance_km, 1)} km</span>
           <span className="hidden min-[430px]:inline">
             {tx("vehicle.trips.pointShort", { value: trip.sample_count })}
@@ -1164,6 +1187,8 @@ function TripListItem({
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))]">
         <MiniStat label={tx("vehicle.trips.distance")} value={`${fmt(trip.distance_km, 1)} km`} />
+        <MiniStat label={tx("vehicle.trips.regen")} value={`${fmt(trip.regen_energy_kwh, 2)} kWh`} />
+        <MiniStat label={tx("vehicle.trips.traction")} value={`${fmt(trip.traction_energy_kwh, 2)} kWh`} />
         <MiniStat label="SOC" value={`${fmt(trip.soc_start)}% -> ${fmt(trip.soc_end)}%`} />
         <MiniStat
           label={tx("vehicle.trips.consumption")}
@@ -1310,6 +1335,9 @@ function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) 
   const powerChart = createChart(t("vehicle.metrics.power"), "kW", [
     { label: t("vehicle.metrics.power"), color: "#facc15", points: [] },
   ]);
+  const regenChart = createChart(t("vehicle.charts.regen"), "kWh", [
+    { label: t("vehicle.trips.regen"), color: "#34d399", points: [] },
+  ], 2);
   const temperatureChart = createChart(t("vehicle.charts.temperatures"), "°C", [
     { label: t("vehicle.charts.battery"), color: "#22c55e", points: [] },
     { label: t("vehicle.charts.outside"), color: "#38bdf8", points: [] },
@@ -1344,7 +1372,14 @@ function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) 
     addDeltaBySocPoint(deltaBySocPoints, time, soc, cellDelta);
   }
 
-  const charts = [socChart, speedChart, powerChart, temperatureChart, cellDeltaChart].map((chart) => ({
+  for (const point of calculateCumulativeRegenPoints(points.map((sample) => ({
+    device_time: sample.device_time,
+    power_kw: sample.telemetry?.power_kw,
+  })))) {
+    addChartPoint(regenChart, 0, point.time, point.value);
+  }
+
+  const charts = [socChart, speedChart, powerChart, regenChart, temperatureChart, cellDeltaChart].map((chart) => ({
     ...chart,
     series: chart.series.map((series) => ({
       ...series,
