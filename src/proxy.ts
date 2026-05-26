@@ -32,6 +32,7 @@ const DIRECT_DEV_PATH_PREFIXES = [
   "/dev/vehicle",
   "/dev/vehicle-telemetry-fixtures",
 ];
+const DEV_SITE_PREFIX = "/dev/site";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -42,6 +43,25 @@ export async function proxy(request: NextRequest) {
   const isDevAuthPath = DEV_AUTH_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+
+  if (
+    isDevelopment &&
+    (pathname === DEV_SITE_PREFIX || pathname.startsWith(`${DEV_SITE_PREFIX}/`))
+  ) {
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname =
+      pathname.slice(DEV_SITE_PREFIX.length).replace(/^\/?/, "/") || "/";
+
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-voltflow-dev-auth-bypass", "1");
+    requestHeaders.set("x-voltflow-dev-path-prefix", DEV_SITE_PREFIX);
+
+    return NextResponse.rewrite(rewriteUrl, {
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
 
   if (
     isDevelopment &&
