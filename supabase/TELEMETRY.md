@@ -1,5 +1,7 @@
 # BYDMate telemetry schema
 
+APK ingest contract: see `supabase/BYDMATE_APK_API.md`.
+
 This document describes the current BYDMate telemetry storage model and the Di+
 fields that the Android app may send.
 
