@@ -12,7 +12,12 @@
     "build": "next build",
     "start": "next start",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/**/*.test.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrations": "node scripts/supabase-migrate-one.mjs",
+    "db:migrations:status": "node scripts/supabase-migrate-one.mjs status",
+    "db:migrations:plan": "node scripts/supabase-migrate-one.mjs plan",
+    "db:migrations:up": "node scripts/supabase-migrate-one.mjs up",
+    "db:migrations:down": "node scripts/supabase-migrate-one.mjs down"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

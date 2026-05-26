@@ -560,6 +560,11 @@ function validNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function isChargingTelemetry(telemetry: BydmateTelemetry) {
+  const chargePowerKw = validNumber(telemetry.charge_power_kw);
+  return telemetry.is_charging === true || (chargePowerKw != null && chargePowerKw > 0.1);
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -612,6 +617,7 @@ function estimateConsumptionKwh100Km(
   const currentTripConsumption = validNumber(telemetry.current_trip_consumption_kwh_100km);
   const currentTripDistance = validNumber(telemetry.current_trip_distance_km);
   if (
+    !isChargingTelemetry(telemetry) &&
     currentTripConsumption != null &&
     currentTripConsumption >= MIN_FORECAST_CONSUMPTION_KWH_100KM &&
     currentTripConsumption <= MAX_FORECAST_CONSUMPTION_KWH_100KM
@@ -765,7 +771,7 @@ function formatDuration(ms: number) {
 
 function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
   const sorted = [...points]
-    .filter((point) => pointTimeMs(point) > 0)
+    .filter((point) => pointTimeMs(point) > 0 && !isChargingTelemetry(point.telemetry))
     .sort((a, b) => pointTimeMs(a) - pointTimeMs(b));
 
   const groups: BydmateTelemetryPointRow[][] = [];
