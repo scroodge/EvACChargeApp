@@ -47,23 +47,23 @@ export function HistoryView() {
   );
 
   return (
-    <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
+    <div className="safe-bottom flex flex-col gap-4 px-4 pb-4 pt-4">
       <header className="flex items-center justify-between gap-4">
         <LogoFull />
         <BrandBadge className="hidden min-[380px]:inline-flex">Session log</BrandBadge>
       </header>
 
-      <section className="voltflow-card p-5">
+      <section className="voltflow-card p-4">
         <p className="text-muted-foreground text-xs uppercase tracking-[0.28em]">
           {t("history.eyebrow")}
         </p>
-        <h1 className="mt-2 font-heading text-3xl font-bold tracking-normal">{t("history.title")}</h1>
-        <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-6">
+        <h1 className="mt-1.5 font-heading text-2xl font-bold tracking-normal">{t("history.title")}</h1>
+        <p className="text-muted-foreground mt-1.5 max-w-xl text-sm leading-5">
           {t("history.subtitle")}
         </p>
       </section>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {finishedFirst.map((session) => (
           <HistoryCard key={session.id} session={session} />
         ))}
@@ -122,9 +122,9 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 
   return (
     <Card className="voltflow-card border-border bg-transparent">
-      <CardContent className="flex flex-col gap-4 p-5">
-        <div className="flex items-start justify-between gap-6">
-          <div>
+      <CardContent className="flex flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-muted-foreground text-xs uppercase tracking-[0.32em]">
               {started
                 ? format(started, "EEEE · HH:mm · MMM d", {
@@ -132,18 +132,18 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
                   })
                 : t("history.queued")}
             </p>
-            <p className="mt-4 font-heading text-4xl font-bold tracking-tight tabular-nums">
+            <p className="mt-3 font-heading text-3xl font-bold tracking-tight tabular-nums">
               {pct}
               %
             </p>
           </div>
           <span
-            className={`rounded-full border border-border bg-white/[0.04] px-4 py-2 font-heading text-xs font-semibold uppercase tracking-[0.2em] ${statusTone}`}
+            className={`shrink-0 rounded-full border border-border bg-white/[0.04] px-3 py-1.5 font-heading text-[11px] font-semibold uppercase tracking-[0.18em] ${statusTone}`}
           >
             {statusLabel}
           </span>
         </div>
-        <dl className="divide-y divide-border rounded-2xl border border-border bg-white/[0.02] px-4 text-lg">
+        <dl className="divide-y divide-border rounded-2xl border border-border bg-white/[0.02] px-4 text-base">
           <Row label={t("history.target") as string} value={`${session.target_percent}%`} />
           <Row
             label={t("history.energy") as string}
@@ -166,7 +166,7 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
           <Row label={t("history.duration") as string} value={elapsed} />
         </dl>
 
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button asChild size="lg" className="h-12 rounded-full font-heading font-semibold">
             <Link href={`/history/${session.id}`}>{t("history.detail")}</Link>
           </Button>
@@ -186,7 +186,7 @@ function HistoryCard({ session }: { session: ChargingSessionRow }) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-4">
+    <div className="flex items-center justify-between py-3">
       <dt className="text-muted-foreground text-sm">{label}</dt>
       <dd className="font-heading text-base font-semibold tabular-nums">{value}</dd>
     </div>

@@ -53,8 +53,8 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
   }
 
   return (
-    <form key={stateKey(state)} action={submitPreparedForm} className="grid gap-5 lg:grid-cols-[1fr_20rem]">
-      <div className="space-y-4">
+    <form key={stateKey(state)} action={submitPreparedForm} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="min-w-0 space-y-4">
         <Panel>
           <FieldError message={state.message} />
           <FieldError message={clientError ?? undefined} />
@@ -212,16 +212,16 @@ export function ArticleForm({ article, categories, articles, action }: ArticleFo
                 ))}
             </select>
           </label>
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap">
             <button disabled={isSaving} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-60">
               {isPreparing ? "Подготовка фото..." : pending || isDispatching ? "Сохранение..." : "Сохранить"}
             </button>
             {article ? (
-              <Link href={`/admin/knowledge/articles/${article.id}/preview`} className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
+              <Link href={`/admin/knowledge/articles/${article.id}/preview`} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold">
                 Предпросмотр
               </Link>
             ) : null}
-            <Link href="/admin/knowledge/articles" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold">
+            <Link href="/admin/knowledge/articles" className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold">
               Отмена
             </Link>
           </div>
@@ -243,7 +243,7 @@ export const textareaClass =
   "min-h-28 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/40";
 
 export function Panel({ children }: { children: React.ReactNode }) {
-  return <section className="space-y-4 rounded-lg border border-border bg-card p-4">{children}</section>;
+  return <section className="space-y-4 rounded-lg border border-border bg-card p-3 sm:p-4">{children}</section>;
 }
 
 export function FieldError({ message }: { message?: string }) {

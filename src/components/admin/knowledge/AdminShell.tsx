@@ -12,14 +12,14 @@ export function AdminShell({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-dvh bg-background px-4 py-6 text-foreground md:px-8">
+    <main className="min-h-dvh bg-background px-3 py-4 text-foreground sm:px-4 sm:py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--voltflow-cyan)]">
               Админка VoltFlow
             </p>
-            <h1 className="mt-2 font-heading text-3xl font-bold">{title}</h1>
+            <h1 className="mt-2 text-wrap font-heading text-2xl font-bold sm:text-3xl">{title}</h1>
             {description ? (
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {description}
