@@ -92,7 +92,7 @@ export function calculateCumulativeRegenPoints(
   maxGapSeconds = MAX_TRIP_ENERGY_GAP_SECONDS,
 ) {
   let recoveredKwh = 0;
-  const cumulative: Array<{ time: number; value: number }> = [];
+  const cumulative: Array<{ time: number; value: number; power_kw: number | null }> = [];
 
   for (let index = 0; index < points.length; index += 1) {
     const currentTime = Date.parse(points[index].device_time);
@@ -114,7 +114,11 @@ export function calculateCumulativeRegenPoints(
       }
     }
 
-    cumulative.push({ time: currentTime, value: recoveredKwh });
+    cumulative.push({
+      time: currentTime,
+      value: recoveredKwh,
+      power_kw: finiteNumber(points[index].power_kw),
+    });
   }
 
   return cumulative;

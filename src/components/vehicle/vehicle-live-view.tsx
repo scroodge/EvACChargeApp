@@ -513,6 +513,7 @@ function CellHealthCard({ snapshot }: { snapshot: BydmateLiveSnapshotRow }) {
 type ChartPoint = {
   time: number;
   value: number;
+  powerKw?: number | null;
 };
 
 type RoutePoint = {
@@ -536,13 +537,14 @@ type MapPan = {
   y: number;
 };
 
-type RouteLayer = "route" | "power" | "speed" | "soc";
+type RouteLayer = "route" | "regen" | "power" | "speed" | "soc";
 
 type RouteSegment = {
   key: string;
   path: string;
   color: string;
   opacity: number;
+  title: string;
 };
 
 type ChartSeries = {
@@ -617,6 +619,7 @@ const ROUTE_LAYER_OPTIONS: Array<{
   color: string;
 }> = [
   { id: "route", label: "Route", color: "var(--voltflow-cyan)" },
+  { id: "regen", label: "Regen", color: "#34d399" },
   { id: "power", label: "Power", color: "#ef4444" },
   { id: "speed", label: "Speed", color: "#22c55e" },
   { id: "soc", label: "SOC", color: "#facc15" },
@@ -1268,6 +1271,23 @@ function addChartPoint(chart: TelemetryChart, seriesIndex: number, time: number,
   chart.hasData = true;
 }
 
+function addChartPointWithPower(
+  chart: TelemetryChart,
+  seriesIndex: number,
+  time: number,
+  value: number | null,
+  powerKw: number | null,
+) {
+  if (value == null || !Number.isFinite(time)) return;
+
+  chart.series[seriesIndex].points.push({ time, value, powerKw });
+  chart.minValue = chart.hasData ? Math.min(chart.minValue, value) : value;
+  chart.maxValue = chart.hasData ? Math.max(chart.maxValue, value) : value;
+  chart.minTime = chart.hasData ? Math.min(chart.minTime, time) : time;
+  chart.maxTime = chart.hasData ? Math.max(chart.maxTime, time) : time;
+  chart.hasData = true;
+}
+
 function addDeltaBySocPoint(points: DeltaBySocPoint[], time: number, soc: number | null, delta: number | null) {
   if (soc == null || delta == null || !Number.isFinite(time)) return;
   points.push({ soc, delta, time });
@@ -1376,7 +1396,7 @@ function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) 
     device_time: sample.device_time,
     power_kw: sample.telemetry?.power_kw,
   })))) {
-    addChartPoint(regenChart, 0, point.time, point.value);
+    addChartPointWithPower(regenChart, 0, point.time, point.value, point.power_kw);
   }
 
   const charts = [socChart, speedChart, powerChart, regenChart, temperatureChart, cellDeltaChart].map((chart) => ({
@@ -1474,11 +1494,34 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
 
   const x = (time: number) => {
     if (maxTime === minTime) return 160;
-    return 18 + ((time - minTime) / (maxTime - minTime)) * 284;
+    return 34 + ((time - minTime) / (maxTime - minTime)) * 284;
   };
   const y = (value: number) => {
     if (yMax === yMin) return 60;
     return 104 - ((value - yMin) / (yMax - yMin)) * 88;
+  };
+  const startTime = Number.isFinite(minTime) ? minTime : 0;
+  const durationMinutes = maxTime > minTime ? Math.round((maxTime - minTime) / 60000) : 0;
+  const xTicks = hasData
+    ? [
+        { label: "0m", time: minTime },
+        { label: `${Math.max(1, Math.round(durationMinutes / 2))}m`, time: minTime + (maxTime - minTime) / 2 },
+        { label: `${durationMinutes}m`, time: maxTime },
+      ]
+    : [];
+  const yTicks = hasData
+    ? [
+        { label: fmt(maxValue, valueDigits), value: maxValue },
+        { label: fmt((minValue + maxValue) / 2, valueDigits), value: (minValue + maxValue) / 2 },
+        { label: fmt(minValue, valueDigits), value: minValue },
+      ]
+    : [];
+
+  const pointTitle = (item: ChartSeries, point: ChartPoint) => {
+    const elapsedMin = Math.max(0, Math.round((point.time - startTime) / 60000));
+    const clock = new Date(point.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const power = point.powerKw == null ? "" : `\n${tx("vehicle.metrics.power")}: ${fmt(point.powerKw, 1)} kW`;
+    return `${item.label}: ${fmt(point.value, valueDigits)} ${unit}\n${elapsedMin}m · ${clock}${power}`;
   };
 
   return (
@@ -1500,9 +1543,31 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         </div>
       </div>
 
-      <svg className="mt-4 h-36 w-full overflow-visible" viewBox="0 0 320 128" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
-        <line x1="18" x2="302" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
-        <line x1="18" x2="302" y1="16" y2="16" stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
+      <svg className="mt-4 h-44 w-full overflow-visible" viewBox="0 0 340 158" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
+        <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
+        <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
+        {yTicks.map((tick) => (
+          <g key={`${title}-y-${tick.label}`}>
+            <line x1="34" x2="318" y1={y(tick.value)} y2={y(tick.value)} stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
+            <text x="29" y={y(tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+              {tick.label}
+            </text>
+          </g>
+        ))}
+        {xTicks.map((tick) => (
+          <g key={`${title}-x-${tick.label}`}>
+            <line x1={x(tick.time)} x2={x(tick.time)} y1="104" y2="109" stroke="currentColor" className="text-border" strokeWidth="1" />
+            <text x={x(tick.time)} y="124" textAnchor="middle" className="fill-muted-foreground text-[9px]">
+              {tick.label}
+            </text>
+          </g>
+        ))}
+        <text x="176" y="148" textAnchor="middle" className="fill-muted-foreground text-[9px]">
+          {tx("vehicle.charts.elapsed")}
+        </text>
+        <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">
+          {unit}
+        </text>
         {series.map((item) => {
           const d = item.points
             .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(point.value).toFixed(2)}`)
@@ -1513,8 +1578,21 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
               {item.points.length > 1 ? (
                 <path d={d} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               ) : null}
+              {item.points.map((point, index) => (
+                <circle
+                  key={`${item.label}-hit-${point.time}-${index}`}
+                  cx={x(point.time)}
+                  cy={y(point.value)}
+                  r="7"
+                  fill="transparent"
+                >
+                  <title>{pointTitle(item, point)}</title>
+                </circle>
+              ))}
               {markers.map((point, index) => (
-                <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color} />
+                <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color}>
+                  <title>{pointTitle(item, point)}</title>
+                </circle>
               ))}
             </g>
           );
@@ -1948,6 +2026,7 @@ function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: num
 }
 
 function routeLayerValue(point: RoutePoint, layer: RouteLayer) {
+  if (layer === "regen") return point.powerKw == null ? null : Math.max(0, -point.powerKw);
   if (layer === "power") return point.powerKw == null ? null : Math.abs(point.powerKw);
   if (layer === "speed") return point.speedKmh;
   if (layer === "soc") return point.soc;
@@ -1963,6 +2042,10 @@ function routeLayerSegmentColor(layer: RouteLayer, normalized: number) {
 
   if (layer === "power") {
     return `hsl(0 84% ${34 + intensity * 30}%)`;
+  }
+
+  if (layer === "regen") {
+    return `hsl(158 72% ${30 + intensity * 34}%)`;
   }
 
   if (layer === "speed") {
@@ -2004,7 +2087,11 @@ function buildRouteSegments(
       key: `${selectedLayer}-${previous.time}-${point.time}-${index}`,
       path: `M ${mappedPrevious.x.toFixed(2)} ${mappedPrevious.y.toFixed(2)} L ${mappedPoint.x.toFixed(2)} ${mappedPoint.y.toFixed(2)}`,
       color: routeLayerSegmentColor(selectedLayer, normalized),
-      opacity: value == null && selectedLayer !== "route" ? 0.35 : 1,
+      opacity:
+        value == null || (selectedLayer === "regen" && value === 0)
+          ? 0.28
+          : 1,
+      title: `${formatClock(point.time)} · ${point.powerKw == null ? "—" : `${fmt(point.powerKw, 1)} kW`}`,
     };
   });
 }
@@ -2033,7 +2120,7 @@ export function RouteMap({
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
-  const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("route");
+  const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("regen");
 
   const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
   const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
@@ -2189,7 +2276,7 @@ function InteractiveRouteCanvas({
 
   return (
     <div className={`relative overflow-hidden bg-background ${className}`}>
-      <div className="absolute left-2 top-2 z-10 grid w-[8.75rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-4 sm:rounded-full">
+      <div className="absolute left-2 top-2 z-10 grid w-[10rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-5 sm:rounded-full">
         {ROUTE_LAYER_OPTIONS.map((option) => {
           const selected = option.id === selectedLayer;
           const label = tx(`vehicle.route.layers.${option.id}` as TranslationKey);
@@ -2292,7 +2379,9 @@ function InteractiveRouteCanvas({
               strokeLinejoin="round"
               opacity={segment.opacity}
               filter="url(#route-line-shadow)"
-            />
+            >
+              <title>{segment.title}</title>
+            </path>
           ))
         ) : route.points.length > 1 ? (
           <path
