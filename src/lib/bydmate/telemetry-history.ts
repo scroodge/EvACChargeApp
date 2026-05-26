@@ -6,6 +6,7 @@ import {
   resolveTelemetryWindow,
   type TelemetryHistoryRange,
 } from "@/lib/bydmate/telemetry-ranges";
+import { resolveChargingSessionSampleWindow } from "@/lib/bydmate/telemetry-session-window";
 import type { BydmateDiplus, BydmateTelemetry, BydmateTelemetrySampleRow } from "@/types/database";
 
 type HourlyRow = {
@@ -212,7 +213,7 @@ export async function fetchChargingSessionSamples({
 }): Promise<TelemetryHistoryPoint[]> {
   const { data: session, error: sessionError } = await supabase
     .from("charging_sessions")
-    .select("id, user_id, status, started_at, stopped_at, updated_at, created_at")
+    .select("id, user_id, status, started_at, stopped_at, updated_at, created_at, current_percent, target_percent")
     .eq("id", sessionId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -220,17 +221,21 @@ export async function fetchChargingSessionSamples({
   if (sessionError) throw sessionError;
   if (!session?.started_at) return [];
 
-  const endAt =
-    session.stopped_at ??
-    (session.status === "charging" ? new Date().toISOString() : session.updated_at) ??
-    new Date().toISOString();
+  const window = resolveChargingSessionSampleWindow({
+    status: session.status,
+    startedAt: session.started_at,
+    stoppedAt: session.stopped_at,
+    updatedAt: session.updated_at,
+    currentPercent: session.current_percent,
+    targetPercent: session.target_percent,
+  });
 
   const data = await fetchChargingTelemetrySamplePages({
     supabase,
     userId,
     vehicleId,
-    from: session.started_at,
-    to: endAt,
+    from: window.from,
+    to: window.to,
   });
 
   const chargingPoints = data.filter(isChargingSample);
