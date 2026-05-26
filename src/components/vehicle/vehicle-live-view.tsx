@@ -267,7 +267,7 @@ function Hero({
             {fmt(telemetry.soc)}
             <span className="text-2xl text-muted-foreground">%</span>
           </h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-muted-foreground" suppressHydrationWarning>
             {t("vehicle.lastUpdate", { value: timeAgo(snapshot.received_at, nowMs, t) })}
           </p>
         </div>
