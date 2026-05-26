@@ -269,7 +269,7 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
         </CardContent>
       </Card>
 
-      <PushDiagnostics />
+      {isAdmin ? <PushDiagnostics /> : null}
 
       {isAdmin ? (
         <Card className="border-white/[0.08]">
