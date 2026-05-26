@@ -156,6 +156,11 @@ function DeltaPlot({
   const plotPoints = zoomMode === "top" && topPoints.length > 0 ? topPoints : points;
   const smoothedPoints = useMemo(() => smoothDeltaPoints(plotPoints), [plotPoints]);
   const latest = plotPoints.at(-1) ?? null;
+  const peakMaxCellPoint = plotPoints.reduce<DeltaPoint | null>((peak, point) => {
+    if (point.maxCellVoltage == null) return peak;
+    if (peak?.maxCellVoltage == null) return point;
+    return point.maxCellVoltage > peak.maxCellVoltage ? point : peak;
+  }, null);
   const minSoc = Math.min(...plotPoints.map((point) => point.soc));
   const maxSoc = Math.max(...plotPoints.map((point) => point.soc));
   const minDelta = Math.min(...plotPoints.map((point) => point.delta));
@@ -356,7 +361,14 @@ function DeltaPlot({
         <DeltaStat label="SOC" value={`${minSoc.toFixed(0)}-${maxSoc.toFixed(0)}%`} />
         <DeltaStat label="Delta" value={`${minDelta.toFixed(3)}-${maxDelta.toFixed(3)} V`} />
         <DeltaStat label="Latest" value={latest ? `${latest.soc.toFixed(0)}% / ${latest.delta.toFixed(3)} V` : "—"} />
-        <DeltaStat label="Latest max cell" value={`${fmtNumber(latest?.maxCellVoltage, 3)} V`} />
+        <DeltaStat
+          label="Peak max cell"
+          value={
+            peakMaxCellPoint
+              ? `${fmtNumber(peakMaxCellPoint.maxCellVoltage, 3)} V · ${peakMaxCellPoint.soc.toFixed(0)}%`
+              : "—"
+          }
+        />
       </div>
       {!isFullscreen ? (
         <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
