@@ -855,7 +855,22 @@ function buildTrips(points: BydmateTelemetryPointRow[]): TripSegment[] {
     }
   }
 
-  return groups.map((tripPoints, index) => {
+  const validGroups = groups.filter((tripPoints) => {
+    // Exclude trips with only a single point
+    if (tripPoints.length < 2) return false;
+    // Exclude trips where the car was not moving for 5+ minutes
+    const durationMs = pointTimeMs(tripPoints.at(-1)!) - pointTimeMs(tripPoints[0]);
+    if (durationMs >= TRIP_GAP_MS) {
+      const speeds = tripPoints
+        .map((point) => validNumber(point.telemetry.speed_kmh))
+        .filter((value): value is number => value != null);
+      const maxSpeed = speeds.length ? Math.max(...speeds) : null;
+      if (maxSpeed === null || maxSpeed === 0) return false;
+    }
+    return true;
+  });
+
+  return validGroups.map((tripPoints, index) => {
     const startMs = pointTimeMs(tripPoints[0]);
     const endMs = pointTimeMs(tripPoints.at(-1) ?? tripPoints[0]);
     const speeds = tripPoints
