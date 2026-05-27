@@ -1,0 +1,437 @@
+"use client";
+
+import Image from "next/image";
+import { Loader2, Save, Search } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+type WbProduct = {
+  wb_id: string;
+  name: string;
+  brand: string;
+  price: number;
+  rating: number;
+  image: string;
+  url: string;
+  exists_in_db: boolean;
+};
+
+type SearchResponse = {
+  items: WbProduct[];
+};
+
+type CheckResponse = {
+  exists: boolean;
+  product?: {
+    id: string;
+    wb_id: string;
+    name: string;
+  } | null;
+};
+
+type SaveResponse = {
+  success: boolean;
+  product?: {
+    id: string;
+    wb_id: string;
+  } | null;
+};
+
+type RowState = {
+  checking?: boolean;
+  saving?: boolean;
+  checkResult?: CheckResponse;
+  saveResult?: SaveResponse;
+  error?: string;
+};
+
+export function WbApiDebugger() {
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState<WbProduct[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
+
+  async function searchProducts() {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setError("Enter a Wildberries search query.");
+      return;
+    }
+
+    setIsSearching(true);
+    setHasSearched(true);
+    setError(null);
+    setRowStates({});
+
+    try {
+      const params = new URLSearchParams({ query: trimmedQuery });
+      const response = await localApiGet<SearchResponse>(
+        `/api/dev/wb/search?${params.toString()}`,
+      );
+
+      setItems(response.items ?? []);
+    } catch (searchError) {
+      setItems([]);
+      setError(errorMessage(searchError));
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  async function checkProduct(product: WbProduct) {
+    setRowState(product.wb_id, { checking: true, error: undefined });
+
+    try {
+      const params = new URLSearchParams({ wb_id: product.wb_id });
+      const response = await localApiGet<CheckResponse>(
+        `/api/dev/wb/products/check?${params.toString()}`,
+      );
+
+      setRowState(product.wb_id, {
+        checking: false,
+        checkResult: response,
+        error: undefined,
+      });
+    } catch (checkError) {
+      setRowState(product.wb_id, {
+        checking: false,
+        error: errorMessage(checkError),
+      });
+    }
+  }
+
+  async function saveProduct(product: WbProduct) {
+    setRowState(product.wb_id, { saving: true, error: undefined });
+
+    try {
+      const response = await localApiPost<SaveResponse>("/api/dev/wb/products", {
+        wb_id: product.wb_id,
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        rating: product.rating,
+        image: product.image,
+        url: product.url,
+      });
+
+      setRowState(product.wb_id, {
+        saving: false,
+        saveResult: response,
+        checkResult: response.product
+          ? {
+              exists: true,
+              product: {
+                id: response.product.id,
+                wb_id: response.product.wb_id,
+                name: product.name,
+              },
+            }
+          : undefined,
+        error: undefined,
+      });
+    } catch (saveError) {
+      setRowState(product.wb_id, {
+        saving: false,
+        error: errorMessage(saveError),
+      });
+    }
+  }
+
+  function setRowState(wbId: string, nextState: RowState) {
+    setRowStates((current) => ({
+      ...current,
+      [wbId]: {
+        ...current[wbId],
+        ...nextState,
+      },
+    }));
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Wildberries backend debug</CardTitle>
+        <CardDescription>
+          Backend URL: {process.env.NEXT_PUBLIC_API_URL}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-5">
+        <form
+          className="flex flex-col gap-3 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void searchProducts();
+          }}
+        >
+          <input
+            className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search goods in Wildberries"
+            type="search"
+          />
+          <Button disabled={isSearching} type="submit">
+            {isSearching ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Search className="size-4" aria-hidden />
+            )}
+            Search
+          </Button>
+        </form>
+
+        {error ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
+        <ResultsTable
+          hasSearched={hasSearched}
+          isSearching={isSearching}
+          items={items}
+          rowStates={rowStates}
+          onCheck={checkProduct}
+          onSave={saveProduct}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ResultsTable({
+  hasSearched,
+  isSearching,
+  items,
+  rowStates,
+  onCheck,
+  onSave,
+}: {
+  hasSearched: boolean;
+  isSearching: boolean;
+  items: WbProduct[];
+  rowStates: Record<string, RowState>;
+  onCheck: (product: WbProduct) => void;
+  onSave: (product: WbProduct) => void;
+}) {
+  if (isSearching) {
+    return (
+      <div className="rounded-lg border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+        Loading products...
+      </div>
+    );
+  }
+
+  if (hasSearched && items.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+        No products returned.
+      </div>
+    );
+  }
+
+  if (!hasSearched) {
+    return (
+      <div className="rounded-lg border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+        Enter a query to call GET /api/dev/wb/search.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th className="p-3">Image</th>
+            <th className="p-3">Name</th>
+            <th className="p-3">Brand</th>
+            <th className="p-3">Price</th>
+            <th className="p-3">Rating</th>
+            <th className="p-3">WB ID</th>
+            <th className="p-3">Exists</th>
+            <th className="p-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <ProductRow
+              key={item.wb_id}
+              item={item}
+              rowState={rowStates[item.wb_id] ?? {}}
+              onCheck={onCheck}
+              onSave={onSave}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProductRow({
+  item,
+  rowState,
+  onCheck,
+  onSave,
+}: {
+  item: WbProduct;
+  rowState: RowState;
+  onCheck: (product: WbProduct) => void;
+  onSave: (product: WbProduct) => void;
+}) {
+  const exists = rowState.checkResult?.exists ?? item.exists_in_db;
+
+  return (
+    <tr className="border-t border-border align-top">
+      <td className="p-3">
+        <div className="relative size-16 overflow-hidden rounded-md border border-border bg-white/[0.03]">
+          {item.image ? (
+            <Image
+              alt={item.name}
+              className="object-cover"
+              fill
+              sizes="64px"
+              src={item.image}
+              unoptimized
+            />
+          ) : null}
+        </div>
+      </td>
+      <td className="max-w-xs p-3">
+        <a
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+          href={item.url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {item.name}
+        </a>
+        {rowState.error ? (
+          <p className="mt-2 text-xs text-destructive">{rowState.error}</p>
+        ) : null}
+        {rowState.saveResult?.success ? (
+          <p className="mt-2 text-xs text-primary">
+            Saved as {rowState.saveResult.product?.id ?? "new product"}.
+          </p>
+        ) : null}
+      </td>
+      <td className="p-3">{item.brand}</td>
+      <td className="p-3">{formatPrice(item.price)}</td>
+      <td className="p-3">{item.rating}</td>
+      <td className="p-3 font-mono text-xs">{item.wb_id}</td>
+      <td className="p-3">
+        <span
+          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+            exists
+              ? "bg-primary/15 text-primary"
+              : "bg-white/[0.04] text-muted-foreground"
+          }`}
+        >
+          {exists ? "Yes" : "No"}
+        </span>
+        {rowState.checkResult?.product ? (
+          <p className="mt-2 max-w-40 break-all text-xs text-muted-foreground">
+            {rowState.checkResult.product.id}
+          </p>
+        ) : null}
+      </td>
+      <td className="p-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={rowState.checking}
+            size="sm"
+            type="button"
+            variant="outline"
+            onClick={() => onCheck(item)}
+          >
+            {rowState.checking ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            Check DB
+          </Button>
+          <Button
+            disabled={rowState.saving}
+            size="sm"
+            type="button"
+            onClick={() => onSave(item)}
+          >
+            {rowState.saving ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Save className="size-4" aria-hidden />
+            )}
+            Save
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function formatPrice(price: number) {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 0,
+    style: "currency",
+    currency: "RUB",
+  }).format(price);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown API request error.";
+}
+
+async function localApiGet<TResponse>(path: string) {
+  return localApiRequest<TResponse>(path, { method: "GET" });
+}
+
+async function localApiPost<TResponse>(path: string, body: unknown) {
+  return localApiRequest<TResponse>(path, {
+    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+}
+
+async function localApiRequest<TResponse>(path: string, init: RequestInit) {
+  const response = await fetch(path, {
+    ...init,
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const detail = readableErrorDetail(payload);
+
+    throw new Error(
+      `API request failed with ${response.status} ${response.statusText}${
+        detail ? `: ${detail}` : ""
+      }`,
+    );
+  }
+
+  return payload as TResponse;
+}
+
+function readableErrorDetail(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  if ("detail" in payload && typeof payload.detail === "string") {
+    return payload.detail;
+  }
+
+  if ("error" in payload && typeof payload.error === "string") {
+    return payload.error;
+  }
+
+  return JSON.stringify(payload);
+}

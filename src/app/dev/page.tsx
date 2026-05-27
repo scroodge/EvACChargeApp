@@ -8,6 +8,7 @@ import {
   LockOpen,
   MessageCircle,
   Search,
+  Server,
   Settings,
   Shield,
   Wrench,
@@ -61,6 +62,7 @@ const publicRoutes: DevRoute[] = [
 ];
 
 const fixtureRoutes: DevRoute[] = [
+  directRoute("WB API debug", "/dev/api", Server),
   directRoute("Dev dashboard", "/dev/dashboard", Gauge),
   directRoute("Charging fixture", "/dev/charging", Zap),
   directRoute("History fixture", "/dev/history", LayoutDashboard),
