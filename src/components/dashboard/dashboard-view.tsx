@@ -47,17 +47,18 @@ import { estimateRangeFromSoc, estimateVehicleRangeKm } from "@/lib/bydmate/rang
 import {
   deriveLiveChargingState,
   findFreshChargingSnapshot,
+  snapshotSoc,
 } from "@/lib/charging-live";
 import { currencySymbols } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
 import { ensureNotificationsPermission, ensurePushSubscription } from "@/lib/push/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useAppPreferences } from "@/stores/use-app-preferences";
-import type { BydmateTripRow, ChargingSessionRow } from "@/types/database";
+import type { BydmateLiveSnapshotRow, BydmateTripRow, ChargingSessionRow } from "@/types/database";
 
-function liveStationarySoc(soc: number | null | undefined, speedKmh: number | null | undefined) {
-  if (speedKmh !== 0 || typeof soc !== "number" || !Number.isFinite(soc)) return null;
-  if (soc < 0 || soc >= 100) return null;
+function liveStartPercent(snapshot: BydmateLiveSnapshotRow | null | undefined) {
+  const soc = snapshotSoc(snapshot);
+  if (soc == null || soc >= 100) return null;
   return String(Math.round(soc));
 }
 
@@ -173,10 +174,8 @@ export function DashboardView() {
     latestBydmateSnapshot?.vehicle_id ?? null,
     8,
   );
-  const stationaryLiveStartPct = liveStationarySoc(
-    latestBydmateSnapshot?.telemetry.soc,
-    latestBydmateSnapshot?.telemetry.speed_kmh,
-  );
+  const latestBydmateSoc = snapshotSoc(latestBydmateSnapshot);
+  const liveStartPct = liveStartPercent(latestBydmateSnapshot);
   const latestSession = sessions?.[0] ?? null;
   const latestTrip = latestTrips[0] ?? null;
 
@@ -232,7 +231,7 @@ export function DashboardView() {
   const currentPercent =
     liveActive?.currentPercent ??
     activeSession?.current_percent ??
-    latestBydmateSnapshot?.telemetry.soc ??
+    latestBydmateSoc ??
     latestSession?.current_percent ??
     Number(startPct);
   const rangeEstimate = latestBydmateSnapshot
@@ -284,7 +283,7 @@ export function DashboardView() {
   const handleMainAction = async () => {
     if (!activeSession) {
       if (canStartSession) {
-        if (stationaryLiveStartPct !== null) setStartPct(stationaryLiveStartPct);
+        if (liveStartPct !== null) setStartPct(liveStartPct);
         setPrice(String(defaultPrice));
         setDialogOpen(true);
       }
@@ -502,8 +501,8 @@ export function DashboardView() {
               icon={<CarFront className="size-5" aria-hidden />}
               label={t("dashboard.liveVehicle") as string}
               title={
-                latestBydmateSnapshot
-                  ? `${fmt(latestBydmateSnapshot.telemetry.soc)}% SOC`
+                latestBydmateSoc != null
+                  ? `${fmt(latestBydmateSoc)}% SOC`
                   : (t("dashboard.noLiveData") as string)
               }
               body={

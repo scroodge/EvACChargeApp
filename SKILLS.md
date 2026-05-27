@@ -1,0 +1,231 @@
+# VoltFlow Skills and Change Workflow
+
+This document captures the project-specific skills needed to continue VoltFlow safely. Use it together with [AGENTS.md](AGENTS.md), [README.md](README.md), and the Supabase docs in [supabase/](supabase/).
+
+## Goal
+
+The current priority is to fix and preserve the existing progress, then add new features without breaking working behavior.
+
+In practice:
+
+- First understand the current route, component, data, and migration shape.
+- Fix regressions with the smallest reasonable change.
+- Add new features behind the existing architecture instead of replacing working flows.
+- Keep charging, VoltFlow Mate, PWA, auth, and knowledge-base behavior stable unless the task explicitly targets them.
+- Add or update tests when changing parser logic, charging completion, trip filtering, telemetry history, push thresholds, or shared utilities.
+
+## Required Agent Skill
+
+Before changing application code, read [AGENTS.md](AGENTS.md). It contains two hard project rules:
+
+- This project uses Next.js 16. Do not rely on older Next.js assumptions. Read the relevant guide under `node_modules/next/dist/docs/` before editing framework-sensitive areas such as routing, layouts, server actions, metadata, middleware/proxy behavior, caching, or file conventions.
+- VoltFlow Mate charging history must preserve delayed completion samples. A chart stopping below the session target does not automatically mean data is missing.
+
+## Core Project Skills
+
+### Charging Skill
+
+Know these files before changing charging behavior:
+
+- `src/lib/charging-math.ts`
+- `src/lib/charging-live.ts`
+- `src/actions/sessions.ts`
+- `src/components/charging/charging-session-screen.tsx`
+- `src/components/charging/charging-hub-view.tsx`
+- `src/app/(app)/charging/page.tsx`
+- `src/app/(app)/charging/[id]/page.tsx`
+- `src/app/(app)/history/page.tsx`
+- `src/app/(app)/history/[id]/page.tsx`
+
+Preserve these behaviors:
+
+- Wall-clock math can calculate current display state, delivered kWh, cost, ETA, and remaining time.
+- Persisted session data keeps refreshes and PWA restores consistent.
+- Realtime updates on `charging_sessions` keep active screens in sync.
+- If VoltFlow Mate live SOC exists, session completion must wait for fresh live SOC and must not be forced by mathematical time estimates.
+
+When debugging history:
+
+- Compare `charging_sessions.started_at`, `charging_sessions.stopped_at`, `charging_sessions.current_percent`, and `charging_sessions.target_percent`.
+- Compare them with `bydmate_telemetry_samples.device_time` and delayed samples around the stop time.
+- Check whether VoltFlow Mate reports target SOC a few minutes after VoltFlow marks the session `completed`.
+- Preserve samples that contain the 100% SOC and cell-voltage tail.
+
+### VoltFlow Mate Ingest Skill
+
+Know these files before changing VoltFlow Mate ingest or history:
+
+- `src/app/api/bydmate/telemetry/route.ts`
+- `src/lib/bydmate/ingest-payload.ts`
+- `src/lib/bydmate/telemetry-sanitizer.ts`
+- `src/lib/bydmate/telemetry-history.ts`
+- `src/lib/bydmate/telemetry-session-window.ts`
+- `src/lib/bydmate/trip-filter.ts`
+- `src/lib/bydmate/trip-energy.ts`
+- `src/lib/bydmate/range-estimate.ts`
+- `supabase/TELEMETRY.md`
+- `supabase/BYDMATE_APK_API.md`
+
+Preserve these behaviors:
+
+- Accept single sample payloads, `{ "samples": [...] }`, and direct JSON arrays.
+- Accept `diplus: null` and store normalized Di+ safely.
+- Accept numeric JSON values and numeric strings.
+- Cap batch payloads at 300 samples.
+- Keep `(user_id, vehicle_id, device_time)` idempotency.
+- Store charging samples in telemetry history but do not create or extend driving trips from charging samples.
+- Drop suspicious GPS track points before persistence.
+
+Run focused tests after changes:
+
+```bash
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/ingest-payload.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/telemetry-sanitizer.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/telemetry-history.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/trip-filter.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/trip-energy.test.mjs
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/bydmate/range-estimate.test.mjs
+```
+
+The full project test command is:
+
+```bash
+npm run test
+```
+
+### Supabase Skill
+
+Know these files before changing database shape:
+
+- `supabase/migrations/`
+- `supabase/MIGRATIONS_AUDIT.md`
+- `scripts/supabase-migrate-one.mjs`
+- `src/types/database.ts`
+- `src/lib/supabase/client.ts`
+- `src/lib/supabase/server.ts`
+- `src/lib/supabase/service.ts`
+- `src/lib/supabase/admin.ts`
+
+Preserve these behaviors:
+
+- RLS must continue scoping user data by `auth.uid()`.
+- `SUPABASE_SERVICE_ROLE_KEY` must stay server-only.
+- Existing migrations remain active history until a deliberate squash/reset plan exists.
+- Do not delete old migration files from `supabase/migrations/` just because later migrations supersede their function bodies.
+
+Use the wrapper for controlled migration work:
+
+```bash
+npm run db:migrations:status
+npm run db:migrations:plan
+npm run db:migrations:up
+npm run db:migrations:down
+```
+
+### Knowledge Base and Telegram Skill
+
+Know these files before changing Telegram or knowledge behavior:
+
+- `src/app/telegram/page.tsx`
+- `src/app/telegram/article/[slug]/page.tsx`
+- `src/app/telegram/category/[slug]/page.tsx`
+- `src/app/admin/knowledge/`
+- `src/components/telegram/`
+- `src/components/admin/knowledge/`
+- `src/data/telegram/`
+- `src/lib/telegram/`
+- `src/lib/knowledge-search.ts`
+- `src/lib/embeddings.ts`
+- `src/app/api/knowledge/search/route.ts`
+
+Preserve these behaviors:
+
+- Static fallback content should keep the Telegram experience usable even when CMS or semantic search is unavailable.
+- Admin CMS changes should not break public article/category routes.
+- Semantic search requires `OPENAI_API_KEY`; without it, the rest of the knowledge experience should still work.
+- Generation filters must stay compatible with model/generation metadata in knowledge content.
+
+### PWA and Mobile UX Skill
+
+Know these files before changing install or shell behavior:
+
+- `src/app/manifest.ts`
+- `public/sw.js`
+- `src/components/sw-register.tsx`
+- `src/components/layout/MobileShell.tsx`
+- `src/components/layout/BottomNavigation.tsx`
+- `INSTALL.md`
+
+Preserve these behaviors:
+
+- Service worker registration is production-only.
+- Start URL is `/telegram`.
+- Mobile safe areas and bottom navigation must remain touch-friendly.
+- iPhone/iPad install instructions expect Safari; Android install instructions expect Chrome.
+
+### Push Notification Skill
+
+Know these files before changing notification behavior:
+
+- `src/lib/push/charge-thresholds.ts`
+- `src/lib/push/charge-notifications.ts`
+- `src/lib/push/client.ts`
+- `src/lib/push/web-push.ts`
+- `src/actions/push.ts`
+- `src/app/api/push/vapid-public-key/route.ts`
+
+Preserve these behaviors:
+
+- Push requires VAPID environment variables.
+- Browser subscription logic must tolerate unsupported browsers.
+- Charge-threshold behavior should stay covered by tests.
+
+Run:
+
+```bash
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/push/charge-thresholds.test.mjs
+```
+
+## Safe Feature Workflow
+
+Use this sequence for new features:
+
+1. Identify the existing owner area: route, component, lib module, action, migration, or API route.
+2. Read nearby code and docs before changing anything.
+3. Keep the feature scoped to the smallest existing boundary that can own it.
+4. Preserve current data contracts unless a migration and compatibility plan are included.
+5. Add tests for shared logic, parser behavior, completion rules, or database-sensitive code.
+6. Run `npm run test` for logic changes and `npm run lint` for code-style and Next.js checks.
+7. For PWA/install changes, verify with `npm run build` and `npm run start`.
+8. Update docs when behavior, routes, env vars, migrations, or ingest contracts change.
+
+## Current Feature Surface to Keep Untouched
+
+Do not accidentally regress:
+
+- Auth pages and callback flow.
+- Vehicle creation/editing.
+- Active charging start/stop flow.
+- Charging progress, ETA, kWh, cost, and tariff calculations.
+- Charging history list and detail.
+- VoltFlow Mate cloud ingest compatibility with the current Android APK.
+- Delayed VoltFlow Mate completion sample preservation.
+- Trip inference excluding charging samples.
+- Telegram knowledge home, categories, articles, FAQ, calculators, accessories, and spare parts.
+- Admin knowledge CMS forms.
+- Semantic search fallback behavior.
+- PWA manifest, production service worker, and install docs.
+- Push subscription and VAPID public-key endpoint.
+- Dev diagnostic pages.
+
+## Documentation Maintenance
+
+When the project changes, update the relevant document:
+
+- `README.md` for product surface, setup, scripts, project structure, and current progress.
+- `AGENTS.md` for hard agent rules and project invariants.
+- `SKILLS.md` for safe workflow, ownership map, and project-specific development skills.
+- `INSTALL.md` for user-facing PWA installation.
+- `supabase/TELEMETRY.md` for telemetry schema/storage behavior.
+- `supabase/BYDMATE_APK_API.md` for APK ingest contract changes.
+- `supabase/MIGRATIONS_AUDIT.md` for migration-chain and squash/reset notes.

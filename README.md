@@ -13,6 +13,15 @@ License
 
 Рабочая версия проекта: [https://volt-flow-beige.vercel.app/](https://volt-flow-beige.vercel.app/)
 
+## Project docs / Документация проекта
+
+- [AGENTS.md](AGENTS.md) — required instructions for AI/coding agents, especially Next.js 16 and VoltFlow Mate charging-history rules.
+- [SKILLS.md](SKILLS.md) — current project skills, safe-change workflow, and feature roadmap discipline.
+- [INSTALL.md](INSTALL.md) — user-facing PWA install guide for iPhone, iPad, and Android.
+- [supabase/TELEMETRY.md](supabase/TELEMETRY.md) — VoltFlow Mate telemetry storage model and ingest compatibility notes.
+- [supabase/BYDMATE_APK_API.md](supabase/BYDMATE_APK_API.md) — Android APK cloud ingest contract.
+- [supabase/MIGRATIONS_AUDIT.md](supabase/MIGRATIONS_AUDIT.md) — migration-chain audit and one-at-a-time migration workflow.
+
 ## Language / Язык
 
 - [English](#english)
@@ -38,8 +47,10 @@ VoltFlow helps EV drivers model and track AC charging sessions without talking d
 - **Internationalization** for English, Belarusian, and Russian.
 - **BYD YUAN UP knowledge base** with Telegram-style guides, FAQ, accessories, spare parts, and admin CMS.
 - **Semantic knowledge search** powered by OpenAI embeddings.
-- **BYDMate live telemetry** ingestion for vehicle snapshots, history, and trip tracks.
+- **VoltFlow Mate live telemetry** ingestion for vehicle snapshots, history, and trip tracks.
+- **VoltFlow Mate charging history** with delayed completion sample preservation for SOC/cell-voltage tails.
 - **Web push notifications** for completed charging sessions when VAPID keys are configured.
+- **Developer diagnostics** for dashboard, charging, history, vehicle telemetry fixtures, VoltFlow Mate Di+, and API debugging.
 
 ### Tech Stack
 
@@ -54,6 +65,60 @@ VoltFlow helps EV drivers model and track AC charging sessions without talking d
 | PWA                | `manifest.ts`, production service worker, app icons, web push   |
 | Deployment target  | Vercel or any Node-compatible Next.js host                      |
 
+
+### Current Progress
+
+This repository already contains the main production surface of VoltFlow. Future work should extend it in place and preserve the working behavior listed here.
+
+#### Working product areas
+
+- Public/marketing entry point and authenticated mobile app shell.
+- Supabase authentication flows: login, forgot password, reset password, auth callback, and protected app routes.
+- Vehicle profile management: create and edit cars with battery, wallbox, efficiency, tariff, and currency preferences.
+- Charging cockpit: active session screen, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback calculations, and realtime session sync.
+- Charging history: session list, detail screen, and VoltFlow Mate session-sample charts through `/api/vehicle/charging-sessions/[sessionId]/samples`.
+- Dashboard, settings, history, charging, and vehicle pages under the authenticated app layout.
+- Installable PWA behavior with manifest, service worker registration in production, branded SVG/PNG assets, and mobile safe-area navigation.
+- Internationalization across English, Belarusian, and Russian.
+- Web push infrastructure for charge-threshold/completion notifications when VAPID keys are configured.
+
+#### VoltFlow Mate and vehicle telemetry
+
+- Cloud ingest endpoint: `POST /api/bydmate/telemetry`.
+- Accepted payloads: single sample, `{ "samples": [...] }`, and direct JSON array batches.
+- API-key and vehicle-id checks through profile VoltFlow Mate cloud key and `X-Vehicle-Id`.
+- Normalized live snapshot storage in `bydmate_live_snapshots`.
+- Append-only historical samples in `bydmate_telemetry_samples`.
+- Hourly rollups in `bydmate_telemetry_hourly`.
+- Server-side trip inference in `bydmate_trips` and GPS track persistence in `bydmate_trip_track_points`.
+- Charging samples are intentionally kept in live/history telemetry but excluded from driving-trip extension.
+- GPS sanity filtering and suspicious point dropping before track persistence.
+- Di+ raw payload storage plus materialized columns for SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC, drive state, and diagnostics.
+
+#### Knowledge base and Telegram experience
+
+- Telegram-style `/telegram` knowledge app with category browsing, article rendering, generation filters, FAQ, charging guides, calculators, accessories, spare parts, ownership experience, and maintenance guides.
+- Server-backed admin CMS for knowledge categories, articles, FAQ, accessories, and spare parts.
+- Public article/category routes at `/telegram/article/[slug]` and `/telegram/category/[slug]`.
+- Semantic knowledge search through OpenAI embeddings and Supabase RPC/table storage when `OPENAI_API_KEY` is available.
+- Fallback/static content in `src/data/telegram/` and typed knowledge helpers in `src/lib/telegram/`.
+
+#### Developer and diagnostic tools
+
+- Dev pages under `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures, and API debugger.
+- Dev proxy/API helpers under `src/app/api/dev/` and `src/components/dev/`.
+- VoltFlow Mate parser, sanitizer, range estimate, trip filter, trip energy, telemetry history, app preferences, and push-threshold tests.
+- Migration wrapper at `scripts/supabase-migrate-one.mjs` for controlled Supabase migration status/plan/up/down operations.
+
+### Preservation Rules
+
+Before adding features or fixing bugs, read [AGENTS.md](AGENTS.md). The short version:
+
+- Treat Next.js 16 as version-specific. Read the relevant guide in `node_modules/next/dist/docs/` before changing framework APIs, routing, server actions, middleware/proxy behavior, metadata, caching, or file structure.
+- Do not assume charging-history data is lost when a chart stops below target SOC. Compare `charging_sessions.started_at`, `charging_sessions.stopped_at`, `charging_sessions.current_percent`, `charging_sessions.target_percent`, `bydmate_telemetry_samples.device_time`, and delayed samples around the stop time.
+- Preserve delayed VoltFlow Mate completion samples because target SOC may arrive minutes after VoltFlow marks a session `completed`.
+- When fresh VoltFlow Mate live SOC exists, never auto-complete a charging session from mathematical time estimates. Math is display fallback only; completion must wait for live SOC so the 100% cell-voltage tail is captured.
+- Keep existing working features untouched unless the task explicitly requires changing them. Prefer narrow, tested edits over broad refactors.
 
 ### Getting Started
 
@@ -94,7 +159,7 @@ VAPID_PRIVATE_KEY=your-vapid-private-key
 VAPID_SUBJECT=mailto:your@email.com
 ```
 
-The client uses the anon key with RLS. The service role key is used by server-side admin, knowledge search, and BYDMate ingestion flows and should never be exposed to the browser. `OPENAI_API_KEY` enables semantic search indexing/search. VAPID keys enable browser push notifications.
+The client uses the anon key with RLS. The service role key is used by server-side admin, knowledge search, and VoltFlow Mate ingestion flows and should never be exposed to the browser. `OPENAI_API_KEY` enables semantic search indexing/search. VAPID keys enable browser push notifications.
 
 #### 3. Prepare Supabase
 
@@ -111,7 +176,7 @@ They create and evolve:
 - `charging_sessions`
 - `push_subscriptions`
 - knowledge CMS tables for categories, articles, FAQ, accessories, spare parts, and semantic search
-- BYDMate telemetry snapshots, samples, trips, and track points
+- VoltFlow Mate telemetry snapshots, samples, trips, and track points
 - RLS policies scoped by `auth.uid()`
 - profile creation trigger
 - `updated_at` trigger
@@ -138,7 +203,12 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run dev       # Start Next.js dev server
 npm run build     # Create production build
 npm run start     # Start production server
+npm run test      # Run Node test suite for VoltFlow Mate, app preferences, and push logic
 npm run lint      # Run ESLint
+npm run db:migrations:status
+npm run db:migrations:plan
+npm run db:migrations:up
+npm run db:migrations:down
 ```
 
 ### Automatic Version Bump
@@ -255,13 +325,15 @@ User-facing install instructions live in [INSTALL.md](INSTALL.md).
 
 ```text
 src/app/                 Routes, layouts, manifest, auth callback
+src/app/api/             VoltFlow Mate, vehicle telemetry, push, knowledge, and dev APIs
 src/actions/             Server actions for cars and sessions
-src/components/          UI, brand, dashboard, charging, history, settings
-src/hooks/               Query, session, translation, and ticking-clock hooks
-src/lib/                 Charging math, i18n, Supabase clients, utilities
+src/components/          UI, brand, dashboard, charging, history, telegram, admin, settings
+src/hooks/               Query hooks, VoltFlow Mate hooks, session, translation, ticking clock
+src/lib/                 Charging math, VoltFlow Mate logic, i18n, Supabase clients, utilities
 src/stores/              Local UI and preference stores
 src/types/               Database types
 supabase/migrations/     Database schema, RLS, triggers, Realtime setup
+supabase/*.md            Telemetry, APK contract, and migration audit docs
 public/                  PWA icons, service worker, brand assets
 ```
 
@@ -300,8 +372,10 @@ VoltFlow помогает владельцам электромобилей мо
 - **Локализация** на английский, белорусский и русский языки.
 - **База знаний BYD YUAN UP** в Telegram-формате: гайды, FAQ, аксессуары, запчасти и admin CMS.
 - **Семантический поиск** по базе знаний через OpenAI embeddings.
-- **BYDMate live telemetry** для live-снимков автомобиля, истории и треков поездок.
+- **VoltFlow Mate live telemetry** для live-снимков автомобиля, истории и треков поездок.
+- **История зарядки VoltFlow Mate** с сохранением отложенных completion-сэмплов для SOC и хвоста cell-voltage.
 - **Web push-уведомления** о завершении зарядки, если настроены VAPID-ключи.
+- **Dev-диагностика** для dashboard, charging, history, vehicle telemetry fixtures, VoltFlow Mate Di+ и API debugging.
 
 ### Стек
 
@@ -316,6 +390,60 @@ VoltFlow помогает владельцам электромобилей мо
 | PWA                | `manifest.ts`, production service worker, app icons, web push   |
 | Деплой             | Vercel или любой Node-compatible хостинг для Next.js            |
 
+
+### Текущий прогресс
+
+В репозитории уже есть основная рабочая поверхность VoltFlow. Новые функции нужно добавлять поверх существующего поведения, не ломая уже работающие сценарии.
+
+#### Рабочие зоны продукта
+
+- Public/marketing entry point и защищенная mobile-first оболочка приложения.
+- Supabase auth: login, forgot password, reset password, auth callback и protected routes.
+- Профили автомобилей: создание и редактирование машины с батареей, wallbox, эффективностью AC-зарядки, тарифом и валютой.
+- Экран зарядки: активная сессия, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback и realtime-синхронизация.
+- История зарядок: список, detail screen и графики VoltFlow Mate samples через `/api/vehicle/charging-sessions/[sessionId]/samples`.
+- Dashboard, settings, history, charging и vehicle pages внутри authenticated app layout.
+- PWA: manifest, production service worker, бренд-ассеты, установка на home screen и safe-area navigation.
+- Локализация на английский, белорусский и русский.
+- Web push инфраструктура для charge-threshold/completion уведомлений при настроенных VAPID ключах.
+
+#### VoltFlow Mate и телеметрия автомобиля
+
+- Cloud ingest endpoint: `POST /api/bydmate/telemetry`.
+- Поддерживаются single sample, `{ "samples": [...] }` и прямой JSON array batch.
+- Проверки API key и `X-Vehicle-Id` через профильный VoltFlow Mate cloud key.
+- Live-состояние хранится в `bydmate_live_snapshots`.
+- Исторические сэмплы хранятся append-only в `bydmate_telemetry_samples`.
+- Hourly rollups хранятся в `bydmate_telemetry_hourly`.
+- Trips строятся сервером в `bydmate_trips`, GPS track points сохраняются в `bydmate_trip_track_points`.
+- Charging samples сохраняются в live/history telemetry, но не создают и не продлевают driving trips.
+- До сохранения треков применяется фильтрация подозрительных GPS-точек.
+- Di+ сохраняется raw JSON и частично материализуется в колонки для SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC и diagnostics.
+
+#### База знаний и Telegram experience
+
+- Telegram-style `/telegram` приложение: категории, статьи, generation filters, FAQ, charging guides, calculators, accessories, spare parts, ownership experience и maintenance guides.
+- Admin CMS для categories, articles, FAQ, accessories и spare parts.
+- Public routes для статей и категорий: `/telegram/article/[slug]`, `/telegram/category/[slug]`.
+- Семантический поиск через OpenAI embeddings и Supabase при наличии `OPENAI_API_KEY`.
+- Static/fallback контент находится в `src/data/telegram/`, typed helpers — в `src/lib/telegram/`.
+
+#### Dev и диагностика
+
+- Dev pages под `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures и API debugger.
+- Dev proxy/API helpers находятся в `src/app/api/dev/` и `src/components/dev/`.
+- Покрыты тестами VoltFlow Mate parser, sanitizer, range estimate, trip filter, trip energy, telemetry history, app preferences и push thresholds.
+- Контролируемые миграции Supabase выполняются через `scripts/supabase-migrate-one.mjs`.
+
+### Правила сохранения рабочей функциональности
+
+Перед изменениями читайте [AGENTS.md](AGENTS.md). Короткая версия:
+
+- Next.js 16 считать отдельной версией с возможными breaking changes. Перед изменениями framework APIs, routing, server actions, middleware/proxy, metadata, caching или file structure читать релевантный guide в `node_modules/next/dist/docs/`.
+- Если график истории зарядки остановился ниже target SOC, не считать данные потерянными. Сначала сравнить `charging_sessions.started_at`, `charging_sessions.stopped_at`, `charging_sessions.current_percent`, `charging_sessions.target_percent`, `bydmate_telemetry_samples.device_time` и delayed samples вокруг stop time.
+- Сохранять отложенные VoltFlow Mate completion samples: target SOC может прийти через несколько минут после того, как VoltFlow отметил сессию `completed`.
+- Если есть свежий VoltFlow Mate live SOC, не auto-complete зарядную сессию по математической оценке времени. Математика может быть только display fallback; завершение должно ждать live SOC, чтобы сохранить 100% cell-voltage tail.
+- Не трогать уже рабочие сценарии без прямой необходимости. Предпочитать узкие изменения с тестами вместо широких рефакторингов.
 
 ### Быстрый старт
 
@@ -356,7 +484,7 @@ VAPID_PRIVATE_KEY=your-vapid-private-key
 VAPID_SUBJECT=mailto:your@email.com
 ```
 
-Клиентская часть использует anon key вместе с RLS. Service role key используется серверными admin-, search- и BYDMate-сценариями и не должен попадать в браузер. `OPENAI_API_KEY` включает семантический поиск. VAPID-ключи включают browser push-уведомления.
+Клиентская часть использует anon key вместе с RLS. Service role key используется серверными admin-, search- и VoltFlow Mate-сценариями и не должен попадать в браузер. `OPENAI_API_KEY` включает семантический поиск. VAPID-ключи включают browser push-уведомления.
 
 #### 3. Подготовьте Supabase
 
@@ -373,7 +501,7 @@ supabase/migrations/
 - `charging_sessions`
 - `push_subscriptions`
 - CMS-таблицы базы знаний для разделов, статей, FAQ, аксессуаров, запчастей и семантического поиска
-- BYDMate telemetry snapshots, samples, trips и track points
+- VoltFlow Mate telemetry snapshots, samples, trips и track points
 - RLS-политики через `auth.uid()`
 - триггер создания профиля
 - триггер `updated_at`
@@ -400,7 +528,12 @@ npm run dev
 npm run dev       # Запуск Next.js dev server
 npm run build     # Production build
 npm run start     # Production server
+npm run test      # Node test suite для VoltFlow Mate, app preferences и push logic
 npm run lint      # ESLint
+npm run db:migrations:status
+npm run db:migrations:plan
+npm run db:migrations:up
+npm run db:migrations:down
 ```
 
 ### Автоматическое обновление версии
@@ -461,13 +594,15 @@ npm run start
 
 ```text
 src/app/                 Роуты, layout-файлы, manifest, auth callback
+src/app/api/             VoltFlow Mate, vehicle telemetry, push, knowledge и dev APIs
 src/actions/             Server actions для автомобилей и сессий
-src/components/          UI, бренд, dashboard, charging, history, settings
-src/hooks/               Query, session, translation и ticking-clock hooks
-src/lib/                 Charging math, i18n, Supabase clients, utilities
+src/components/          UI, бренд, dashboard, charging, history, telegram, admin, settings
+src/hooks/               Query hooks, VoltFlow Mate hooks, session, translation, ticking clock
+src/lib/                 Charging math, VoltFlow Mate logic, i18n, Supabase clients, utilities
 src/stores/              Локальные UI и preference stores
 src/types/               Типы базы данных
 supabase/migrations/     Схема БД, RLS, triggers, Realtime
+supabase/*.md            Telemetry, APK contract и migration audit docs
 public/                  PWA icons, service worker, brand assets
 ```
 

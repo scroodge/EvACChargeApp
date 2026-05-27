@@ -1,4 +1,4 @@
-# BYDMate APK API Contract
+# VoltFlow Mate APK API Contract
 
 Last updated: 2026-05-26
 
@@ -33,7 +33,7 @@ X-Vehicle-Id: <vehicle_id>
 Rules:
 
 - `schema_version` must be `1`.
-- `source` must be `"BYDMate"`.
+- `source` must remain the legacy wire value `"BYDMate"` for compatibility.
 - `vehicle_id` must be 1..160 chars.
 - `device_time` should be ISO-8601, for example `2026-05-26T10:30:00.000Z`.
 - `telemetry` is required and must be an object. `{}` is valid.

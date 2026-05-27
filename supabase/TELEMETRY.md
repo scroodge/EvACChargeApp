@@ -1,8 +1,8 @@
-# BYDMate telemetry schema
+# VoltFlow Mate telemetry schema
 
 APK ingest contract: see `supabase/BYDMATE_APK_API.md`.
 
-This document describes the current BYDMate telemetry storage model and the Di+
+This document describes the current VoltFlow Mate telemetry storage model and the Di+
 fields that the Android app may send.
 
 ## Cloud ingest contract
@@ -53,7 +53,7 @@ or a batch:
 Important compatibility rules:
 
 - `schema_version` must be `1`.
-- `source` must be `BYDMate`.
+- `source` must remain the legacy wire value `BYDMate` for compatibility.
 - `telemetry` is required and must be an object; it may contain only a subset of
   fields, for example `{ "soc": 50 }`.
 - `location` is required and must be an object; `{}` is valid.
@@ -63,7 +63,7 @@ Important compatibility rules:
   numeric strings. `is_charging` may arrive as a boolean or `"true"`/`"false"`.
 - Batch payloads are capped at 300 samples.
 
-Current BYDMate-own APK generation, as of the local
+Current VoltFlow Mate Android APK generation, as of the legacy local
 `/Users/way/Dev/BYDMate-own` checkout:
 
 - `CloudTelemetryPayload.build(...)` emits `schema_version`, `vehicle_id`,
@@ -75,7 +75,7 @@ Current BYDMate-own APK generation, as of the local
 
 Future compatibility checklist:
 
-- Any change to `CloudTelemetryPayload` in BYDMate-own must be mirrored by a
+- Any change to `CloudTelemetryPayload` in the VoltFlow Mate Android APK must be mirrored by a
   VoltFlow parser test in `src/lib/bydmate/ingest-payload.test.mjs`.
 - Any change to `src/lib/bydmate/ingest-payload.ts` should keep accepting
   existing APK payloads, especially batch samples with `diplus: null`.
@@ -141,7 +141,7 @@ The table is unique on `(trip_id, device_time)`.
 
 ### Removed legacy table
 
-`bydmate_telemetry_points` was the first BYDMate history table. Its data was
+`bydmate_telemetry_points` was the first VoltFlow Mate history table. Its data was
 backfilled into `bydmate_telemetry_samples`; new code should not read it.
 
 ## Di+ payload fields

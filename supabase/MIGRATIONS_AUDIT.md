@@ -6,7 +6,7 @@ Date: 2026-05-26
 
 The migration chain is mostly valid, but it contains several historical fixup migrations that repeatedly redefine the same functions. These files are not safe to delete from an already-linked Supabase project unless the remote migration history is also repaired or the project is rebuilt from a squashed baseline.
 
-The main churn is in BYDMate telemetry:
+The main churn is in VoltFlow Mate telemetry:
 
 - `public.bydmate_ingest_telemetry(...)` is redefined in `20260519120000`, `20260521120000`, `20260522100000`, `20260525153000`, `20260525164000`, `20260525172000`, and `20260526101500`.
 - `public.bydmate_ingest_telemetry_batch(...)` is redefined in `20260519140000`, `20260521120000`, `20260522100000`, `20260525173500`, and `20260525175000`.
