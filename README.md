@@ -49,8 +49,10 @@ VoltFlow helps EV drivers model and track AC charging sessions without talking d
 - **Semantic knowledge search** powered by OpenAI embeddings.
 - **VoltFlow Mate live telemetry** ingestion for vehicle snapshots, history, and trip tracks.
 - **VoltFlow Mate charging history** with delayed completion sample preservation for SOC/cell-voltage tails.
+- **Trip history** with per-trip energy summary, sample timeline, and GPS track viewer.
+- **Knowledge search** standalone page at `/knowledge/search` for full-text article lookup.
 - **Web push notifications** for completed charging sessions when VAPID keys are configured.
-- **Developer diagnostics** for dashboard, charging, history, vehicle telemetry fixtures, VoltFlow Mate Di+, and API debugging.
+- **Developer diagnostics** with fixture pages, Wildberries product search, and a `/dev/site/` mirror that bypasses auth for local development.
 
 ### Tech Stack
 
@@ -77,6 +79,8 @@ This repository already contains the main production surface of VoltFlow. Future
 - Vehicle profile management: create and edit cars with battery, wallbox, efficiency, tariff, and currency preferences.
 - Charging cockpit: active session screen, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback calculations, and realtime session sync.
 - Charging history: session list, detail screen, and VoltFlow Mate session-sample charts through `/api/vehicle/charging-sessions/[sessionId]/samples`.
+- Trip history: trip list with energy summary via `/api/vehicle/trips`, per-trip sample timeline via `/api/vehicle/trips/[tripId]/samples`, and GPS track via `/api/vehicle/trips/[tripId]/track`.
+- Knowledge search: standalone page at `/knowledge/search` with full-text lookup backed by `GET /api/knowledge/search`.
 - Dashboard, settings, history, charging, and vehicle pages under the authenticated app layout.
 - Installable PWA behavior with manifest, service worker registration in production, branded SVG/PNG assets, and mobile safe-area navigation.
 - Internationalization across English, Belarusian, and Russian.
@@ -91,6 +95,7 @@ This repository already contains the main production surface of VoltFlow. Future
 - Append-only historical samples in `bydmate_telemetry_samples`.
 - Hourly rollups in `bydmate_telemetry_hourly`.
 - Server-side trip inference in `bydmate_trips` and GPS track persistence in `bydmate_trip_track_points`.
+- Trip API endpoints: `GET /api/vehicle/trips`, `GET /api/vehicle/trips/[tripId]/samples`, `GET /api/vehicle/trips/[tripId]/track`.
 - Charging samples are intentionally kept in live/history telemetry but excluded from driving-trip extension.
 - GPS sanity filtering and suspicious point dropping before track persistence.
 - Di+ raw payload storage plus materialized columns for SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC, drive state, and diagnostics.
@@ -105,8 +110,9 @@ This repository already contains the main production surface of VoltFlow. Future
 
 #### Developer and diagnostic tools
 
-- Dev pages under `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures, and API debugger.
-- Dev proxy/API helpers under `src/app/api/dev/` and `src/components/dev/`.
+- Dev pages under `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures, and Wildberries product search (`/dev/api`).
+- `/dev/site/` mirror rewrites any app route with auth bypass so protected pages can be viewed in development without a real session.
+- Wildberries dev API proxy under `src/app/api/dev/wb/` and debugger UI in `src/components/dev/wb-api-debugger.tsx`.
 - VoltFlow Mate parser, sanitizer, range estimate, trip filter, trip energy, telemetry history, app preferences, and push-threshold tests.
 - Migration wrapper at `scripts/supabase-migrate-one.mjs` for controlled Supabase migration status/plan/up/down operations.
 
@@ -374,8 +380,10 @@ VoltFlow помогает владельцам электромобилей мо
 - **Семантический поиск** по базе знаний через OpenAI embeddings.
 - **VoltFlow Mate live telemetry** для live-снимков автомобиля, истории и треков поездок.
 - **История зарядки VoltFlow Mate** с сохранением отложенных completion-сэмплов для SOC и хвоста cell-voltage.
+- **История поездок** с energy summary, timeline сэмплов и просмотром GPS-трека.
+- **Поиск по базе знаний** на отдельной странице `/knowledge/search`.
 - **Web push-уведомления** о завершении зарядки, если настроены VAPID-ключи.
-- **Dev-диагностика** для dashboard, charging, history, vehicle telemetry fixtures, VoltFlow Mate Di+ и API debugging.
+- **Dev-диагностика** с fixture-страницами, поиском Wildberries и `/dev/site/` зеркалом для обхода авторизации в dev-режиме.
 
 ### Стек
 
@@ -402,6 +410,8 @@ VoltFlow помогает владельцам электромобилей мо
 - Профили автомобилей: создание и редактирование машины с батареей, wallbox, эффективностью AC-зарядки, тарифом и валютой.
 - Экран зарядки: активная сессия, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback и realtime-синхронизация.
 - История зарядок: список, detail screen и графики VoltFlow Mate samples через `/api/vehicle/charging-sessions/[sessionId]/samples`.
+- История поездок: список с energy summary через `/api/vehicle/trips`, timeline сэмплов через `/api/vehicle/trips/[tripId]/samples`, GPS-трек через `/api/vehicle/trips/[tripId]/track`.
+- Поиск знаний: отдельная страница `/knowledge/search` с full-text поиском через `GET /api/knowledge/search`.
 - Dashboard, settings, history, charging и vehicle pages внутри authenticated app layout.
 - PWA: manifest, production service worker, бренд-ассеты, установка на home screen и safe-area navigation.
 - Локализация на английский, белорусский и русский.
@@ -416,6 +426,7 @@ VoltFlow помогает владельцам электромобилей мо
 - Исторические сэмплы хранятся append-only в `bydmate_telemetry_samples`.
 - Hourly rollups хранятся в `bydmate_telemetry_hourly`.
 - Trips строятся сервером в `bydmate_trips`, GPS track points сохраняются в `bydmate_trip_track_points`.
+- Trip API: `GET /api/vehicle/trips`, `GET /api/vehicle/trips/[tripId]/samples`, `GET /api/vehicle/trips/[tripId]/track`.
 - Charging samples сохраняются в live/history telemetry, но не создают и не продлевают driving trips.
 - До сохранения треков применяется фильтрация подозрительных GPS-точек.
 - Di+ сохраняется raw JSON и частично материализуется в колонки для SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC и diagnostics.
@@ -430,8 +441,9 @@ VoltFlow помогает владельцам электромобилей мо
 
 #### Dev и диагностика
 
-- Dev pages под `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures и API debugger.
-- Dev proxy/API helpers находятся в `src/app/api/dev/` и `src/components/dev/`.
+- Dev pages под `/dev`: dashboard, charging, history, vehicle, VoltFlow Mate Di+, vehicle telemetry fixtures и Wildberries product search (`/dev/api`).
+- `/dev/site/` зеркало перезаписывает любой app route с bypass авторизации — защищённые страницы открываются в dev без реальной сессии.
+- Wildberries dev API proxy находится в `src/app/api/dev/wb/`, UI debugger — в `src/components/dev/wb-api-debugger.tsx`.
 - Покрыты тестами VoltFlow Mate parser, sanitizer, range estimate, trip filter, trip energy, telemetry history, app preferences и push thresholds.
 - Контролируемые миграции Supabase выполняются через `scripts/supabase-migrate-one.mjs`.
 

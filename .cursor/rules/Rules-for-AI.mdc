@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+
+Use minimal context. Do not scan the whole repository unless explicitly asked.
+Prefer small focused changes.
+Before editing, explain which files need to change.
+Do not run destructive commands.
+For large tasks, split the work into phases.

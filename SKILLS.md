@@ -60,9 +60,16 @@ Know these files before changing VoltFlow Mate ingest or history:
 - `src/lib/bydmate/telemetry-sanitizer.ts`
 - `src/lib/bydmate/telemetry-history.ts`
 - `src/lib/bydmate/telemetry-session-window.ts`
+- `src/lib/bydmate/telemetry-ranges.ts`
 - `src/lib/bydmate/trip-filter.ts`
 - `src/lib/bydmate/trip-energy.ts`
 - `src/lib/bydmate/range-estimate.ts`
+- `src/app/api/vehicle/trips/route.ts`
+- `src/app/api/vehicle/trips/[tripId]/samples/route.ts`
+- `src/app/api/vehicle/trips/[tripId]/track/route.ts`
+- `src/hooks/use-bydmate-trips-query.ts`
+- `src/hooks/use-bydmate-trip-samples-query.ts`
+- `src/hooks/use-bydmate-trip-track-query.ts`
 - `supabase/TELEMETRY.md`
 - `supabase/BYDMATE_APK_API.md`
 
@@ -211,6 +218,7 @@ Do not accidentally regress:
 - VoltFlow Mate cloud ingest compatibility with the current Android APK.
 - Delayed VoltFlow Mate completion sample preservation.
 - Trip inference excluding charging samples.
+- Trip API endpoints returning list, samples, and GPS track for each trip.
 - Telegram knowledge home, categories, articles, FAQ, calculators, accessories, and spare parts.
 - Admin knowledge CMS forms.
 - Semantic search fallback behavior.
