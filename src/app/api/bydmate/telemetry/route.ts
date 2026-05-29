@@ -154,11 +154,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const payloads = normalized.payloads;
-  const mismatchedPayload = payloads.find((payload) => payload.vehicle_id !== headerVehicleId);
-  if (mismatchedPayload) {
-    return Response.json({ ok: false, error: "Vehicle ID mismatch" }, { status: 400 });
-  }
+  // Normalize vehicle_id in every payload to the header value.
+  // The header reflects the user's current APK setting; stale queue items
+  // may carry an old vehicle_id baked in at enqueue time. Rewriting here
+  // prevents a 400 mismatch that would mark those items non-retryable in
+  // the APK and silently drain the queue.
+  const payloads = normalized.payloads.map((p) =>
+    p.vehicle_id !== headerVehicleId ? { ...p, vehicle_id: headerVehicleId } : p,
+  );
 
   const receivedAt = new Date().toISOString();
   const parsedSamples = payloads.map((payload) => ({

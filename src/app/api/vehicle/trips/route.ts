@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isStationaryChargingLikeTrip } from "@/lib/bydmate/trip-filter";
+import { isStationaryChargingLikeTrip, isSingleSampleTrip } from "@/lib/bydmate/trip-filter";
 import { calculateTripEnergy } from "@/lib/bydmate/trip-energy";
 import { createClient } from "@/lib/supabase/server";
 import type { BydmateTelemetry, BydmateTripRow } from "@/types/database";
@@ -84,7 +84,7 @@ async function attachTripEnergy({
       current_trip_distance_km: sample.telemetry?.current_trip_distance_km,
     }));
 
-    if (isStationaryChargingLikeTrip(trip, points)) {
+    if (isSingleSampleTrip(trip) || isStationaryChargingLikeTrip(trip, points)) {
       return [];
     }
 

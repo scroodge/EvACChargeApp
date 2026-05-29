@@ -59,6 +59,10 @@ function hasStationaryEvidence(trip: BydmateTripRow, points: TripMotionPowerPoin
   });
 }
 
+export function isSingleSampleTrip(trip: BydmateTripRow): boolean {
+  return trip.sample_count < 2;
+}
+
 export function isStationaryChargingLikeTrip(
   trip: BydmateTripRow,
   points: TripMotionPowerPoint[],

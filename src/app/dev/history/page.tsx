@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/service";
 import { mapChargingSession } from "@/lib/db-map";
 import { calculateTripEnergy } from "@/lib/bydmate/trip-energy";
-import { isStationaryChargingLikeTrip } from "@/lib/bydmate/trip-filter";
+import { isStationaryChargingLikeTrip, isSingleSampleTrip } from "@/lib/bydmate/trip-filter";
 import { HistoryDevClient } from "./HistoryDevClient";
 import type { BydmateTelemetry, BydmateTripRow } from "@/types/database";
 
@@ -62,7 +62,7 @@ export default async function DevHistoryPage() {
     trips = rawTrips.flatMap((trip) => {
       // Reverse to restore chronological order (samples were fetched descending)
       const points = (samplesByTrip.get(trip.id) ?? []).slice().reverse().map((s) => ({ device_time: s.device_time, power_kw: s.telemetry?.power_kw, speed_kmh: s.telemetry?.speed_kmh, current_trip_distance_km: s.telemetry?.current_trip_distance_km }));
-      if (isStationaryChargingLikeTrip(trip, points)) return [];
+      if (isSingleSampleTrip(trip) || isStationaryChargingLikeTrip(trip, points)) return [];
       return [{ ...trip, ...calculateTripEnergy(points) }];
     });
   }
