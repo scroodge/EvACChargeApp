@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { applyWaySessionFilter, DEV_WAY_VEHICLE_ID, resolveWayDevContext } from "@/lib/dev/way-context";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
-const DEFAULT_VEHICLE_ID = "way";
+const DEFAULT_VEHICLE_ID = DEV_WAY_VEHICLE_ID;
 const CHARGING_SAMPLE_LIMIT = 360;
 const AVAILABLE_DATES_SAMPLE_LIMIT = 900;
 const CHARGE_WINDOW_GAP_MS = 30 * 60 * 1000;
@@ -75,6 +76,10 @@ export default async function DevChargingPage({
   const requestedDate = readParam(params.date);
   const requestedWindowIndex = Number(readParam(params.window) ?? "0");
   const supabase = createServiceClient();
+  const way =
+    vehicleId === DEV_WAY_VEHICLE_ID
+      ? await resolveWayDevContext(supabase, vehicleId)
+      : { vehicleId, appUserId: null as string | null, carIds: [] as string[] };
 
   const { data: liveRows, error: liveError } = await supabase
     .from("bydmate_live_snapshots")
@@ -85,12 +90,15 @@ export default async function DevChargingPage({
 
   const live = ((liveRows ?? []) as LiveRow[])[0] ?? null;
 
-  const { data: activeRows, error: activeError } = await supabase
-    .from("charging_sessions")
-    .select("id, user_id, status, started_at, stopped_at, updated_at, created_at, start_percent, current_percent, target_percent, battery_capacity_kwh, efficiency_percent, price_per_kwh, charged_energy_kwh, estimated_cost, charger_power_kw")
-    .eq("status", "charging")
-    .order("created_at", { ascending: false })
-    .limit(3);
+  const { data: activeRows, error: activeError } = await applyWaySessionFilter(
+    supabase
+      .from("charging_sessions")
+      .select("id, user_id, status, started_at, stopped_at, updated_at, created_at, start_percent, current_percent, target_percent, battery_capacity_kwh, efficiency_percent, price_per_kwh, charged_energy_kwh, estimated_cost, charger_power_kw")
+      .eq("status", "charging")
+      .order("created_at", { ascending: false })
+      .limit(3),
+    way,
+  );
 
   const { data: availableRows } = await supabase
     .from("bydmate_telemetry_samples")

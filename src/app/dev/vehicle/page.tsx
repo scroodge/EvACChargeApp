@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import type { ChargingSampleRef } from "@/app/dev/vehicle-telemetry-fixtures/build-charging-snapshot";
 import { VehicleFixtureModeSwitch } from "@/app/dev/vehicle-telemetry-fixtures/VehicleFixtureModeSwitch";
+import { DEV_WAY_VEHICLE_ID } from "@/lib/dev/way-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import type {
   BydmateLiveSnapshotRow,
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
-const DEFAULT_VEHICLE_ID = "way";
+const DEFAULT_VEHICLE_ID = DEV_WAY_VEHICLE_ID;
 const SAMPLE_LIMIT = 420;
 
 type SampleRow = {

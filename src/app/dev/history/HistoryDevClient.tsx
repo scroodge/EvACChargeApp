@@ -698,7 +698,7 @@ export function HistoryDevClient({
       {tab === "charging" ? (
         sessions.length === 0 ? (
           <p className="rounded-2xl border border-border bg-white/[0.02] p-6 text-center text-sm text-muted-foreground">
-            No charging sessions yet for this vehicle user.
+            No charging sessions yet for vehicle “way” (cars.vehicle_alias).
           </p>
         ) : (
           <ChargingTab sessions={sessions} />
