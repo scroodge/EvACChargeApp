@@ -36,13 +36,15 @@ async function attachTripEnergy({
     Date.parse(tripEndTime(trip)) > Date.parse(max) ? tripEndTime(trip) : max
   ), tripEndTime(trips[0]));
 
+  // Descending so the 10000-row limit covers the most recent samples first;
+  // each trip's sample list is reversed to chronological order before energy calculation.
   let query = supabase
     .from("bydmate_telemetry_samples")
     .select("vehicle_id, device_time, telemetry")
     .eq("user_id", userId)
     .gte("device_time", from)
     .lte("device_time", to)
-    .order("device_time", { ascending: true })
+    .order("device_time", { ascending: false })
     .limit(10000);
 
   if (vehicleId) {
@@ -74,7 +76,8 @@ async function attachTripEnergy({
   }
 
   return trips.flatMap((trip) => {
-    const points = (samplesByTrip.get(trip.id) ?? []).map((sample) => ({
+    // Reverse to chronological order (samples were fetched descending)
+    const points = (samplesByTrip.get(trip.id) ?? []).slice().reverse().map((sample) => ({
       device_time: sample.device_time,
       power_kw: sample.telemetry?.power_kw,
       speed_kmh: sample.telemetry?.speed_kmh,
@@ -100,10 +103,10 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const date = params.get("date");
   const vehicleId = params.get("vehicle_id")?.trim();
-  const limit = Math.min(Math.max(Number(params.get("limit") ?? 1) || 1, 1), 20);
+  const limit = Math.min(Math.max(Number(params.get("limit") ?? 1) || 1, 1), 100);
 
   if (!date) {
-    const queryLimit = Math.min(limit * 4, 80);
+    const queryLimit = Math.min(limit * 2, 200);
     let latestQuery = supabase
       .from("bydmate_trips")
       .select("*")
