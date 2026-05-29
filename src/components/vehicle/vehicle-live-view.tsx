@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   Activity,
   BatteryCharging,
@@ -30,7 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useBydmateTripSamplesQuery } from "@/hooks/use-bydmate-trip-samples-query";
 import { useBydmateTripTrackQuery } from "@/hooks/use-bydmate-trip-track-query";
-import { useBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
+import { useBydmateTripsQuery, useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
 import { calculateCumulativeRegenPoints, calculateTripEnergy } from "@/lib/bydmate/trip-energy";
@@ -141,6 +142,7 @@ function VehicleLiveContent({
   fixturePoints?: BydmateTelemetryPointRow[];
 }) {
   const isCharging = isChargingTelemetry(snapshot.telemetry);
+  const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
   const [fallbackDate] = useState(() => localDateKey(Date.now()));
   const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
   const fixtureDateKeys = useMemo(() => {
@@ -166,10 +168,10 @@ function VehicleLiveContent({
     data: apiTrips = [],
     isLoading: isTripsLoading,
     error: tripsError,
-  } = useBydmateTripsQuery(selectedDate, snapshot.vehicle_id, !fixturePoints && !isCharging);
+  } = useBydmateTripsQuery(selectedDate, snapshot.vehicle_id, !fixturePoints && !isCharging && !isStale);
   const {
     data: forecastApiTrips = [],
-  } = useBydmateTripsQuery(fallbackDate, snapshot.vehicle_id, !fixturePoints && !isCharging && selectedDate !== fallbackDate);
+  } = useBydmateTripsQuery(fallbackDate, snapshot.vehicle_id, !fixturePoints && !isCharging && !isStale && selectedDate !== fallbackDate);
   const trips = fixtureTrips ?? apiTrips;
   const forecastTrips = fixtureTrips ?? (selectedDate === fallbackDate ? apiTrips : forecastApiTrips);
   const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
@@ -177,7 +179,6 @@ function VehicleLiveContent({
   const expandedTripId = selectedTripId === undefined ? defaultTripId : selectedTripId;
   const expandedFixtureTrip =
     fixtureTripSegments?.find((trip) => trip.id === expandedTripId) ?? null;
-  const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
 
   return (
     <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
@@ -195,30 +196,36 @@ function VehicleLiveContent({
         <>
           <CellHealthCard snapshot={snapshot} />
           {isStale ? (
-            <StaleTelemetryNotice />
+            <>
+              <StaleTelemetryNotice />
+              <LastTripCard vehicleId={snapshot.vehicle_id} />
+              <LocationCard snapshot={snapshot} />
+            </>
           ) : (
-            <TelemetryGrid telemetry={snapshot.telemetry} />
+            <>
+              <TelemetryGrid telemetry={snapshot.telemetry} />
+              <TripBrowser
+                selectedDate={selectedDate}
+                availableDateKeys={fixtureDateKeys}
+                onDateChange={(value) => {
+                  setSelectedDateOverride(value);
+                  setSelectedTripId(undefined);
+                }}
+                trips={trips}
+                selectedTripId={expandedTripId}
+                onSelectTrip={(tripId) => {
+                  setSelectedTripId((currentTripId) => {
+                    const currentExpandedTripId = currentTripId === undefined ? defaultTripId : currentTripId;
+                    return currentExpandedTripId === tripId ? null : tripId;
+                  });
+                }}
+                isLoading={isTripsLoading}
+                hasError={Boolean(tripsError)}
+                expandedFixtureTrip={expandedFixtureTrip}
+              />
+              <LocationCard snapshot={snapshot} />
+            </>
           )}
-          <TripBrowser
-            selectedDate={selectedDate}
-            availableDateKeys={fixtureDateKeys}
-            onDateChange={(value) => {
-              setSelectedDateOverride(value);
-              setSelectedTripId(undefined);
-            }}
-            trips={trips}
-            selectedTripId={expandedTripId}
-            onSelectTrip={(tripId) => {
-              setSelectedTripId((currentTripId) => {
-                const currentExpandedTripId = currentTripId === undefined ? defaultTripId : currentTripId;
-                return currentExpandedTripId === tripId ? null : tripId;
-              });
-            }}
-            isLoading={isTripsLoading}
-            hasError={Boolean(tripsError)}
-            expandedFixtureTrip={expandedFixtureTrip}
-          />
-          <LocationCard snapshot={snapshot} />
         </>
       )}
     </div>
@@ -2494,6 +2501,84 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4 border-t border-border py-3 first:border-t-0 first:pt-0">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-heading font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function LastTripCard({ vehicleId }: { vehicleId: string }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const { data: trips = [], isLoading } = useLatestBydmateTripsQuery(vehicleId, 1);
+  const trip = trips[0] ?? null;
+
+  return (
+    <section className="voltflow-card p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight">
+            {tx("vehicle.trips.lastTrip")}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {tx("vehicle.trips.olderInHistory")}
+          </p>
+        </div>
+        <Link
+          href="/history"
+          className="shrink-0 rounded-full border border-border bg-white/[0.03] px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+        >
+          {tx("vehicle.trips.viewHistory")}
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="mt-5">
+          <Skeleton className="h-28 rounded-2xl" />
+        </div>
+      ) : !trip ? (
+        <p className="mt-5 rounded-2xl border border-border bg-white/[0.03] p-4 text-sm text-muted-foreground">
+          {tx("vehicle.trips.empty")}
+        </p>
+      ) : (
+        <LastTripDetail trip={trip} />
+      )}
+    </section>
+  );
+}
+
+function LastTripDetail({ trip }: { trip: BydmateTripRow }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const startMs = Date.parse(trip.started_at);
+  const endMs = Date.parse(trip.ended_at ?? trip.last_device_time);
+  const durationMs = Math.max(0, endMs - startMs);
+
+  return (
+    <div className="mt-5 grid gap-3">
+      <div className="rounded-2xl border border-primary bg-primary/10 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-heading text-lg font-semibold tracking-tight">
+              {formatClock(startMs)} — {formatClock(endMs)}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatDuration(durationMs)} · {new Date(startMs).toLocaleDateString()}
+            </p>
+          </div>
+          <span className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            {tx("vehicle.trips.pointShort", { value: trip.sample_count })}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 min-[430px]:grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))]">
+          <MiniStat label={tx("vehicle.trips.distance")} value={`${fmt(trip.distance_km, 1)} km`} />
+          <MiniStat label={tx("vehicle.trips.regen")} value={`${fmt(trip.regen_energy_kwh, 2)} kWh`} />
+          <MiniStat label={tx("vehicle.trips.traction")} value={`${fmt(trip.traction_energy_kwh, 2)} kWh`} />
+          <MiniStat label="SOC" value={`${fmt(trip.soc_start)}% → ${fmt(trip.soc_end)}%`} />
+          <MiniStat label={tx("vehicle.trips.consumption")} value={`${fmt(trip.avg_consumption_kwh_100km, 1)} kWh/100`} />
+          <MiniStat label={tx("vehicle.trips.maxSpeed")} value={`${fmt(trip.max_speed_kmh)} km/h`} />
+          <MiniStat label={tx("vehicle.trips.avgSpeed")} value={`${fmt(trip.avg_speed_kmh)} km/h`} />
+        </div>
+      </div>
+      <ExpandedTripPanel tripId={trip.id} />
     </div>
   );
 }
