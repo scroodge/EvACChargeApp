@@ -47,13 +47,13 @@ export async function resolveWayDevContext(
   return { vehicleId, appUserId: fallbackUserId, carIds: [] };
 }
 
-type SessionFilterQuery = {
-  in(column: "car_id", values: string[]): SessionFilterQuery;
-  eq(column: "user_id", value: string): SessionFilterQuery;
-};
+export type WaySessionFilter =
+  | { kind: "car"; carIds: string[] }
+  | { kind: "user"; userId: string }
+  | null;
 
-export function applyWaySessionFilter<Q extends SessionFilterQuery>(query: Q, ctx: WayDevContext): Q {
-  if (ctx.carIds.length > 0) return query.in("car_id", ctx.carIds) as Q;
-  if (ctx.appUserId) return query.eq("user_id", ctx.appUserId) as Q;
-  return query;
+export function waySessionFilter(ctx: WayDevContext): WaySessionFilter {
+  if (ctx.carIds.length > 0) return { kind: "car", carIds: ctx.carIds };
+  if (ctx.appUserId) return { kind: "user", userId: ctx.appUserId };
+  return null;
 }

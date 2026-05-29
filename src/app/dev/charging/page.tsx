@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { applyWaySessionFilter, DEV_WAY_VEHICLE_ID, resolveWayDevContext } from "@/lib/dev/way-context";
+import { DEV_WAY_VEHICLE_ID, resolveWayDevContext, waySessionFilter } from "@/lib/dev/way-context";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -90,15 +90,19 @@ export default async function DevChargingPage({
 
   const live = ((liveRows ?? []) as LiveRow[])[0] ?? null;
 
-  const { data: activeRows, error: activeError } = await applyWaySessionFilter(
-    supabase
-      .from("charging_sessions")
-      .select("id, user_id, status, started_at, stopped_at, updated_at, created_at, start_percent, current_percent, target_percent, battery_capacity_kwh, efficiency_percent, price_per_kwh, charged_energy_kwh, estimated_cost, charger_power_kw")
-      .eq("status", "charging")
-      .order("created_at", { ascending: false })
-      .limit(3),
-    way,
-  );
+  let activeSessionQuery = supabase
+    .from("charging_sessions")
+    .select("id, user_id, status, started_at, stopped_at, updated_at, created_at, start_percent, current_percent, target_percent, battery_capacity_kwh, efficiency_percent, price_per_kwh, charged_energy_kwh, estimated_cost, charger_power_kw")
+    .eq("status", "charging")
+    .order("created_at", { ascending: false })
+    .limit(3);
+  const activeScope = waySessionFilter(way);
+  if (activeScope?.kind === "car") {
+    activeSessionQuery = activeSessionQuery.in("car_id", activeScope.carIds);
+  } else if (activeScope?.kind === "user") {
+    activeSessionQuery = activeSessionQuery.eq("user_id", activeScope.userId);
+  }
+  const { data: activeRows, error: activeError } = await activeSessionQuery;
 
   const { data: availableRows } = await supabase
     .from("bydmate_telemetry_samples")

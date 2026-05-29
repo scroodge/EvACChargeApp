@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { applyWaySessionFilter, DEV_WAY_VEHICLE_ID, resolveWayDevContext } from "@/lib/dev/way-context";
+import { resolveWayDevContext, waySessionFilter } from "@/lib/dev/way-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { mapChargingSession } from "@/lib/db-map";
 import { calculateTripEnergy } from "@/lib/bydmate/trip-energy";
@@ -27,15 +27,18 @@ export default async function DevHistoryPage() {
 
   const rawTrips = (tripRows ?? []) as BydmateTripRow[];
 
-  const sessionQuery = applyWaySessionFilter(
-    supabase
-      .from("charging_sessions")
-      .select("*")
-      .not("started_at", "is", null)
-      .order("started_at", { ascending: false })
-      .limit(100),
-    way,
-  );
+  let sessionQuery = supabase
+    .from("charging_sessions")
+    .select("*")
+    .not("started_at", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(100);
+  const sessionScope = waySessionFilter(way);
+  if (sessionScope?.kind === "car") {
+    sessionQuery = sessionQuery.in("car_id", sessionScope.carIds);
+  } else if (sessionScope?.kind === "user") {
+    sessionQuery = sessionQuery.eq("user_id", sessionScope.userId);
+  }
 
   const sessionPromise = sessionQuery;
 
