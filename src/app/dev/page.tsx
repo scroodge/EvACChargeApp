@@ -28,7 +28,7 @@ type DevRoute = {
   href?: string;
 };
 
-const sitePrefix = "/dev/site";
+const sitePrefix = "/dev";
 
 const appRoutes: DevRoute[] = [
   route("Cockpit", "/dashboard", Gauge),
@@ -37,6 +37,7 @@ const appRoutes: DevRoute[] = [
   route("History", "/history", LayoutDashboard),
   route("Settings", "/settings", Settings),
   route("New car", "/cars/new", CarFront),
+  route("Edit car (way)", "/cars/[id]/edit", CarFront, "Open from Settings after loading cars"),
 ];
 
 const adminRoutes: DevRoute[] = [
@@ -63,10 +64,6 @@ const publicRoutes: DevRoute[] = [
 
 const fixtureRoutes: DevRoute[] = [
   directRoute("WB API debug", "/dev/api", Server),
-  directRoute("Dev dashboard", "/dev/dashboard", Gauge),
-  directRoute("Charging fixture", "/dev/charging", Zap),
-  directRoute("History fixture", "/dev/history", LayoutDashboard),
-  directRoute("Vehicle fixture", "/dev/vehicle", CarFront),
   directRoute("Vehicle fixture controls", "/dev/vehicle-telemetry-fixtures", Beaker),
   directRoute("DiPlus diagnostics", "/dev/bydmate-diplus", Beaker),
 ];
@@ -101,14 +98,16 @@ export default function DevIndexPage() {
               Все страницы VoltFlow
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Ссылки с префиксом /dev/site открывают реальные страницы через dev-зеркало с bypass авторизации. Fixture-страницы остаются отдельными быстрыми превью.
+              Ссылки с префиксом /dev открывают те же страницы, что и prod, без логина — данные
+              scroodgemac@gmail.com и машины way. Fixture-страницы остаются отдельными
+              диагностическими превью.
             </p>
           </div>
           <Link
-            href="/dev/site/dashboard"
+            href="/dev/dashboard"
             className="inline-flex min-h-10 w-fit items-center justify-center rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground"
           >
-            Открыть cockpit
+            Открыть cockpit (way)
           </Link>
         </header>
 
@@ -204,6 +203,6 @@ function templateRoute(
     title,
     path,
     icon,
-    description: "Нужен реальный id/slug. Откройте из списка сущностей или подставьте значение в адрес /dev/site/...",
+    description: "Нужен реальный id/slug. Откройте из списка сущностей или подставьте значение в адрес /dev/...",
   };
 }

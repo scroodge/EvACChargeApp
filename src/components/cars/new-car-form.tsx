@@ -5,10 +5,12 @@ import type { FormEvent } from "react";
 
 import { CarForm } from "@/components/cars/car-form";
 import { useCreateCarMutation } from "@/hooks/use-cars-query";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 
 export function NewCarForm() {
   const router = useRouter();
+  const appPath = useAppPath();
   const mutation = useCreateCarMutation();
   const setCar = useAppPreferences((s) => s.setSelectedCarId);
 
@@ -18,7 +20,7 @@ export function NewCarForm() {
     mutation.mutate(fd, {
       onSuccess: (createdId) => {
         setCar(createdId);
-        router.replace("/dashboard");
+        router.replace(appPath("/dashboard"));
       },
     });
   };
@@ -26,7 +28,7 @@ export function NewCarForm() {
   return (
     <CarForm
       mode="create"
-      cancelHref="/dashboard"
+      cancelHref={appPath("/dashboard")}
       isPending={mutation.isPending}
       onSubmit={handleSubmit}
     />

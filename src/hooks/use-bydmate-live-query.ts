@@ -3,11 +3,24 @@
 import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { usePageVisible } from "@/hooks/use-page-visible";
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 import type { BydmateLiveSnapshotRow } from "@/types/database";
 
+async function fetchBydmateLiveDev(): Promise<BydmateLiveSnapshotRow[]> {
+  const response = await devFetch("/api/vehicle/live");
+  if (!response.ok) throw new Error("Unauthorized");
+  const payload = (await response.json()) as { snapshots?: BydmateLiveSnapshotRow[] };
+  return payload.snapshots ?? [];
+}
+
 async function fetchBydmateLive(): Promise<BydmateLiveSnapshotRow[]> {
+  if (isDevAppRoute()) {
+    return fetchBydmateLiveDev();
+  }
+
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
@@ -27,8 +40,12 @@ async function fetchBydmateLive(): Promise<BydmateLiveSnapshotRow[]> {
 export function useBydmateLiveQuery() {
   const queryClient = useQueryClient();
   const supabase = useMemo(() => createClient(), []);
+  const devRoute = isDevAppRoute();
+  const pageVisible = usePageVisible();
 
   useEffect(() => {
+    if (devRoute) return;
+
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     void supabase.auth.getUser().then(({ data: userData }) => {
@@ -57,12 +74,12 @@ export function useBydmateLiveQuery() {
         void supabase.removeChannel(channel);
       }
     };
-  }, [queryClient, supabase]);
+  }, [queryClient, supabase, devRoute]);
 
   return useQuery({
     queryKey: queryKeys.bydmateLive,
     queryFn: fetchBydmateLive,
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: pageVisible ? (devRoute ? 30_000 : 60_000) : false,
   });
 }

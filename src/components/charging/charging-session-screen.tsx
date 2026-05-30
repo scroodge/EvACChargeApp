@@ -21,6 +21,7 @@ import {
   type DerivedChargingState,
 } from "@/lib/charging-math";
 import { formatCurrencyAmount } from "@/lib/i18n";
+import { isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { createClient } from "@/lib/supabase/client";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
@@ -35,6 +36,7 @@ import {
   snapshotSoc,
 } from "@/lib/charging-live";
 import { useAppPreferences } from "@/stores/use-app-preferences";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { useChargingUi } from "@/stores/use-charging-ui";
 import type { ChargingSessionRow } from "@/types/database";
 
@@ -103,6 +105,7 @@ export function ChargingSessionScreen({
   const liveDerived = useChargingUi((s) => s.liveDerived);
   const setLiveDerived = useChargingUi((s) => s.setLiveDerived);
   const currency = useAppPreferences((s) => s.currency);
+  const appPath = useAppPath();
   const { locale, t } = useTranslation();
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
@@ -111,6 +114,8 @@ export function ChargingSessionScreen({
   const completionNoticeRef = useRef(false);
 
   useEffect(() => {
+    if (isDevAppRoute()) return;
+
     const channel = supabase
       .channel(`session-live:${sessionId}`)
       .on(
@@ -381,7 +386,7 @@ export function ChargingSessionScreen({
       <div className="flex flex-col gap-6 p-4">
         <p className="text-muted-foreground">{t("charging.unavailable")}</p>
         <Button asChild size="lg" className="min-h-[48px] text-base">
-          <Link href="/dashboard">{t("charging.backHome")}</Link>
+          <Link href={appPath("/dashboard")}>{t("charging.backHome")}</Link>
         </Button>
       </div>
     );
@@ -442,7 +447,7 @@ export function ChargingSessionScreen({
           </p>
         </div>
         <Button asChild variant="outline" size="lg" className="min-h-[44px]">
-          <Link href={historyMode ? "/history" : "/dashboard"}>
+          <Link href={appPath(historyMode ? "/history" : "/dashboard")}>
             {historyMode ? t("history.title") : t("charging.dashboard")}
           </Link>
         </Button>

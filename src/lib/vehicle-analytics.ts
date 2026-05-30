@@ -232,13 +232,22 @@ export async function fetchLifetimeTrackPoints({
   vehicleId: string;
   limit?: number;
 }) {
+  const { data: trips, error: tripsError } = await supabase
+    .from("bydmate_trips")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("vehicle_id", vehicleId);
+
+  if (tripsError) throw tripsError;
+
+  const tripIds = (trips ?? []).map((trip) => trip.id as string);
+  if (tripIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("bydmate_trip_track_points")
     .select("lat, lon, device_time, trip_id")
     .eq("user_id", userId)
-    .eq("vehicle_id", vehicleId)
-    .not("lat", "is", null)
-    .not("lon", "is", null)
+    .in("trip_id", tripIds)
     .order("device_time", { ascending: false })
     .limit(limit);
 

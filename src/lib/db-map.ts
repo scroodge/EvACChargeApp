@@ -28,6 +28,7 @@ export function mapCar(raw: Record<string, unknown>): Car {
     home_charger_lat: raw.home_charger_lat != null ? num(raw.home_charger_lat) : null,
     home_charger_lon: raw.home_charger_lon != null ? num(raw.home_charger_lon) : null,
     home_charger_radius_m: raw.home_charger_radius_m != null ? num(raw.home_charger_radius_m, 150) : null,
+    vehicle_alias: raw.vehicle_alias != null ? String(raw.vehicle_alias) : null,
     created_at: String(raw.created_at ?? ""),
   };
 }

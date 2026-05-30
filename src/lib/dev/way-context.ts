@@ -3,6 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /** BYDMate vehicle_id / cars.vehicle_alias used across dev routes. */
 export const DEV_WAY_VEHICLE_ID = "way";
 
+/** VoltFlow account impersonated in local /dev/* mirrors. */
+export const DEV_USER_EMAIL = "scroodgemac@gmail.com";
+
 export type WayDevContext = {
   vehicleId: string;
   /** VoltFlow account that owns charging_sessions for this vehicle. */
@@ -16,22 +19,43 @@ export type WayDevContext = {
  * BYDMate rows may use a different user_id than the app account; sessions
  * must be loaded via car_id / app user, not live-snapshot user_id alone.
  */
+async function resolveDevUserId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", DEV_USER_EMAIL)
+    .maybeSingle();
+
+  return (profile?.id as string | undefined) ?? null;
+}
+
 export async function resolveWayDevContext(
   supabase: SupabaseClient,
   vehicleId: string = DEV_WAY_VEHICLE_ID,
 ): Promise<WayDevContext> {
+  const devUserId = await resolveDevUserId(supabase);
+
   const { data: cars } = await supabase
     .from("cars")
     .select("id, user_id, vehicle_alias")
     .eq("vehicle_alias", vehicleId);
 
-  const matched = cars ?? [];
+  const matched = (cars ?? []).filter(
+    (car) => !devUserId || car.user_id === devUserId,
+  );
+
   if (matched.length > 0) {
     return {
       vehicleId,
-      appUserId: matched[0].user_id as string,
+      appUserId: (matched[0].user_id as string) ?? devUserId,
       carIds: matched.map((car) => car.id as string),
     };
+  }
+
+  if (devUserId) {
+    return { vehicleId, appUserId: devUserId, carIds: [] };
   }
 
   const { data: liveRows } = await supabase

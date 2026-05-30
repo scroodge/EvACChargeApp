@@ -3,11 +3,19 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { createClient } from "@/lib/supabase/client";
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
 import type { ChargingSessionRow } from "@/types/database";
 
 export async function fetchSessions(): Promise<ChargingSessionRow[]> {
+  if (isDevAppRoute()) {
+    const response = await devFetch("/api/vehicle/sessions");
+    if (!response.ok) throw new Error("Unauthorized");
+    const payload = (await response.json()) as { sessions?: ChargingSessionRow[] };
+    return payload.sessions ?? [];
+  }
+
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;

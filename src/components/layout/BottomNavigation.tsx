@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useTranslation } from "@/hooks/use-translation";
+import { useVehicleDrivingMode } from "@/hooks/use-vehicle-driving-mode";
+import { getDevPathPrefix, withDevPath } from "@/lib/dev/dev-path";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -17,21 +19,30 @@ const items = [
 
 export function BottomNavigation() {
   const pathname = usePathname();
+  const devPrefix = getDevPathPrefix(pathname);
   const { t } = useTranslation();
+  const isDriving = useVehicleDrivingMode();
+  const visibleItems = isDriving ? items.filter((item) => item.href !== "/charging") : items;
 
   return (
     <nav className="app-bottom-nav" aria-label={t("nav.aria") as string}>
-      <div className="grid grid-cols-5 gap-1">
-        {items.map(({ href, label, fallback, icon: Icon }) => {
+      <div
+        className={cn(
+          "grid gap-1",
+          visibleItems.length === 4 ? "grid-cols-4" : "grid-cols-5",
+        )}
+      >
+        {visibleItems.map(({ href, label, fallback, icon: Icon }) => {
+          const linkHref = withDevPath(href, devPrefix);
           const active =
-            pathname === href ||
-            (href === "/charging" && pathname.startsWith("/charging/")) ||
-            (href !== "/charging" && pathname.startsWith(href + "/"));
+            pathname === linkHref ||
+            (href === "/charging" && pathname.startsWith(withDevPath("/charging/", devPrefix))) ||
+            (href !== "/charging" && pathname.startsWith(linkHref + "/"));
 
           return (
             <Link
               key={href}
-              href={href}
+              href={linkHref}
               className={cn(
                 "flex min-h-[52px] flex-col items-center justify-center rounded-2xl text-[11px] font-semibold transition-colors",
                 active

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isStationaryChargingLikeTrip, isSingleSampleTrip } from "@/lib/bydmate/trip-filter";
 import { calculateTripEnergy } from "@/lib/bydmate/trip-energy";
-import { createClient } from "@/lib/supabase/server";
+import { devVehicleId, resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 import type { BydmateTelemetry, BydmateTripRow } from "@/types/database";
 
 type TripSampleRow = {
@@ -102,23 +102,26 @@ async function attachTripEnergy({
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const access = await resolveVehicleApiAccess(request);
+  if (!access) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const params = request.nextUrl.searchParams;
   const date = params.get("date");
-  const vehicleId = params.get("vehicle_id")?.trim();
+  let vehicleId = params.get("vehicle_id")?.trim() || null;
+  if (!vehicleId && access.devMode) {
+    vehicleId = devVehicleId(request);
+  }
   const limit = Math.min(Math.max(Number(params.get("limit") ?? 1) || 1, 1), 100);
+  const lite = params.get("lite") === "1";
 
   if (!date) {
     const queryLimit = Math.min(limit * 2, 200);
-    let latestQuery = supabase
+    let latestQuery = access.supabase
       .from("bydmate_trips")
       .select("*")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", access.userId)
       .order("started_at", { ascending: false })
       .limit(queryLimit);
 
@@ -131,14 +134,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to load trips" }, { status: 500 });
     }
 
-    const trips = await attachTripEnergy({
-      supabase,
-      userId: userData.user.id,
-      trips: (data ?? []) as BydmateTripRow[],
-      vehicleId,
-    });
+    const rawTrips = (data ?? []) as BydmateTripRow[];
+    const trips = lite
+      ? rawTrips.slice(0, limit)
+      : await attachTripEnergy({
+          supabase: access.supabase,
+          userId: access.userId,
+          trips: rawTrips,
+          vehicleId: vehicleId ?? undefined,
+        }).then((rows) => rows.slice(0, limit));
 
-    return NextResponse.json({ trips: trips.slice(0, limit) });
+    return NextResponse.json({ trips });
   }
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -148,10 +154,10 @@ export async function GET(request: NextRequest) {
   const dayStart = `${date}T00:00:00.000Z`;
   const dayEnd = `${date}T23:59:59.999Z`;
 
-  let query = supabase
+  let query = access.supabase
     .from("bydmate_trips")
     .select("*")
-    .eq("user_id", userData.user.id)
+    .eq("user_id", access.userId)
     .lte("started_at", dayEnd)
     .or(`ended_at.is.null,ended_at.gte.${dayStart}`)
     .order("started_at", { ascending: false });
@@ -166,10 +172,10 @@ export async function GET(request: NextRequest) {
   }
 
   const trips = await attachTripEnergy({
-    supabase,
-    userId: userData.user.id,
+    supabase: access.supabase,
+    userId: access.userId,
     trips: (data ?? []) as BydmateTripRow[],
-    vehicleId,
+    vehicleId: vehicleId ?? undefined,
   });
 
   return NextResponse.json({ date, trips });

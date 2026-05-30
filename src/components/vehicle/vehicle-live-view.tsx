@@ -3,6 +3,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Activity,
   BatteryCharging,
@@ -35,6 +36,7 @@ import { useBydmateTripTrackQuery } from "@/hooks/use-bydmate-trip-track-query";
 import { useBydmateTripsQuery, useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { calculateCumulativeRegenPoints, calculateTripEnergy } from "@/lib/bydmate/trip-energy";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
@@ -81,6 +83,8 @@ function timeAgo(iso: string, nowMs: number, t: Translator) {
 export function VehicleLiveView() {
   const { t } = useTranslation();
   const tx = t as Translator;
+  const searchParams = useSearchParams();
+  const initialTripId = searchParams.get("trip");
   const { data, isLoading, error } = useBydmateLiveQuery();
   const nowMs = useTickingClock(true);
   const snapshot = data?.[0] ?? null;
@@ -117,7 +121,7 @@ export function VehicleLiveView() {
   }
 
   return (
-    <VehicleLiveContent snapshot={snapshot} nowMs={nowMs} />
+    <VehicleLiveContent snapshot={snapshot} nowMs={nowMs} initialTripId={initialTripId} />
   );
 }
 
@@ -137,10 +141,12 @@ function VehicleLiveContent({
   snapshot,
   nowMs,
   fixturePoints,
+  initialTripId = null,
 }: {
   snapshot: BydmateLiveSnapshotRow;
   nowMs: number;
   fixturePoints?: BydmateTelemetryPointRow[];
+  initialTripId?: string | null;
 }) {
   const isCharging = isChargingTelemetry(snapshot.telemetry);
   const isStale = nowMs - Date.parse(snapshot.received_at) > 90_000;
@@ -175,7 +181,9 @@ function VehicleLiveContent({
   } = useBydmateTripsQuery(fallbackDate, snapshot.vehicle_id, !fixturePoints && !isCharging && !isStale && selectedDate !== fallbackDate);
   const trips = fixtureTrips ?? apiTrips;
   const forecastTrips = fixtureTrips ?? (selectedDate === fallbackDate ? apiTrips : forecastApiTrips);
-  const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
+  const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(
+    initialTripId ?? undefined,
+  );
   const defaultTripId = trips[0]?.id ?? null;
   const expandedTripId = selectedTripId === undefined ? defaultTripId : selectedTripId;
   const expandedFixtureTrip =
@@ -2520,6 +2528,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function LastTripCard({ vehicleId }: { vehicleId: string }) {
   const { t } = useTranslation();
+  const appPath = useAppPath();
   const tx = t as Translator;
   const { data: trips = [], isLoading } = useLatestBydmateTripsQuery(vehicleId, 1);
   const trip = trips[0] ?? null;
@@ -2536,7 +2545,7 @@ function LastTripCard({ vehicleId }: { vehicleId: string }) {
           </p>
         </div>
         <Link
-          href="/history"
+          href={appPath("/history")}
           className="shrink-0 rounded-full border border-border bg-white/[0.03] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
         >
           {tx("vehicle.trips.viewHistory")}

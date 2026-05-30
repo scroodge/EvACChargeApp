@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { VehicleLiveView } from "@/components/vehicle/vehicle-live-view";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function VehiclePage() {
-  return <VehicleLiveView />;
+  return (
+    <Suspense fallback={null}>
+      <VehicleLiveView />
+    </Suspense>
+  );
 }

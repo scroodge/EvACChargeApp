@@ -1,6 +1,6 @@
 import type { BydmateTripRow } from "@/types/database";
 
-const MOVING_SPEED_THRESHOLD_KMH = 3;
+export const MOVING_SPEED_THRESHOLD_KMH = 3;
 const STATIONARY_DISTANCE_THRESHOLD_KM = 0.1;
 const CHARGING_POWER_THRESHOLD_KW = -0.1;
 

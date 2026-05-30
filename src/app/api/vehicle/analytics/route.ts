@@ -5,25 +5,24 @@ import {
   fetchMonthlyStats,
   fetchPhantomDrain,
 } from "@/lib/vehicle-analytics";
-import { createClient } from "@/lib/supabase/server";
+import { devVehicleId, resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const access = await resolveVehicleApiAccess(request);
+  if (!access) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const params = request.nextUrl.searchParams;
   const type = params.get("type") ?? "monthly";
-  const vehicleId = params.get("vehicle_id")?.trim() || null;
+  const vehicleId = params.get("vehicle_id")?.trim() || devVehicleId(request);
 
   try {
     if (type === "monthly") {
       const month = params.get("month") ?? new Date().toISOString().slice(0, 7);
       const stats = await fetchMonthlyStats({
-        supabase,
-        userId: userData.user.id,
+        supabase: access.supabase,
+        userId: access.userId,
         vehicleId,
         monthKey: month,
       });
@@ -31,13 +30,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "phantom") {
-      if (!vehicleId) {
-        return NextResponse.json({ error: "vehicle_id required" }, { status: 400 });
-      }
       const days = Number(params.get("days") ?? "14");
       const rows = await fetchPhantomDrain({
-        supabase,
-        userId: userData.user.id,
+        supabase: access.supabase,
+        userId: access.userId,
         vehicleId,
         days: Number.isFinite(days) ? days : 14,
       });
@@ -48,8 +44,8 @@ export async function GET(request: NextRequest) {
       const fromDate = params.get("from") ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       const toDate = params.get("to") ?? new Date().toISOString().slice(0, 10);
       const summary = await fetchCostPerKm({
-        supabase,
-        userId: userData.user.id,
+        supabase: access.supabase,
+        userId: access.userId,
         vehicleId,
         fromDate,
         toDate,

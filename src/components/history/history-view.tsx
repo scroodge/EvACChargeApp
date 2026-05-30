@@ -10,6 +10,7 @@ import { TripDetailPanel } from "@/components/vehicle/TripDetailPanel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDuration } from "@/lib/charging-math";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { useSessionsQuery } from "@/hooks/use-sessions-query";
 import { useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import type { BydmateTripRow, ChargingSessionRow } from "@/types/database";
@@ -274,6 +275,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 // ─── Charging tab ─────────────────────────────────────────────────────────────
 
 function SessionCard({ session }: { session: ChargingSessionRow }) {
+  const appPath = useAppPath();
   const started = session.started_at;
   return (
     <div className="voltflow-card p-3">
@@ -309,7 +311,7 @@ function SessionCard({ session }: { session: ChargingSessionRow }) {
         size="sm"
         className="mt-3 h-9 w-full rounded-full font-heading font-semibold"
       >
-        <Link href={`/history/${session.id}`}>View Detail</Link>
+        <Link href={appPath(`/history/${session.id}`)}>View Detail</Link>
       </Button>
     </div>
   );
@@ -324,6 +326,7 @@ function SessionAccordionItem({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const appPath = useAppPath();
   const started = session.started_at;
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white/[0.02]">
@@ -371,7 +374,7 @@ function SessionAccordionItem({
             size="sm"
             className="mt-2.5 h-8 w-full rounded-full border-border font-heading text-xs font-semibold"
           >
-            <Link href={`/history/${session.id}`}>View Detail →</Link>
+            <Link href={appPath(`/history/${session.id}`)}>View Detail →</Link>
           </Button>
         </div>
       )}

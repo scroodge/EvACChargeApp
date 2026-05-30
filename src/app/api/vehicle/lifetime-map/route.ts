@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { fetchLifetimeTrackPoints } from "@/lib/vehicle-analytics";
-import { createClient } from "@/lib/supabase/server";
+import { devVehicleId, resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const access = await resolveVehicleApiAccess(request);
+  if (!access) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const vehicleId = request.nextUrl.searchParams.get("vehicle_id")?.trim();
-  if (!vehicleId) {
-    return NextResponse.json({ error: "vehicle_id required" }, { status: 400 });
-  }
+  const vehicleId = request.nextUrl.searchParams.get("vehicle_id")?.trim() || devVehicleId(request);
 
   try {
     const points = await fetchLifetimeTrackPoints({
-      supabase,
-      userId: userData.user.id,
+      supabase: access.supabase,
+      userId: access.userId,
       vehicleId,
     });
     return NextResponse.json({ vehicleId, points });

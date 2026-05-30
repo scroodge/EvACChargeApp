@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import { fetchSessions } from "@/hooks/use-sessions-query";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { formatDuration } from "@/lib/charging-math";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ function sessionDate(session: ChargingSessionRow, locale: string): string {
 
 export function ChargingHubView() {
   const router = useRouter();
+  const appPath = useAppPath();
   const { locale, t } = useTranslation();
   const { data: sessions, isLoading } = useQuery({
     queryKey: queryKeys.sessions,
@@ -46,9 +48,9 @@ export function ChargingHubView() {
   // Redirect straight to the live session detail when charging is in progress
   useEffect(() => {
     if (active?.id) {
-      router.replace(`/charging/${active.id}`);
+      router.replace(appPath(`/charging/${active.id}`));
     }
-  }, [active, router]);
+  }, [active, appPath, router]);
 
   // Loading skeleton
   if (isLoading) {
@@ -67,7 +69,7 @@ export function ChargingHubView() {
       <div className="flex flex-1 flex-col items-center gap-12 px-6 py-36 text-lg text-muted-foreground">
         <p>{t("charging.syncing")}</p>
         <Button asChild variant="outline" size="lg" className="h-[52px] rounded-full px-12">
-          <Link href={`/charging/${active.id}`}>{t("charging.redirectStalls")}</Link>
+          <Link href={appPath(`/charging/${active.id}`)}>{t("charging.redirectStalls")}</Link>
         </Button>
       </div>
     );
@@ -93,7 +95,7 @@ export function ChargingHubView() {
       {/* Latest session card or empty-state hint */}
       {latestSession ? (
         <Link
-          href={`/history/${latestSession.id}`}
+          href={appPath(`/history/${latestSession.id}`)}
           className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-border bg-white/[0.03] p-4 transition hover:border-primary/50 hover:bg-white/[0.05]"
         >
           <span className="min-w-0">
@@ -131,7 +133,7 @@ export function ChargingHubView() {
           size="lg"
           className="h-[52px] w-full rounded-full bg-[linear-gradient(90deg,#00E676_0%,#00D1FF_100%)] font-heading text-base font-bold text-[#06110B]"
         >
-          <Link href="/dashboard">{t("charging.backCockpit")}</Link>
+          <Link href={appPath("/dashboard")}>{t("charging.backCockpit")}</Link>
         </Button>
         {hasHistory && (
           <Button
@@ -140,7 +142,7 @@ export function ChargingHubView() {
             size="lg"
             className="h-11 w-full rounded-full border-border bg-white/[0.03] font-heading text-sm font-bold"
           >
-            <Link href="/history">{t("history.title")}</Link>
+            <Link href={appPath("/history")}>{t("history.title")}</Link>
           </Button>
         )}
       </div>

@@ -8,6 +8,7 @@ import {
   type ChargingSampleRef,
 } from "@/app/dev/vehicle-telemetry-fixtures/build-charging-snapshot";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
+import { VehicleAnalyticsPanels } from "@/components/vehicle/vehicle-analytics-panels";
 import { VehicleLiveFixtureView } from "@/components/vehicle/vehicle-live-view";
 import type { BydmateLiveSnapshotRow, BydmateTelemetryPointRow } from "@/types/database";
 
@@ -77,6 +78,9 @@ export function VehicleFixtureModeSwitch({
         </div>
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pt-[env(safe-area-inset-top)]">
           <VehicleLiveFixtureView snapshot={displayedSnapshot} points={points} />
+          <div className="px-4 pb-6">
+            <VehicleAnalyticsPanels vehicleId={vehicleId} />
+          </div>
         </main>
         <BottomNavigation />
       </div>

@@ -37,6 +37,8 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
+import { useAppPath } from "@/lib/dev/dev-path";
 import {
   ensureNotificationsPermission,
   ensurePushSubscription,
@@ -48,7 +50,9 @@ import type { Car } from "@/types/database";
 
 export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   const router = useRouter();
-  const { data: cars, isLoading } = useCarsQuery();
+  const appPath = useAppPath();
+  const { data: carsResult, isLoading } = useCarsQuery();
+  const cars = carsResult?.cars;
   const [email, setEmail] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [bydmateCloudApiKey, setBydmateCloudApiKey] = useState("");
@@ -60,6 +64,45 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   const { t } = useTranslation();
   useEffect(() => {
     let mounted = true;
+
+    if (isDevAppRoute()) {
+      void devFetch("/api/vehicle/profile").then(async (response) => {
+        if (!mounted || !response.ok) return;
+        const payload = (await response.json()) as {
+          email?: string | null;
+          profile?: {
+            id?: string;
+            preferred_currency?: string;
+            default_price_per_kwh?: number;
+            bydmate_cloud_api_key?: string | null;
+          } | null;
+        };
+
+        setEmail(payload.email ?? null);
+        setProfileUserId(payload.profile?.id ?? null);
+
+        const preferredCurrency = payload.profile?.preferred_currency;
+        if (typeof preferredCurrency === "string" && isCurrency(preferredCurrency)) {
+          setCurrency(preferredCurrency);
+        }
+
+        const defaultPrice = Number(payload.profile?.default_price_per_kwh);
+        if (Number.isFinite(defaultPrice) && defaultPrice >= 0) {
+          setDefaultPrice(defaultPrice);
+        }
+
+        setBydmateCloudApiKey(
+          typeof payload.profile?.bydmate_cloud_api_key === "string"
+            ? payload.profile.bydmate_cloud_api_key
+            : "",
+        );
+      });
+
+      return () => {
+        mounted = false;
+      };
+    }
+
     const supabase = createClient();
 
     void supabase.auth.getUser().then(async ({ data }) => {
@@ -179,6 +222,10 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   };
 
   const handleSignOut = async () => {
+    if (isDevAppRoute()) {
+      toast.message("Dev preview — sign out disabled");
+      return;
+    }
     const supabase = createClient();
     await supabase.auth.signOut();
     toast.success(t("settings.signedOut") as string);
@@ -422,7 +469,7 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
                 </p>
               </div>
               <Button asChild variant="secondary" size="lg" className="h-[54px] rounded-full">
-                <Link href="/cars/new">{t("settings.addEv")}</Link>
+                <Link href={appPath("/cars/new")}>{t("settings.addEv")}</Link>
               </Button>
             </div>
             <div className="space-y-5">
@@ -572,6 +619,7 @@ function PushStatusRow({ label, value }: { label: string; value: string }) {
 
 function CarRow({ car }: { car: Car }) {
   const { t } = useTranslation();
+  const appPath = useAppPath();
   const generationLabel = t(`cars.generation.${car.model_generation}`) as string;
 
   const handleDelete = async () => {
@@ -605,7 +653,7 @@ function CarRow({ car }: { car: Car }) {
           className="rounded-full px-8 text-[15px]"
           asChild
         >
-          <Link href={`/cars/${car.id}/edit`}>
+          <Link href={appPath(`/cars/${car.id}/edit`)}>
             <Pencil className="mr-2 size-4" aria-hidden />
             {t("settings.edit")}
           </Link>

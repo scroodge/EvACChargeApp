@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { fetchTelemetryHistory } from "@/lib/bydmate/telemetry-history";
 import { parseTelemetryRange } from "@/lib/bydmate/telemetry-ranges";
-import { createClient } from "@/lib/supabase/server";
+import { devVehicleId, resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const access = await resolveVehicleApiAccess(request);
+  if (!access) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,8 +17,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const points = await fetchTelemetryHistory({
-      supabase,
-      userId: userData.user.id,
+      supabase: access.supabase,
+      userId: access.userId,
       vehicleId,
       range,
       anchorDate,

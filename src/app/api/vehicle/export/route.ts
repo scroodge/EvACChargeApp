@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { devVehicleId, resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 
 function csvEscape(value: unknown) {
   const text = value == null ? "" : String(value);
@@ -9,9 +9,8 @@ function csvEscape(value: unknown) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const access = await resolveVehicleApiAccess(request);
+  if (!access) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,27 +18,27 @@ export async function GET(request: NextRequest) {
   const format = params.get("format") === "json" ? "json" : "csv";
   const from = params.get("from") ?? new Date(Date.now() - 30 * 86400000).toISOString();
   const to = params.get("to") ?? new Date().toISOString();
-  const vehicleId = params.get("vehicle_id")?.trim() || null;
+  const vehicleId = params.get("vehicle_id")?.trim() || devVehicleId(request);
   const vehicleFilter = vehicleId ? { vehicle_id: vehicleId } : {};
 
   const [{ data: sessions }, { data: trips }, { data: samples }] = await Promise.all([
-    supabase
+    access.supabase
       .from("charging_sessions")
       .select("*")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", access.userId)
       .gte("started_at", from)
       .lte("started_at", to),
-    supabase
+    access.supabase
       .from("bydmate_trips")
       .select("*")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", access.userId)
       .match(vehicleFilter)
       .gte("started_at", from)
       .lte("started_at", to),
-    supabase
+    access.supabase
       .from("bydmate_telemetry_samples")
       .select("device_time, vehicle_id, telemetry, location")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", access.userId)
       .match(vehicleFilter)
       .gte("device_time", from)
       .lte("device_time", to)

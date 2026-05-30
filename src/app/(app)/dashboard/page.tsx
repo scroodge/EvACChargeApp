@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DashboardDevToolbar } from "@/components/dev/dashboard-dev-toolbar";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardPage() {
-  return <DashboardView />;
+  return (
+    <>
+      <DashboardDevToolbar />
+      <DashboardView />
+    </>
+  );
 }

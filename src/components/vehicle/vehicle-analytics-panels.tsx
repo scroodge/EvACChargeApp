@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateTelemetryHistoryQuery } from "@/hooks/use-bydmate-telemetry-history-query";
 import { useTranslation } from "@/hooks/use-translation";
+import { devFetch, isDevAppRoute, withDevApiParams } from "@/lib/dev/dev-fetch";
 import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
 import type { BydmateTripTrackPointRow } from "@/types/database";
 
@@ -19,7 +20,9 @@ function fmt(value: number | null | undefined, digits = 1) {
 }
 
 async function fetchAnalytics<T>(path: string): Promise<T> {
-  const response = await fetch(path, { cache: "no-store" });
+  const response = isDevAppRoute()
+    ? await devFetch(path)
+    : await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error("Failed to load analytics");
   return response.json() as Promise<T>;
 }
@@ -93,7 +96,8 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
       }));
   }, [sohQuery.data]);
 
-  const exportUrl = `/api/vehicle/export?format=csv&vehicle_id=${encodeURIComponent(vehicleId)}&from=${costFrom}T00:00:00.000Z&to=${costTo}T23:59:59.999Z`;
+  const exportBase = `/api/vehicle/export?format=csv&vehicle_id=${encodeURIComponent(vehicleId)}&from=${costFrom}T00:00:00.000Z&to=${costTo}T23:59:59.999Z`;
+  const exportUrl = isDevAppRoute() ? withDevApiParams(exportBase) : exportBase;
 
   return (
     <div className="grid gap-3">

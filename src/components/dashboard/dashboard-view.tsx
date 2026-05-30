@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BatteryCharging, CarFront, Route, SlidersHorizontal } from "lucide-react";
+import { BatteryCharging, CarFront, Route } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -12,9 +12,11 @@ import { startChargingSession, stopChargingSession } from "@/actions/sessions";
 import { BrandBadge } from "@/components/brand/BrandBadge";
 import { ChargingBolt } from "@/components/brand/ChargingBolt";
 import { LogoFull } from "@/components/brand/LogoFull";
+import { useDashboardDevSnapshotOverride } from "@/components/dev/dashboard-dev-snapshot-context";
 import { BatteryRing } from "@/components/charging/BatteryRing";
 import { ChargingActionButton } from "@/components/charging/ChargingActionButton";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
 import { useCarsQuery } from "@/hooks/use-cars-query";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import { fetchSessions } from "@/hooks/use-sessions-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
@@ -49,10 +52,18 @@ import {
   findFreshChargingSnapshot,
   snapshotSoc,
 } from "@/lib/charging-live";
+import { useAppPath } from "@/lib/dev/dev-path";
 import { currencySymbols } from "@/lib/i18n";
 import { parseDecimalInput } from "@/lib/number-input";
 import { ensureNotificationsPermission, ensurePushSubscription } from "@/lib/push/client";
 import { queryKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
+import {
+  canStartChargingSession,
+  deriveDashboardVehicleMode,
+  resolveLiveSnapshotForVehicle,
+  type DashboardVehicleMode,
+} from "@/lib/vehicle-live-mode";
 import { useAppPreferences } from "@/stores/use-app-preferences";
 import type { BydmateLiveSnapshotRow, BydmateTripRow, ChargingSessionRow } from "@/types/database";
 
@@ -89,6 +100,100 @@ function durationBetween(startIso: string | null, endIso: string | null) {
 function tripSoc(trip: BydmateTripRow) {
   if (typeof trip.soc_start !== "number" || typeof trip.soc_end !== "number") return "—";
   return `${fmt(trip.soc_start)}% -> ${fmt(trip.soc_end)}%`;
+}
+
+function drivingStatsFromLive(
+  snapshot: BydmateLiveSnapshotRow | null,
+  trip: BydmateTripRow | null,
+) {
+  const telemetry = snapshot?.telemetry;
+  const ongoingTrip = trip && !trip.ended_at ? trip : null;
+
+  return {
+    avgSpeedKmh: ongoingTrip?.avg_speed_kmh ?? telemetry?.speed_kmh ?? null,
+    consumptionKwh100:
+      telemetry?.current_trip_consumption_kwh_100km ??
+      ongoingTrip?.avg_consumption_kwh_100km ??
+      null,
+    distanceKm:
+      telemetry?.current_trip_distance_km ?? ongoingTrip?.distance_km ?? null,
+    regenKwh: trip?.regen_energy_kwh ?? ongoingTrip?.regen_energy_kwh ?? null,
+  };
+}
+
+function DashboardStatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-white/[0.03] p-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 font-heading text-base font-bold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+type DrivingStatAccent = "cyan" | "green" | "default";
+
+function DrivingStatsGrid({
+  items,
+}: {
+  items: {
+    label: string;
+    value: string;
+    unit?: string;
+    accent?: DrivingStatAccent;
+  }[];
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border/80 bg-border/80">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="min-h-[4.25rem] bg-[#12151C]/90 px-3 py-2.5"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {item.label}
+          </p>
+          <p
+            className={cn(
+              "mt-1.5 flex items-baseline gap-1 font-heading font-bold tabular-nums leading-none",
+              item.accent === "cyan" && "text-[var(--voltflow-cyan)]",
+              item.accent === "green" && "text-[var(--voltflow-green)]",
+              (!item.accent || item.accent === "default") && "text-foreground",
+            )}
+          >
+            <span className="text-xl tracking-normal">{item.value}</span>
+            {item.unit ? (
+              <span className="text-[11px] font-semibold text-muted-foreground">{item.unit}</span>
+            ) : null}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function drivingStatParts(
+  value: number | null | undefined,
+  digits: number,
+  unit: string,
+): { value: string; unit?: string } {
+  if (value == null || !Number.isFinite(value)) return { value: "—" };
+  return { value: fmt(value, digits), unit };
+}
+
+function statusBadgeClass(mode: DashboardVehicleMode) {
+  switch (mode) {
+    case "app_charging":
+    case "live_charging":
+      return "text-[var(--voltflow-green)]";
+    case "driving":
+      return "text-[var(--voltflow-cyan)]";
+    case "stale":
+      return "text-muted-foreground";
+    default:
+      return "text-[var(--voltflow-green)]";
+  }
 }
 
 function DashboardSummaryCard({
@@ -140,11 +245,52 @@ function RangeBadge({ value }: { value: string | null }) {
   );
 }
 
+function DashboardLoadingSkeleton() {
+  return (
+    <>
+      <section className="voltflow-card overflow-hidden p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3 w-16 rounded" />
+            <Skeleton className="h-7 w-32 rounded-xl" />
+          </div>
+          <Skeleton className="h-7 w-16 rounded-full" />
+        </div>
+        <div className="mt-3 grid grid-cols-[132px_minmax(0,1fr)] items-center gap-4">
+          <Skeleton className="aspect-square max-w-[132px] rounded-full" />
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-16 rounded-xl" />
+            </div>
+          </div>
+        </div>
+        <Skeleton className="mt-4 h-14 w-full rounded-full" />
+      </section>
+      <div className="grid gap-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Skeleton key={index} className="h-[92px] rounded-2xl" />
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function DashboardView() {
   const router = useRouter();
+  const appPath = useAppPath();
   const qc = useQueryClient();
-  const { data: cars, isLoading } = useCarsQuery();
-  const { data: bydmateLive = [] } = useBydmateLiveQuery();
+  const pageVisible = usePageVisible();
+  const {
+    data: carsResult,
+    isLoading: loadingCars,
+    isError: carsError,
+    refetch: refetchCars,
+  } = useCarsQuery();
+  const cars = carsResult?.cars;
+  const preferredCarId = carsResult?.preferredCarId ?? null;
+  const { data: bydmateLive = [], isLoading: loadingLive } = useBydmateLiveQuery();
   const selectedCarId = useAppPreferences((s) => s.selectedCarId);
   const setSelectedCarId = useAppPreferences((s) => s.setSelectedCarId);
   const defaultPrice = useAppPreferences((s) => s.defaultPricePerKwh);
@@ -155,38 +301,73 @@ export function DashboardView() {
     queryKey: queryKeys.sessions,
     queryFn: fetchSessions,
     refetchInterval: (query) => {
+      if (!pageVisible) return false;
       const list = query.state.data as ChargingSessionRow[] | undefined;
       return list?.some((s) => s.status === "charging") ? 1000 : false;
     },
   });
 
-  const activeSession = useMemo(
-    () => sessions?.find((s) => s.status === "charging") ?? null,
-    [sessions],
-  );
-  const nowMs = useTickingClock(Boolean(activeSession));
-  const latestBydmateSnapshot = bydmateLive[0] ?? null;
-  const liveChargingSnapshot = useMemo(
-    () => findFreshChargingSnapshot(bydmateLive, nowMs),
-    [bydmateLive, nowMs],
-  );
-  const { data: latestTrips = [], isLoading: loadingTrips } = useLatestBydmateTripsQuery(
-    latestBydmateSnapshot?.vehicle_id ?? null,
-    8,
-  );
-  const latestBydmateSoc = snapshotSoc(latestBydmateSnapshot);
-  const liveStartPct = liveStartPercent(latestBydmateSnapshot);
-  const latestSession = sessions?.[0] ?? null;
-  const latestTrip = latestTrips[0] ?? null;
-
   const selectedCar =
     cars?.find((c) => c.id === selectedCarId) ?? cars?.[0] ?? null;
+  const scopedVehicleId = selectedCar?.vehicle_alias ?? null;
+
+  const baseBydmateSnapshot = useMemo(
+    () => resolveLiveSnapshotForVehicle(bydmateLive, scopedVehicleId),
+    [bydmateLive, scopedVehicleId],
+  );
+  const latestBydmateSnapshot = useDashboardDevSnapshotOverride(baseBydmateSnapshot);
+
+  const activeSession = useMemo(
+    () =>
+      sessions?.find(
+        (s) => s.status === "charging" && (!selectedCar || s.car_id === selectedCar.id),
+      ) ??
+      sessions?.find((s) => s.status === "charging") ??
+      null,
+    [sessions, selectedCar],
+  );
+
+  const nowMs = useTickingClock(Boolean(activeSession) || pageVisible);
+
+  const vehicleMode = deriveDashboardVehicleMode({
+    snapshot: latestBydmateSnapshot,
+    nowMs,
+    hasActiveSession: Boolean(activeSession),
+  });
+
+  const tripVehicleId = latestBydmateSnapshot?.vehicle_id ?? scopedVehicleId;
+  const { data: latestTrips = [], isLoading: loadingTrips } = useLatestBydmateTripsQuery(
+    tripVehicleId,
+    1,
+    Boolean(tripVehicleId),
+    vehicleMode !== "driving",
+  );
+
+  const carSessions = useMemo(() => {
+    if (!sessions) return [];
+    if (!selectedCar) return sessions;
+    return sessions.filter((s) => s.car_id === selectedCar.id);
+  }, [sessions, selectedCar]);
+
+  const latestSession = carSessions[0] ?? null;
+  const latestTrip = latestTrips[0] ?? null;
 
   useEffect(() => {
     if (!cars?.length) return;
     const exists = cars.some((c) => c.id === selectedCarId);
-    if (!exists) setSelectedCarId(cars[0].id);
-  }, [cars, selectedCarId, setSelectedCarId]);
+    if (!exists) {
+      const nextId =
+        (preferredCarId && cars.some((c) => c.id === preferredCarId)
+          ? preferredCarId
+          : cars[0].id) ?? cars[0].id;
+      setSelectedCarId(nextId);
+    }
+  }, [cars, preferredCarId, selectedCarId, setSelectedCarId]);
+
+  const liveChargingSnapshot = useMemo(
+    () => findFreshChargingSnapshot(bydmateLive, nowMs),
+    [bydmateLive, nowMs],
+  );
 
   const liveActive = useMemo(() => {
     if (!activeSession?.started_at) return null;
@@ -222,18 +403,44 @@ export function DashboardView() {
     () => false,
   );
 
-  const canStartSession = hasMounted && selectedCar && !activeSession;
-  const dashboardStatus = activeSession ? "charging" : "idle";
-  const statusLabel =
-    dashboardStatus === "charging"
-      ? (t("dashboard.statusCharging") as string)
-      : (t("dashboard.statusIdle") as string);
+  const latestBydmateSoc = snapshotSoc(latestBydmateSnapshot);
+  const liveStartPct = liveStartPercent(latestBydmateSnapshot);
+
+  const statusLabel = (() => {
+    switch (vehicleMode) {
+      case "app_charging":
+        return t("dashboard.statusCharging") as string;
+      case "live_charging":
+        return t("dashboard.statusLiveCharging") as string;
+      case "driving":
+        return t("dashboard.statusLive") as string;
+      case "stale":
+        return t("dashboard.statusStale") as string;
+      default:
+        return t("dashboard.statusIdle") as string;
+    }
+  })();
+
+  const actionButtonStatus =
+    vehicleMode === "app_charging"
+      ? "charging"
+      : vehicleMode === "driving"
+        ? "driving"
+        : "idle";
+
+  const canStartSession =
+    hasMounted &&
+    selectedCar &&
+    !activeSession &&
+    canStartChargingSession(vehicleMode);
+
   const currentPercent =
     liveActive?.currentPercent ??
     activeSession?.current_percent ??
     latestBydmateSoc ??
     latestSession?.current_percent ??
     Number(startPct);
+
   const rangeEstimate = latestBydmateSnapshot
     ? estimateVehicleRangeKm(latestBydmateSnapshot, latestTrips)
     : estimateRangeFromSoc({
@@ -245,6 +452,23 @@ export function DashboardView() {
     rangeEstimate?.estimatedRangeKm != null
       ? `≈ ${fmt(rangeEstimate.estimatedRangeKm)} km`
       : null;
+
+  const chargingProgressLine =
+    activeSession && liveActive
+      ? (t("dashboard.chargingProgress", {
+          remaining: formatDuration(Math.round(liveActive.remainingSeconds)),
+          energy: fmt(liveActive.chargedEnergyKwh, 2),
+          cost: `${currencySymbols[currency]}${fmt(liveActive.estimatedCost, 2)}`,
+        }) as string)
+      : null;
+
+  const drivingStats =
+    vehicleMode === "driving"
+      ? drivingStatsFromLive(latestBydmateSnapshot, latestTrip)
+      : null;
+
+  const isPageLoading = loadingCars || (loadingLive && !latestBydmateSnapshot);
+
   const handleStart = async () => {
     if (!selectedCar) return;
     const start = Number(startPct);
@@ -272,7 +496,7 @@ export function DashboardView() {
       await ensurePushSubscription();
       setDialogOpen(false);
       toast.success(t("dashboard.started") as string);
-      router.push(`/charging/${res.sessionId}`);
+      router.push(appPath(`/charging/${res.sessionId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : (t("dashboard.couldNotStart") as string));
     } finally {
@@ -280,13 +504,20 @@ export function DashboardView() {
     }
   };
 
+  const openQuickSession = () => {
+    if (!canStartSession) return;
+    if (liveStartPct !== null) setStartPct(liveStartPct);
+    setPrice(String(defaultPrice));
+    setDialogOpen(true);
+  };
+
   const handleMainAction = async () => {
     if (!activeSession) {
-      if (canStartSession) {
-        if (liveStartPct !== null) setStartPct(liveStartPct);
-        setPrice(String(defaultPrice));
-        setDialogOpen(true);
+      if (vehicleMode === "driving") {
+        router.push(appPath("/vehicle"));
+        return;
       }
+      openQuickSession();
       return;
     }
 
@@ -301,6 +532,13 @@ export function DashboardView() {
     toast.message(t("charging.saved") as string);
   };
 
+  const mainButtonLabel =
+    vehicleMode === "live_charging" && !activeSession
+      ? (t("dashboard.trackCharge") as string)
+      : vehicleMode === "driving"
+        ? (t("dashboard.statusDriving") as string)
+        : undefined;
+
   return (
     <div className="safe-bottom flex flex-col gap-5 px-4 pb-6 pt-5">
       <header className="flex items-center justify-between gap-4">
@@ -310,7 +548,27 @@ export function DashboardView() {
         </BrandBadge>
       </header>
 
-      {!isLoading && cars && cars.length === 0 ? (
+      {isPageLoading ? <DashboardLoadingSkeleton /> : null}
+
+      {!loadingCars && carsError ? (
+        <Card className="voltflow-card border-border bg-transparent">
+          <CardContent className="space-y-4 p-5">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t("dashboard.loadError")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="rounded-full" onClick={() => void refetchCars()}>
+                {t("charging.checkAgain")}
+              </Button>
+              <Button asChild className="rounded-full">
+                <Link href={appPath("/login?next=/dashboard")}>{t("dashboard.signIn")}</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!loadingCars && !carsError && cars && cars.length === 0 ? (
         <section className="voltflow-card p-5">
           <div className="flex items-start gap-3">
             <ChargingBolt className="size-10 shrink-0" aria-hidden />
@@ -328,12 +586,12 @@ export function DashboardView() {
             size="lg"
             className="mt-5 h-14 w-full rounded-full bg-[linear-gradient(90deg,#00E676_0%,#00D1FF_100%)] font-heading text-base font-bold text-[#06110B]"
           >
-            <Link href="/cars/new">{t("dashboard.addVehicle")}</Link>
+            <Link href={appPath("/cars/new")}>{t("dashboard.addVehicle")}</Link>
           </Button>
         </section>
       ) : null}
 
-      {cars && cars.length > 0 ? (
+      {!isPageLoading && !carsError && cars && cars.length > 0 ? (
         <>
           <section className="voltflow-card overflow-hidden p-4">
             <div className="flex items-start justify-between gap-3">
@@ -345,8 +603,10 @@ export function DashboardView() {
                   {selectedCar?.name ?? "EV"}
                 </h1>
               </div>
-              <div className="rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--voltflow-green)]">
-                {statusLabel}
+              <div
+                className={`rounded-full border border-border bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${statusBadgeClass(vehicleMode)}`}
+              >
+                {loadingSessions ? (t("dashboard.syncing") as string) : statusLabel}
               </div>
             </div>
 
@@ -355,15 +615,15 @@ export function DashboardView() {
                 <BatteryRing
                   percent={currentPercent}
                   status={loadingSessions ? (t("dashboard.syncing") as string) : statusLabel}
-                  charging={dashboardStatus === "charging"}
+                  charging={
+                    vehicleMode === "app_charging" || vehicleMode === "live_charging"
+                  }
                   size="compact"
                 />
                 <RangeBadge value={rangeDetail} />
               </div>
               <div className="min-w-0 space-y-3">
-                {isLoading ? (
-                  <Skeleton className="h-10 w-full rounded-xl" />
-                ) : cars.length > 1 ? (
+                {cars.length > 1 ? (
                   <Select
                     items={cars.map((car) => ({
                       value: car.id,
@@ -393,58 +653,75 @@ export function DashboardView() {
                   </Select>
                 ) : null}
 
-                {cars.length <= 1 ? (
-                  <div className="rounded-xl border border-border bg-white/[0.03] px-3 py-2 text-sm text-muted-foreground">
-                    {t("dashboard.singleVehicle") as string}
-                  </div>
-                ) : null}
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl border border-border bg-white/[0.03] p-2.5">
-                    <p className="truncate text-muted-foreground">{t("dashboard.batteryPack")}</p>
-                    <p className="mt-1 font-heading text-base font-bold">
-                      {selectedCar?.battery_capacity_kwh ?? "--"} kWh
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-white/[0.03] p-2.5">
-                    <p className="truncate text-muted-foreground">{t("dashboard.chargerPower")}</p>
-                    <p className="mt-1 font-heading text-base font-bold">
-                      {selectedCar?.default_charger_power_kw ?? "--"} kW
-                    </p>
-                  </div>
+                <div className="text-xs">
+                  {drivingStats ? (
+                    <DrivingStatsGrid
+                      items={[
+                        {
+                          label: t("dashboard.driveAvgSpeed") as string,
+                          ...drivingStatParts(drivingStats.avgSpeedKmh, 0, "km/h"),
+                          accent: "cyan",
+                        },
+                        {
+                          label: t("dashboard.driveConsumption") as string,
+                          ...drivingStatParts(drivingStats.consumptionKwh100, 1, "kWh/100"),
+                        },
+                        {
+                          label: t("dashboard.driveDistance") as string,
+                          ...drivingStatParts(drivingStats.distanceKm, 1, "km"),
+                        },
+                        {
+                          label: t("dashboard.driveRegen") as string,
+                          ...drivingStatParts(drivingStats.regenKwh, 2, "kWh"),
+                          accent: "green",
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <DashboardStatTile
+                        label={t("dashboard.packShort") as string}
+                        value={`${selectedCar?.battery_capacity_kwh ?? "--"} kWh`}
+                      />
+                      <DashboardStatTile
+                        label={t("dashboard.chargerShort") as string}
+                        value={`${selectedCar?.default_charger_power_kw ?? "--"} kW`}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
+            {chargingProgressLine ? (
+              <p className="mt-3 text-center text-xs font-medium text-muted-foreground">
+                {chargingProgressLine}
+              </p>
+            ) : null}
+
             <div className="mt-4 grid gap-2">
               <ChargingActionButton
-                status={dashboardStatus}
+                status={actionButtonStatus}
                 disabled={!selectedCar || stopping}
                 loading={stopping}
                 labels={{
-                  start: t("dashboard.startCharging") as string,
+                  start: mainButtonLabel ?? (t("dashboard.startCharging") as string),
                   stop: t("charging.stop") as string,
                   syncing: t("dashboard.syncing") as string,
+                  driving: t("dashboard.statusDriving") as string,
                 }}
                 onClick={() => void handleMainAction()}
               />
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="h-11 w-full rounded-full border-border bg-white/[0.03] font-heading text-sm font-bold"
-              >
-                <Link href={activeSession ? `/charging/${activeSession.id}` : "/settings"}>
-                  <SlidersHorizontal className="size-4" aria-hidden />
-                  {t("dashboard.adjustSettings")}
-                </Link>
-              </Button>
             </div>
           </section>
 
           <section className="grid gap-3">
             <DashboardSummaryCard
-              href="/vehicle"
+              href={
+                latestTrip
+                  ? appPath(`/vehicle?trip=${encodeURIComponent(latestTrip.id)}`)
+                  : appPath("/vehicle")
+              }
               icon={<Route className="size-5" aria-hidden />}
               label={t("dashboard.latestTrip") as string}
               title={
@@ -470,7 +747,11 @@ export function DashboardView() {
               }
             />
             <DashboardSummaryCard
-              href={latestSession ? "/history" : "/charging"}
+              href={
+                latestSession
+                  ? appPath(`/history/${latestSession.id}`)
+                  : appPath("/charging")
+              }
               icon={<BatteryCharging className="size-5" aria-hidden />}
               label={t("dashboard.latestCharge") as string}
               title={
@@ -497,7 +778,7 @@ export function DashboardView() {
               }
             />
             <DashboardSummaryCard
-              href="/vehicle"
+              href={appPath("/vehicle")}
               icon={<CarFront className="size-5" aria-hidden />}
               label={t("dashboard.liveVehicle") as string}
               title={

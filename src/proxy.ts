@@ -28,9 +28,6 @@ const DEV_AUTH_PREFIXES = [
 const DIRECT_DEV_PATH_PREFIXES = [
   "/dev/api",
   "/dev/bydmate-diplus",
-  "/dev/charging",
-  "/dev/history",
-  "/dev/vehicle",
   "/dev/vehicle-telemetry-fixtures",
 ];
 const DEV_SITE_PREFIX = "/dev/site";
@@ -100,6 +97,9 @@ export async function proxy(request: NextRequest) {
   if (
     (isDevelopment && pathname.startsWith("/api/dev/")) ||
     pathname.startsWith("/api/bydmate/") ||
+    (isDevelopment &&
+      pathname.startsWith("/api/vehicle/") &&
+      request.nextUrl.searchParams.get("dev") === "1") ||
     PUBLIC_METADATA_PATHS.has(pathname) ||
     pathname.startsWith("/icons/") ||
     pathname.endsWith(".webmanifest")

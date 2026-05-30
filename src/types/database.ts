@@ -23,6 +23,7 @@ export type Car = {
   home_charger_lat?: number | null;
   home_charger_lon?: number | null;
   home_charger_radius_m?: number | null;
+  vehicle_alias?: string | null;
   created_at: string;
 };
 

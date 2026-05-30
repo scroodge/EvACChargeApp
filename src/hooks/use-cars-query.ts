@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { createCar, updateCar } from "@/actions/cars";
 import { isCarGeneration } from "@/lib/car-generations";
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { createClient } from "@/lib/supabase/client";
 import { mapCar } from "@/lib/db-map";
 import { parseDecimalInput } from "@/lib/number-input";
@@ -12,7 +13,25 @@ import { queryKeys } from "@/lib/query-keys";
 import { useTranslation } from "@/hooks/use-translation";
 import type { Car } from "@/types/database";
 
-async function fetchCars(): Promise<Car[]> {
+export type CarsQueryResult = {
+  cars: Car[];
+  preferredCarId: string | null;
+};
+
+async function fetchCars(): Promise<CarsQueryResult> {
+  if (isDevAppRoute()) {
+    const response = await devFetch("/api/vehicle/cars");
+    if (!response.ok) throw new Error("Unauthorized");
+    const payload = (await response.json()) as {
+      cars?: Car[];
+      preferredCarId?: string | null;
+    };
+    return {
+      cars: payload.cars ?? [],
+      preferredCarId: payload.preferredCarId ?? null,
+    };
+  }
+
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
@@ -26,7 +45,10 @@ async function fetchCars(): Promise<Car[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((r) => mapCar(r as Record<string, unknown>));
+  return {
+    cars: (data ?? []).map((r) => mapCar(r as Record<string, unknown>)),
+    preferredCarId: null,
+  };
 }
 
 export function useCarsQuery() {
@@ -50,7 +72,7 @@ export function useCreateCarMutation() {
     },
     onMutate: async (formData) => {
       await qc.cancelQueries({ queryKey: queryKeys.cars });
-      const previous = qc.getQueryData<Car[]>(queryKeys.cars);
+      const previous = qc.getQueryData<CarsQueryResult>(queryKeys.cars);
 
       const generationRaw = formData.get("model_generation");
       const optimistic: Car = {
@@ -64,7 +86,10 @@ export function useCreateCarMutation() {
         created_at: new Date().toISOString(),
       };
 
-      qc.setQueryData<Car[]>(queryKeys.cars, (old = []) => [optimistic, ...old]);
+      qc.setQueryData<CarsQueryResult>(queryKeys.cars, (old) => ({
+        cars: [optimistic, ...(old?.cars ?? [])],
+        preferredCarId: old?.preferredCarId ?? null,
+      }));
 
       return { previous, tempId: optimistic.id };
     },
@@ -94,11 +119,11 @@ export function useUpdateCarMutation(carId: string) {
     },
     onMutate: async (formData) => {
       await qc.cancelQueries({ queryKey: queryKeys.cars });
-      const previous = qc.getQueryData<Car[]>(queryKeys.cars);
+      const previous = qc.getQueryData<CarsQueryResult>(queryKeys.cars);
       const generationRaw = formData.get("model_generation");
 
-      qc.setQueryData<Car[]>(queryKeys.cars, (old = []) =>
-        old.map((car) =>
+      qc.setQueryData<CarsQueryResult>(queryKeys.cars, (old) => ({
+        cars: (old?.cars ?? []).map((car) =>
           car.id === carId
             ? {
                 ...car,
@@ -118,7 +143,8 @@ export function useUpdateCarMutation(carId: string) {
               }
             : car,
         ),
-      );
+        preferredCarId: old?.preferredCarId ?? null,
+      }));
 
       return { previous };
     },

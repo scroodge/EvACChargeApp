@@ -7,10 +7,13 @@ import { CarForm } from "@/components/cars/car-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCarsQuery, useUpdateCarMutation } from "@/hooks/use-cars-query";
 import { useTranslation } from "@/hooks/use-translation";
+import { useAppPath } from "@/lib/dev/dev-path";
 
 export function EditCarForm({ carId }: { carId: string }) {
   const router = useRouter();
-  const { data: cars, isLoading } = useCarsQuery();
+  const appPath = useAppPath();
+  const { data: carsResult, isLoading } = useCarsQuery();
+  const cars = carsResult?.cars;
   const mutation = useUpdateCarMutation(carId);
   const { t } = useTranslation();
   const car = cars?.find((item) => item.id === carId);
@@ -20,7 +23,7 @@ export function EditCarForm({ carId }: { carId: string }) {
     const fd = new FormData(event.currentTarget);
     mutation.mutate(fd, {
       onSuccess: () => {
-        router.replace("/settings");
+        router.replace(appPath("/settings"));
       },
     });
   };
@@ -41,7 +44,7 @@ export function EditCarForm({ carId }: { carId: string }) {
     <CarForm
       mode="edit"
       car={car}
-      cancelHref="/settings"
+      cancelHref={appPath("/settings")}
       isPending={mutation.isPending}
       onSubmit={handleSubmit}
     />

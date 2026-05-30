@@ -2,15 +2,15 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "VoltFlow: база знаний BYD YUAN UP",
+    name: "VoltFlow — EV charging cockpit",
     short_name: "VoltFlow",
     description:
-      "Русская база знаний для BYD YUAN UP: зарядка, обслуживание, аксессуары, калькуляторы и опыт эксплуатации.",
+      "Real-time EV charging tracker, vehicle telemetry, and session history for your BYD.",
     lang: "en",
     display: "standalone",
     orientation: "portrait",
     scope: "/",
-    start_url: "/telegram",
+    start_url: "/dashboard",
     background_color: "#12151C",
     theme_color: "#12151C",
     icons: [

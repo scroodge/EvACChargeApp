@@ -1,5 +1,6 @@
-/* Minimal service worker — installability, push, and a tiny public Telegram cache. */
+/* Service worker — push, Telegram cache, and app shell for the charging cockpit. */
 const TELEGRAM_CACHE = "voltflow-telegram-v1";
+const APP_SHELL_CACHE = "voltflow-app-shell-v1";
 const TELEGRAM_ASSETS = [
   "/telegram",
   "/manifest.webmanifest",
@@ -7,14 +8,27 @@ const TELEGRAM_ASSETS = [
   "/icon-192.png",
   "/icon-512.png",
 ];
+const APP_SHELL_ROUTES = [
+  "/dashboard",
+  "/charging",
+  "/vehicle",
+  "/history",
+  "/settings",
+  "/login",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(TELEGRAM_CACHE)
-      .then((cache) => cache.addAll(TELEGRAM_ASSETS))
-      .catch(() => undefined)
-      .then(() => self.skipWaiting()),
+    Promise.all([
+      caches
+        .open(TELEGRAM_CACHE)
+        .then((cache) => cache.addAll(TELEGRAM_ASSETS))
+        .catch(() => undefined),
+      caches
+        .open(APP_SHELL_CACHE)
+        .then((cache) => cache.addAll(APP_SHELL_ROUTES))
+        .catch(() => undefined),
+    ]).then(() => self.skipWaiting()),
   );
 });
 
@@ -27,21 +41,28 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  const isTelegramPage =
-    url.origin === self.location.origin && url.pathname.startsWith("/telegram");
-  const isPublicAsset =
-    url.origin === self.location.origin &&
-    (url.pathname.startsWith("/_next/static/") ||
-      TELEGRAM_ASSETS.includes(url.pathname));
+  if (url.origin !== self.location.origin) return;
 
-  if (!isTelegramPage && !isPublicAsset) return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  const isTelegramPage = url.pathname.startsWith("/telegram");
+  const isAppShellRoute = APP_SHELL_ROUTES.some(
+    (route) => url.pathname === route || url.pathname.startsWith(`${route}/`),
+  );
+  const isPublicAsset =
+    url.pathname.startsWith("/_next/static/") ||
+    TELEGRAM_ASSETS.includes(url.pathname) ||
+    url.pathname.startsWith("/icons/");
+
+  if (!isTelegramPage && !isAppShellRoute && !isPublicAsset) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(TELEGRAM_CACHE).then((cache) => {
+          const cacheName = isTelegramPage ? TELEGRAM_CACHE : APP_SHELL_CACHE;
+          caches.open(cacheName).then((cache) => {
             cache.put(request, copy).catch(() => undefined);
           });
         }
@@ -57,6 +78,18 @@ self.addEventListener("fetch", (event) => {
                 (fallback) =>
                   fallback ||
                   new Response("VoltFlow Telegram knowledge base is offline.", {
+                    status: 503,
+                    headers: { "Content-Type": "text/plain; charset=utf-8" },
+                  }),
+              );
+          }
+          if (isAppShellRoute) {
+            return caches
+              .match("/dashboard")
+              .then(
+                (fallback) =>
+                  fallback ||
+                  new Response("VoltFlow is offline. Reconnect to sync live data.", {
                     status: 503,
                     headers: { "Content-Type": "text/plain; charset=utf-8" },
                   }),

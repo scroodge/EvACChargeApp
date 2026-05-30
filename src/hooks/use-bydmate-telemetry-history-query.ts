@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { queryKeys } from "@/lib/query-keys";
 import type { TelemetryHistoryPoint } from "@/lib/bydmate/telemetry-history";
 import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
@@ -14,9 +15,11 @@ async function fetchTelemetryHistory(
   const params = new URLSearchParams({ range, date: anchorDate });
   if (vehicleId) params.set("vehicle_id", vehicleId);
 
-  const response = await fetch(`/api/vehicle/telemetry?${params.toString()}`, {
-    cache: "no-store",
-  });
+  const path = `/api/vehicle/telemetry?${params.toString()}`;
+  const response = isDevAppRoute()
+    ? await devFetch(path)
+    : await fetch(path, { cache: "no-store" });
+
   if (!response.ok) throw new Error("Failed to load telemetry history");
 
   const payload = (await response.json()) as { points: TelemetryHistoryPoint[] };
