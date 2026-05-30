@@ -56,7 +56,7 @@ export function DashboardDevSnapshotProvider({ children }: { children: ReactNode
     (base: BydmateLiveSnapshotRow | null): BydmateLiveSnapshotRow | null => {
       if (!devRoute || !base) return null;
       if (mode === "charge") {
-        const charging = buildChargingSnapshot(base);
+        const charging = buildChargingSnapshot(base, null);
         return {
           ...charging,
           telemetry: {

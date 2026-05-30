@@ -57,7 +57,7 @@ export function VehicleDevSnapshotProvider({ children }: { children: ReactNode }
       if (!devRoute || !base) return null;
 
       if (mode === "charging") {
-        return buildChargingSnapshot(base);
+        return buildChargingSnapshot(base, null);
       }
 
       if (mode === "stale") {
