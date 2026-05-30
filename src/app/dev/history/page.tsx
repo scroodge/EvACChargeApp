@@ -18,12 +18,17 @@ export default async function DevHistoryPage() {
   const supabase = createServiceClient();
   const way = await resolveWayDevContext(supabase);
 
-  const { data: tripRows } = await supabase
+  let tripQuery = supabase
     .from("bydmate_trips")
     .select("*")
     .eq("vehicle_id", way.vehicleId)
     .order("started_at", { ascending: false })
     .limit(100);
+  if (way.appUserId) {
+    tripQuery = tripQuery.eq("user_id", way.appUserId);
+  }
+
+  const { data: tripRows } = await tripQuery;
 
   const rawTrips = (tripRows ?? []) as BydmateTripRow[];
 
@@ -59,11 +64,13 @@ export default async function DevHistoryPage() {
             (max, t) => (Date.parse(tripEndTime(t)) > Date.parse(max) ? tripEndTime(t) : max),
             tripEndTime(energyTrips[0]),
           );
-          return supabase
+          let q = supabase
             .from("bydmate_telemetry_samples")
             .select("vehicle_id, device_time, telemetry")
             .eq("vehicle_id", way.vehicleId)
-            .gte("device_time", from)
+            .gte("device_time", from);
+          if (way.appUserId) q = q.eq("user_id", way.appUserId);
+          return q
             .lte("device_time", to)
             .order("device_time", { ascending: false })
             .limit(5000);
