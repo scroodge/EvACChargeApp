@@ -76,6 +76,14 @@ async function attachTripEnergy({
   }
 
   return trips.flatMap((trip) => {
+    if (
+      typeof trip.regen_energy_kwh === "number" &&
+      typeof trip.traction_energy_kwh === "number"
+    ) {
+      if (isSingleSampleTrip(trip)) return [];
+      return [trip];
+    }
+
     // Reverse to chronological order (samples were fetched descending)
     const points = (samplesByTrip.get(trip.id) ?? []).slice().reverse().map((sample) => ({
       device_time: sample.device_time,

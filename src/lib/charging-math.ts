@@ -118,3 +118,28 @@ export function formatDuration(totalSeconds: number): string {
   if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
+
+/** Project SOC at a future wall-clock time from charging params. */
+export function projectSocAtTime(
+  params: ChargingParams,
+  startedAtMs: number,
+  targetMs: number,
+): number | null {
+  const rate = percentPerSecond(params);
+  if (rate <= 0) return null;
+  const elapsedSeconds = Math.max(0, (targetMs - startedAtMs) / 1000);
+  const projected = params.startPercent + rate * elapsedSeconds;
+  return Math.min(params.targetPercent, projected);
+}
+
+/** Seconds until target SOC from current percent (or session start if lower). */
+export function secondsUntilTargetSoc(
+  params: ChargingParams,
+  currentPercent: number,
+): number | null {
+  const rate = percentPerSecond(params);
+  if (rate <= 0) return null;
+  const remaining = params.targetPercent - currentPercent;
+  if (remaining <= 0) return 0;
+  return remaining / rate;
+}

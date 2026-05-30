@@ -15,6 +15,8 @@ import {
   energyFromGridKwh,
   energyNeededKwh,
   formatDuration,
+  projectSocAtTime,
+  secondsUntilTargetSoc,
   type ChargingParams,
   type DerivedChargingState,
 } from "@/lib/charging-math";
@@ -402,6 +404,25 @@ export function ChargingSessionScreen({
         )
       : null;
 
+  const chargeParams = toParams(session);
+  const startedAtMs = session.started_at ? Date.parse(session.started_at) : null;
+  const estimatedFinishMs =
+    charging && derived.remainingSeconds > 0 ? nowMs + derived.remainingSeconds * 1000 : null;
+  const morningTargetMs = (() => {
+    const anchor = new Date(nowMs);
+    anchor.setHours(7, 0, 0, 0);
+    if (anchor.getTime() <= nowMs) anchor.setDate(anchor.getDate() + 1);
+    return anchor.getTime();
+  })();
+  const projectedSocAtMorning =
+    charging && startedAtMs != null
+      ? projectSocAtTime(chargeParams, startedAtMs, morningTargetMs)
+      : null;
+  const secondsToTarget =
+    charging && derived.currentPercent != null
+      ? secondsUntilTargetSoc(chargeParams, derived.currentPercent)
+      : null;
+
   return (
     <div className="flex flex-1 flex-col gap-5 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -511,6 +532,28 @@ export function ChargingSessionScreen({
         value={`${session.charger_power_kw.toFixed(1)} kW`}
       />
       <CardRow label={t("charging.batteryPack") as string} value={`${session.battery_capacity_kwh} kWh`} />
+
+      {!historyMode && charging && estimatedFinishMs != null ? (
+        <CardRow
+          label={t("charging.estimatedFinish") as string}
+          value={new Date(estimatedFinishMs).toLocaleTimeString(locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        />
+      ) : null}
+      {!historyMode && charging && projectedSocAtMorning != null ? (
+        <CardRow
+          label={t("charging.projectedAtSeven") as string}
+          value={`${projectedSocAtMorning.toFixed(1)}%`}
+        />
+      ) : null}
+      {!historyMode && charging && secondsToTarget != null && secondsToTarget > 0 ? (
+        <CardRow
+          label={t("charging.secondsToTarget") as string}
+          value={formatDuration(secondsToTarget)}
+        />
+      ) : null}
 
       <ChargingDeltaCard session={session} />
 

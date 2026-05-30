@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { deriveChargingState } from "@/lib/charging-math";
+import { isAtHomeCharger } from "@/lib/home-charger-geofence";
 import type { SessionStatus } from "@/types/database";
 
 const startSchema = z.object({
@@ -54,7 +55,24 @@ export async function startChargingSession(input: z.infer<typeof startSchema>) {
     .eq("user_id", user.id)
     .eq("status", "charging");
 
-  const pricePerKwh = parsed.data.pricePerKwh ?? 0;
+  let pricePerKwh = parsed.data.pricePerKwh ?? 0;
+
+  if (pricePerKwh <= 0) {
+    const [{ data: liveRows }, { data: profile }] = await Promise.all([
+      supabase
+        .from("bydmate_live_snapshots")
+        .select("location")
+        .eq("user_id", user.id)
+        .order("received_at", { ascending: false })
+        .limit(1),
+      supabase.from("profiles").select("default_price_per_kwh").eq("id", user.id).maybeSingle(),
+    ]);
+
+    const liveLocation = liveRows?.[0]?.location as { lat?: number; lon?: number } | null | undefined;
+    if (isAtHomeCharger(liveLocation, car)) {
+      pricePerKwh = Number(profile?.default_price_per_kwh ?? 0);
+    }
+  }
 
   const { data: session, error: insertError } = await supabase
     .from("charging_sessions")

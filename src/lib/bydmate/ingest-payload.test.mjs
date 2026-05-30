@@ -189,3 +189,45 @@ test("coerces numeric BYDMate values sent as strings", () => {
   assert.equal(result.payloads[0].diplus?.drl, "1");
   assert.equal(result.payloads[0].location.lat, 53.9);
 });
+
+test("accepts slim idle payload without diplus or power fields", () => {
+  const result = normalizePayloads({
+    schema_version: 1,
+    vehicle_id: "way",
+    device_time: "2026-05-30T08:00:00.000Z",
+    source: "BYDMate",
+    telemetry: {
+      soc: 68,
+      is_charging: false,
+    },
+    location: {},
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.payloads.length, 1);
+  assert.equal(result.payloads[0].telemetry.soc, 68);
+  assert.equal(result.payloads[0].telemetry.power_kw, undefined);
+  assert.equal(result.payloads[0].diplus, undefined);
+});
+
+test("accepts legacy 60-sample batch from old APK", () => {
+  const samples = Array.from({ length: 60 }, (_, index) => ({
+    schema_version: 1,
+    vehicle_id: "way",
+    device_time: new Date(Date.UTC(2026, 4, 30, 8, 0, index)).toISOString(),
+    source: "BYDMate",
+    telemetry: {
+      soc: 50 + index * 0.1,
+      power_kw: -7,
+      is_charging: true,
+    },
+    diplus: null,
+    location: {},
+  }));
+
+  const result = normalizePayloads({ samples });
+  assert.equal(result.success, true);
+  assert.equal(result.payloads.length, 60);
+  assert.equal(result.payloads[0].schema_version, 1);
+  assert.equal(result.payloads.at(-1)?.telemetry.soc, 55.9);
+});

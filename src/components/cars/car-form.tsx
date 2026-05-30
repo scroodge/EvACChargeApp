@@ -183,6 +183,50 @@ export function CarForm({
               <p className="text-muted-foreground text-xs">{t("cars.efficiencyHelp")}</p>
             </div>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="home_charger_lat">{t("cars.homeGeofence")}</Label>
+              <p className="text-muted-foreground text-xs">{t("cars.homeGeofenceHelp")}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="home_charger_lat">{t("cars.homeLat")}</Label>
+              <Input
+                id="home_charger_lat"
+                name="home_charger_lat"
+                type="text"
+                inputMode="decimal"
+                defaultValue={car?.home_charger_lat ?? ""}
+                placeholder="53.9"
+                className="min-h-[52px] rounded-2xl text-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="home_charger_lon">{t("cars.homeLon")}</Label>
+              <Input
+                id="home_charger_lon"
+                name="home_charger_lon"
+                type="text"
+                inputMode="decimal"
+                defaultValue={car?.home_charger_lon ?? ""}
+                placeholder="27.56"
+                className="min-h-[52px] rounded-2xl text-lg"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="home_charger_radius_m">{t("cars.homeRadius")}</Label>
+              <Input
+                id="home_charger_radius_m"
+                name="home_charger_radius_m"
+                type="number"
+                inputMode="numeric"
+                min={10}
+                max={5000}
+                step="1"
+                defaultValue={car?.home_charger_radius_m ?? 150}
+                className="min-h-[52px] rounded-2xl text-lg"
+              />
+            </div>
+          </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-3 pt-8 sm:flex-row">

@@ -63,15 +63,19 @@ Important compatibility rules:
   numeric strings. `is_charging` may arrive as a boolean or `"true"`/`"false"`.
 - Batch payloads are capped at 300 samples.
 
-Current VoltFlow Mate Android APK generation, as of the legacy local
-`/Users/way/Dev/BYDMate-own` checkout:
+Current VoltFlow Mate Android APK generation (updated 2026-05-30):
 
-- `CloudTelemetryPayload.build(...)` emits `schema_version`, `vehicle_id`,
-  `device_time`, `source`, `telemetry`, `diplus`, and `location`.
-- `CloudTelemetryPayload.buildBatch(...)` wraps previously built sample JSON
-  objects in `{ "samples": [...] }`.
-- When Di+ data is unavailable, the APK emits `"diplus": null`.
-- When GPS is unavailable, the APK emits `location` with null fields or `{}`.
+- **Active cadence:** 1 s enqueue while moving or charging; 15 s HTTP flush with batches up to 15 samples.
+- **Idle cadence:** 5 min heartbeats; up to 2 consecutive unchanged idle samples may be skipped (SOC/charging/power unchanged).
+- **Payload tiers:** idle samples are slim (mostly `soc` + `is_charging`); moving/charging include `power_kw`; null fields are omitted.
+- **GPS privacy:** optional Cloud Sync setting sends `location: {}` even when GPS is available (`cloud_sync_omit_gps`).
+- **Bad GPS pre-filter:** accuracy > 30 m is dropped before enqueue (server sanitizer remains authoritative).
+- `CloudTelemetryPayload.build(...)` emits `schema_version`, `vehicle_id`, `device_time`, `source`, `telemetry`, optional `diplus`, and `location`.
+- `CloudTelemetryPayload.buildBatch(...)` wraps previously built sample JSON objects in `{ "samples": [...] }`.
+- When Di+ data is unavailable on idle heartbeats, `diplus` is omitted.
+- When GPS is unavailable or privacy is enabled, the APK emits `location: {}`.
+
+Full APK wire details: `docs/cloud-telemetry-contract-ru.md` in the VoltFlow Mate Android repo.
 
 Future compatibility checklist:
 
@@ -90,6 +94,10 @@ Future compatibility checklist:
 
 One row per `(user_id, vehicle_id)` with the latest cloud telemetry payload. Use
 this table for live dashboard cards and quick status checks.
+
+This table is published to Supabase Realtime (`supabase_realtime`). The vehicle
+page subscribes to changes and invalidates the live query instead of polling
+every 5 seconds.
 
 Important columns:
 
@@ -126,11 +134,26 @@ not create duplicate samples.
 Hourly rollup for long-range charts. It is updated during ingest and keeps
 sample counts plus selected min/max/last/average metrics.
 
+Since migration `20260530121000`, each hour also stores:
+
+- `regen_kwh_sum` — integrated regen energy from `power_kw` trapezoid segments
+- `traction_kwh_sum` — integrated traction energy from positive `power_kw`
+
+These sums power month/year regen charts after raw samples expire.
+
 ### `bydmate_trips`
 
 Server-side trip segments inferred from telemetry samples. A trip is closed when
 the next accepted sample arrives more than five minutes after the previous
 sample.
+
+Since migration `20260530121000`, closed trips persist:
+
+- `regen_energy_kwh` — total regen for the trip (computed at trip close from samples)
+- `traction_energy_kwh` — total traction energy for the trip
+
+The trips API prefers stored values; it only recomputes from raw samples when
+those columns are null (legacy trips or pre-migration data).
 
 ### `bydmate_trip_track_points`
 
@@ -209,3 +232,84 @@ Keep hot-path indexes small:
 
 Avoid per-field indexes for every Di+ column unless a production query actually
 filters or sorts by that field.
+
+## Retention (90-day raw, 3-year hourly)
+
+Migration `20260530120000` adds `public.purge_old_bydmate_telemetry()`:
+
+| Data | TTL |
+| --- | --- |
+| `bydmate_telemetry_samples` | 90 days (`device_time`) |
+| `bydmate_trip_track_points` | 90 days (`device_time`) |
+| `bydmate_telemetry_hourly` | 3 years (`hour_start`) |
+
+Trips, live snapshots, and trip-level energy columns are **not** purged by this
+job — regen/traction on `bydmate_trips` survives after raw samples expire.
+
+On Supabase Pro, pg_cron schedules a daily run at 03:00 UTC when the extension
+is available. Manual run (service role):
+
+```sql
+select public.purge_old_bydmate_telemetry();
+```
+
+## Home charger geofence (`cars`)
+
+Migration `20260530123000` adds optional geofence columns on `cars`:
+
+| Column | Purpose |
+| --- | --- |
+| `home_charger_lat` | Home charger latitude |
+| `home_charger_lon` | Home charger longitude |
+| `home_charger_radius_m` | Match radius in meters (default 150, max 5000) |
+
+When a charging session starts without an explicit tariff, VoltFlow checks the
+latest `bydmate_live_snapshots.location` against the car geofence. If the car is
+inside the radius, `profiles.default_price_per_kwh` is applied automatically.
+
+Configure geofence in **Settings → Edit car**.
+
+## Vehicle analytics APIs
+
+New read/export endpoints (authenticated, RLS-scoped):
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/vehicle/telemetry?range=&date=&vehicle_id=` | Day/week/month/quarter/year history (hourly + recent raw merge) |
+| `GET /api/vehicle/analytics?type=monthly&month=&vehicle_id=` | Monthly distance, regen, charged kWh, cost, consumption |
+| `GET /api/vehicle/analytics?type=phantom&vehicle_id=&days=` | Parked SOC drain (idle heartbeats, 4+ h idle) |
+| `GET /api/vehicle/analytics?type=cost-per-km&from=&to=&vehicle_id=` | Charging cost divided by trip distance |
+| `GET /api/vehicle/lifetime-map?vehicle_id=` | Aggregated GPS track points for lifetime map |
+| `GET /api/vehicle/export?format=csv\|json&from=&to=&vehicle_id=` | User data export (sessions, trips, samples) |
+
+UI: **Vehicle** page → analytics panels below trip browser (`vehicle-analytics-panels.tsx`).
+
+## Server-side ingest and read optimizations
+
+Applied in app code and migrations `20260530120000`–`20260530123000`:
+
+- **Day chart cap:** `fetchTelemetryHistory` loads at most 5000 raw day samples before client downsample (`MAX_DAY_RAW_SAMPLES`).
+- **Live Realtime:** `useBydmateLiveQuery` subscribes to `bydmate_live_snapshots` postgres changes.
+- **Batch push writes:** charge notification state upserts once per vehicle per ingest batch (not per sample).
+- **Trip energy at close:** `bydmate_ingest_telemetry` updates hourly regen/traction sums and finalizes trip energy on trip close (charging gap + 5 min gap).
+
+## Charging session UX additions
+
+Active charging screen (`charging-session-screen.tsx`):
+
+- **Estimated finish** — wall-clock time when target SOC is reached
+- **SOC at 07:00** — projected SOC at next local 07:00 if charging continues
+- **Time to target SOC** — seconds remaining from live/math state
+
+Uses helpers in `src/lib/charging-math.ts`: `projectSocAtTime`, `secondsUntilTargetSoc`.
+
+## Compatibility tests
+
+`src/lib/bydmate/ingest-payload.test.mjs` covers:
+
+- Legacy payloads without `diplus`
+- Slim idle payloads (SOC only, empty location)
+- Old-style 60-sample charging batches from pre-15s-flush APKs
+- Numeric string coercion
+
+Any APK payload change must keep these tests green.

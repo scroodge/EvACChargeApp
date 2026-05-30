@@ -17,6 +17,18 @@ const carSchema = z.object({
     .min(50)
     .max(100)
     .default(90),
+  home_charger_lat: z.preprocess(
+    (value) => (value === "" || value == null ? null : value),
+    z.coerce.number().min(-90).max(90).nullable().optional(),
+  ),
+  home_charger_lon: z.preprocess(
+    (value) => (value === "" || value == null ? null : value),
+    z.coerce.number().min(-180).max(180).nullable().optional(),
+  ),
+  home_charger_radius_m: z.preprocess(
+    (value) => (value === "" || value == null ? null : value),
+    z.coerce.number().min(10).max(5000).nullable().optional(),
+  ),
 });
 
 function parseCarFormData(formData: FormData) {
@@ -27,6 +39,9 @@ function parseCarFormData(formData: FormData) {
     battery_capacity_kwh: normalizeFormDecimal(formData.get("battery_capacity_kwh")),
     default_charger_power_kw: normalizeFormDecimal(formData.get("default_charger_power_kw")),
     default_efficiency_percent: formData.get("default_efficiency_percent"),
+    home_charger_lat: formData.get("home_charger_lat"),
+    home_charger_lon: formData.get("home_charger_lon"),
+    home_charger_radius_m: formData.get("home_charger_radius_m"),
   });
 }
 

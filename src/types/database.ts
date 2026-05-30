@@ -20,6 +20,9 @@ export type Car = {
   battery_capacity_kwh: number;
   default_charger_power_kw: number;
   default_efficiency_percent: number;
+  home_charger_lat?: number | null;
+  home_charger_lon?: number | null;
+  home_charger_radius_m?: number | null;
   created_at: string;
 };
 

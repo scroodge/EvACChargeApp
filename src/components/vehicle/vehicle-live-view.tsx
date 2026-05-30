@@ -24,6 +24,7 @@ import {
 
 import { BrandBadge } from "@/components/brand/BrandBadge";
 import { LogoFull } from "@/components/brand/LogoFull";
+import { VehicleAnalyticsPanels } from "@/components/vehicle/vehicle-analytics-panels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -223,6 +224,7 @@ function VehicleLiveContent({
                 hasError={Boolean(tripsError)}
                 expandedFixtureTrip={expandedFixtureTrip}
               />
+              {!fixturePoints ? <VehicleAnalyticsPanels vehicleId={snapshot.vehicle_id} /> : null}
               <LocationCard snapshot={snapshot} />
             </>
           )}
@@ -822,6 +824,8 @@ type TelemetryChartSource = {
   diplus_min_cell_voltage_v?: number | null;
   diplus_max_cell_voltage_v?: number | null;
   diplus_cell_delta_v?: number | null;
+  regen_kwh_sum?: number | null;
+  traction_kwh_sum?: number | null;
   location?: BydmateLocation;
 };
 
@@ -1415,11 +1419,20 @@ function prepareTelemetryHistory(points: TelemetryChartSource[], t: Translator) 
     addDeltaBySocPoint(deltaBySocPoints, time, soc, cellDelta);
   }
 
-  for (const point of calculateCumulativeRegenPoints(points.map((sample) => ({
-    device_time: sample.device_time,
-    power_kw: sample.telemetry?.power_kw,
-  })))) {
-    addChartPointWithPower(regenChart, 0, point.time, point.value, point.power_kw);
+  const hourlyRegen = points.some((point) => typeof point.regen_kwh_sum === "number");
+  if (hourlyRegen) {
+    let cumulative = 0;
+    for (const point of points) {
+      cumulative += point.regen_kwh_sum ?? 0;
+      addChartPoint(regenChart, 0, pointTimeMs(point), cumulative);
+    }
+  } else {
+    for (const point of calculateCumulativeRegenPoints(points.map((sample) => ({
+      device_time: sample.device_time,
+      power_kw: sample.telemetry?.power_kw,
+    })))) {
+      addChartPointWithPower(regenChart, 0, point.time, point.value, point.power_kw);
+    }
   }
 
   const charts = [socChart, speedChart, powerChart, regenChart, temperatureChart, cellDeltaChart].map((chart) => ({

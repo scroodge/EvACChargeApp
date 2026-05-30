@@ -25,6 +25,9 @@ export function mapCar(raw: Record<string, unknown>): Car {
     battery_capacity_kwh: num(raw.battery_capacity_kwh),
     default_charger_power_kw: num(raw.default_charger_power_kw, 4.4),
     default_efficiency_percent: num(raw.default_efficiency_percent, 90),
+    home_charger_lat: raw.home_charger_lat != null ? num(raw.home_charger_lat) : null,
+    home_charger_lon: raw.home_charger_lon != null ? num(raw.home_charger_lon) : null,
+    home_charger_radius_m: raw.home_charger_radius_m != null ? num(raw.home_charger_radius_m, 150) : null,
     created_at: String(raw.created_at ?? ""),
   };
 }

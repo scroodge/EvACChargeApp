@@ -1,6 +1,30 @@
 # Supabase Migrations Audit
 
-Date: 2026-05-26
+Date: 2026-05-30
+
+## Applied 2026-05-30 (database architecture review)
+
+These migrations are applied to the linked production project (`fgazcjtxbkiuimdoyelh`):
+
+| Migration | Purpose |
+| --- | --- |
+| `20260528120000_add_cars_vehicle_alias.sql` | Optional `cars.vehicle_alias` for display vs telemetry `vehicle_id` |
+| `20260530120000_telemetry_retention_and_live_realtime.sql` | 90d/3y retention function, pg_cron schedule, Realtime on `bydmate_live_snapshots` |
+| `20260530121000_bydmate_energy_rollups_and_trip_columns.sql` | Trip energy columns; hourly regen/traction sums; SQL helpers |
+| `20260530122000_bydmate_ingest_energy_hooks.sql` | Ingest RPC updates hourly energy + finalizes trip energy on close |
+| `20260530123000_cars_home_charger_geofence.sql` | `home_charger_lat/lon/radius_m` on `cars` |
+
+**Note:** Remote migration `20260526000100` (`marketplace_persistence`) existed only on the
+linked DB, not in this repo. It was marked `reverted` in history so the CLI could
+apply the above chain; schema from that migration remains in the DB.
+
+**Apply command** (linked project, pooler URL):
+
+```sh
+npm run db:migrations:up -- --target=linked --yes --db-url-from-pooler --password-env=SUPABASE_POSTGRESS_PASSWORD
+```
+
+Repeat until `npm run db:migrations -- plan` reports no pending migrations.
 
 ## Current shape
 

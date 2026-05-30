@@ -129,10 +129,18 @@ export async function processBydmateChargeNotifications({
       );
       sent += pushResult.sent;
     }
+  }
+
+  for (const vehicleId of vehicleIds) {
+    const state = states.get(vehicleId);
+    if (!state) continue;
+
+    const lastSample = [...orderedSamples].reverse().find((sample) => sample.vehicle_id === vehicleId);
+    const deviceTime = lastSample?.device_time ?? new Date().toISOString();
 
     const { error: upsertError } = await supabase
       .from("bydmate_charge_notification_state")
-      .upsert(stateToRow(userId, sample.vehicle_id, sample.device_time, result.nextState), {
+      .upsert(stateToRow(userId, vehicleId, deviceTime, state), {
         onConflict: "user_id,vehicle_id",
       });
 

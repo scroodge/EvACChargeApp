@@ -18,7 +18,7 @@ License
 - [AGENTS.md](AGENTS.md) — required instructions for AI/coding agents, especially Next.js 16 and VoltFlow Mate charging-history rules.
 - [SKILLS.md](SKILLS.md) — current project skills, safe-change workflow, and feature roadmap discipline.
 - [INSTALL.md](INSTALL.md) — user-facing PWA install guide for iPhone, iPad, and Android.
-- [supabase/TELEMETRY.md](supabase/TELEMETRY.md) — VoltFlow Mate telemetry storage model and ingest compatibility notes.
+- [supabase/TELEMETRY.md](supabase/TELEMETRY.md) — VoltFlow Mate telemetry storage model, retention, analytics APIs, and ingest compatibility notes.
 - [supabase/BYDMATE_APK_API.md](supabase/BYDMATE_APK_API.md) — Android APK cloud ingest contract.
 - [supabase/MIGRATIONS_AUDIT.md](supabase/MIGRATIONS_AUDIT.md) — migration-chain audit and one-at-a-time migration workflow.
 
@@ -50,6 +50,9 @@ VoltFlow helps EV drivers model and track AC charging sessions without talking d
 - **VoltFlow Mate live telemetry** ingestion for vehicle snapshots, history, and trip tracks.
 - **VoltFlow Mate charging history** with delayed completion sample preservation for SOC/cell-voltage tails.
 - **Trip history** with per-trip energy summary, sample timeline, and GPS track viewer.
+- **Vehicle analytics** — week/month/quarter/year telemetry charts, SOH trend, monthly stats, phantom drain, cost/km, lifetime map, CSV/JSON export.
+- **Home charger geofence** — auto-apply home tariff when charging starts inside configured GPS radius.
+- **Charge finish projection** — estimated finish time and SOC-at-07:00 on the active charging screen.
 - **Knowledge search** standalone page at `/knowledge/search` for full-text article lookup.
 - **Web push notifications** for completed charging sessions when VAPID keys are configured.
 - **Developer diagnostics** with fixture pages, Wildberries product search, and a `/dev/site/` mirror that bypasses auth for local development.
@@ -99,6 +102,11 @@ This repository already contains the main production surface of VoltFlow. Future
 - Charging samples are intentionally kept in live/history telemetry but excluded from driving-trip extension.
 - GPS sanity filtering and suspicious point dropping before track persistence.
 - Di+ raw payload storage plus materialized columns for SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC, drive state, and diagnostics.
+- **90-day raw retention** and **3-year hourly retention** via `purge_old_bydmate_telemetry()` (pg_cron on Pro).
+- **Trip regen/traction persist** on `bydmate_trips` at trip close; hourly `regen_kwh_sum` / `traction_kwh_sum` rollups.
+- **Realtime live vehicle** via Supabase Realtime on `bydmate_live_snapshots` (replaces 5 s polling).
+- **Analytics APIs:** `GET /api/vehicle/telemetry`, `/api/vehicle/analytics`, `/api/vehicle/lifetime-map`, `/api/vehicle/export`.
+- **VoltFlow Mate APK (2026-05-30):** 1 s active enqueue, 15 s flush, slim idle payloads, optional GPS privacy switch — see Mate `docs/cloud-telemetry-contract-ru.md`.
 
 #### Knowledge base and Telegram experience
 
@@ -186,7 +194,7 @@ They create and evolve:
 - RLS policies scoped by `auth.uid()`
 - profile creation trigger
 - `updated_at` trigger
-- Realtime publication for `charging_sessions`
+- Realtime publication for `charging_sessions` and `bydmate_live_snapshots`
 
 In Supabase, also enable Realtime for the `charging_sessions` table, confirm the knowledge image storage buckets from the migrations exist if you plan to manage CMS images, and configure Auth redirect URLs:
 
@@ -381,6 +389,9 @@ VoltFlow помогает владельцам электромобилей мо
 - **VoltFlow Mate live telemetry** для live-снимков автомобиля, истории и треков поездок.
 - **История зарядки VoltFlow Mate** с сохранением отложенных completion-сэмплов для SOC и хвоста cell-voltage.
 - **История поездок** с energy summary, timeline сэмплов и просмотром GPS-трека.
+- **Аналитика автомобиля** — графики телеметрии за неделю/месяц/квартал/год, тренд SOH, месячная сводка, phantom drain, стоимость/км, карта поездок, экспорт CSV/JSON.
+- **Геозона домашней зарядки** — автоматический домашний тариф при старте зарядки внутри заданного GPS-радиуса.
+- **Прогноз окончания зарядки** — оценочное время завершения и SOC в 07:00 на экране активной сессии.
 - **Поиск по базе знаний** на отдельной странице `/knowledge/search`.
 - **Web push-уведомления** о завершении зарядки, если настроены VAPID-ключи.
 - **Dev-диагностика** с fixture-страницами, поиском Wildberries и `/dev/site/` зеркалом для обхода авторизации в dev-режиме.
@@ -430,6 +441,11 @@ VoltFlow помогает владельцам электромобилей мо
 - Charging samples сохраняются в live/history telemetry, но не создают и не продлевают driving trips.
 - До сохранения треков применяется фильтрация подозрительных GPS-точек.
 - Di+ сохраняется raw JSON и частично материализуется в колонки для SOC, speed, power, cell voltages, temperatures, doors, windows, tires, lights, HVAC и diagnostics.
+- **Retention 90 дней raw / 3 года hourly** через `purge_old_bydmate_telemetry()` (pg_cron на Pro).
+- **Regen/traction на поездке** сохраняются в `bydmate_trips` при закрытии; hourly `regen_kwh_sum` / `traction_kwh_sum`.
+- **Realtime live vehicle** через Supabase Realtime на `bydmate_live_snapshots` (вместо polling каждые 5 с).
+- **Analytics API:** `GET /api/vehicle/telemetry`, `/api/vehicle/analytics`, `/api/vehicle/lifetime-map`, `/api/vehicle/export`.
+- **VoltFlow Mate APK (2026-05-30):** enqueue 1 с в движении/зарядке, flush 15 с, slim idle payload, переключатель GPS privacy — см. `docs/cloud-telemetry-contract-ru.md` в репозитории Mate.
 
 #### База знаний и Telegram experience
 
@@ -517,7 +533,7 @@ supabase/migrations/
 - RLS-политики через `auth.uid()`
 - триггер создания профиля
 - триггер `updated_at`
-- Realtime-публикацию для `charging_sessions`
+- Realtime-публикацию для `charging_sessions` и `bydmate_live_snapshots`
 
 Также включите Realtime для таблицы `charging_sessions`, проверьте наличие storage buckets из миграций для загрузки изображений из knowledge admin, если планируете управлять CMS-контентом, и добавьте Auth Redirect URLs:
 

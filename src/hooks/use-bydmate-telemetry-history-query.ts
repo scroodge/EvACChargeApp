@@ -1,0 +1,43 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+
+import { queryKeys } from "@/lib/query-keys";
+import type { TelemetryHistoryPoint } from "@/lib/bydmate/telemetry-history";
+import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
+
+async function fetchTelemetryHistory(
+  range: TelemetryHistoryRange,
+  anchorDate: string,
+  vehicleId: string | null,
+): Promise<TelemetryHistoryPoint[]> {
+  const params = new URLSearchParams({ range, date: anchorDate });
+  if (vehicleId) params.set("vehicle_id", vehicleId);
+
+  const response = await fetch(`/api/vehicle/telemetry?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Failed to load telemetry history");
+
+  const payload = (await response.json()) as { points: TelemetryHistoryPoint[] };
+  return payload.points ?? [];
+}
+
+export function useBydmateTelemetryHistoryQuery({
+  range,
+  anchorDate,
+  vehicleId,
+  enabled = true,
+}: {
+  range: TelemetryHistoryRange;
+  anchorDate: string;
+  vehicleId: string | null;
+  enabled?: boolean;
+}) {
+  return useQuery({
+    queryKey: queryKeys.bydmateTelemetryHistory(range, anchorDate, vehicleId),
+    queryFn: () => fetchTelemetryHistory(range, anchorDate, vehicleId),
+    enabled,
+    staleTime: 60_000,
+  });
+}

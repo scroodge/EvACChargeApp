@@ -20,9 +20,13 @@ type HourlyRow = {
   battery_temp_avg: number | null;
   cabin_temp_avg: number | null;
   outside_temp_avg: number | null;
+  regen_kwh_sum: number | null;
+  traction_kwh_sum: number | null;
 };
 
 const SUPABASE_PAGE_SIZE = 1000;
+/** Cap raw day fetches before client downsample (heavy charging days). */
+export const MAX_DAY_RAW_SAMPLES = 5000;
 
 export type TelemetryHistoryPoint = {
   device_time: string;
@@ -31,6 +35,8 @@ export type TelemetryHistoryPoint = {
   diplus_min_cell_voltage_v?: number | null;
   diplus_max_cell_voltage_v?: number | null;
   diplus_cell_delta_v?: number | null;
+  regen_kwh_sum?: number | null;
+  traction_kwh_sum?: number | null;
 };
 
 function hourlyToSample(row: HourlyRow): TelemetryHistoryPoint {
@@ -44,6 +50,8 @@ function hourlyToSample(row: HourlyRow): TelemetryHistoryPoint {
       cabin_temp_c: row.cabin_temp_avg,
       outside_temp_c: row.outside_temp_avg,
     },
+    regen_kwh_sum: row.regen_kwh_sum,
+    traction_kwh_sum: row.traction_kwh_sum,
   };
 }
 
@@ -64,18 +72,31 @@ export async function fetchTelemetryHistory({
   const vehicleFilter = vehicleId ? { vehicle_id: vehicleId } : {};
 
   if (range === "day") {
-    const { data, error } = await supabase
-      .from("bydmate_telemetry_samples")
-      .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
-      .eq("user_id", userId)
-      .match(vehicleFilter)
-      .gte("device_time", window.from)
-      .lte("device_time", window.to)
-      .order("device_time", { ascending: true });
+    const rows: TelemetryHistoryPoint[] = [];
 
-    if (error) throw error;
-    const points = (data ?? []) as Pick<BydmateTelemetrySampleRow, "device_time" | "telemetry">[];
-    return downsampleByIndex(points, MAX_TELEMETRY_CHART_POINTS);
+    for (let fromIndex = 0; fromIndex < MAX_DAY_RAW_SAMPLES; fromIndex += SUPABASE_PAGE_SIZE) {
+      const toIndex = Math.min(fromIndex + SUPABASE_PAGE_SIZE - 1, MAX_DAY_RAW_SAMPLES - 1);
+      const { data, error } = await supabase
+        .from("bydmate_telemetry_samples")
+        .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
+        .eq("user_id", userId)
+        .match(vehicleFilter)
+        .gte("device_time", window.from)
+        .lte("device_time", window.to)
+        .order("device_time", { ascending: true })
+        .range(fromIndex, toIndex);
+
+      if (error) throw error;
+
+      const page = (data ?? []) as TelemetryHistoryPoint[];
+      rows.push(...page);
+
+      if (page.length < SUPABASE_PAGE_SIZE || rows.length >= MAX_DAY_RAW_SAMPLES) {
+        break;
+      }
+    }
+
+    return downsampleByIndex(rows, MAX_TELEMETRY_CHART_POINTS);
   }
 
   const rawFrom =
@@ -87,7 +108,7 @@ export async function fetchTelemetryHistory({
   const { data: hourlyData, error: hourlyError } = await supabase
     .from("bydmate_telemetry_hourly")
     .select(
-      "hour_start, sample_count, soc_min, soc_max, soc_last, speed_max, power_avg, battery_temp_avg, cabin_temp_avg, outside_temp_avg",
+      "hour_start, sample_count, soc_min, soc_max, soc_last, speed_max, power_avg, battery_temp_avg, cabin_temp_avg, outside_temp_avg, regen_kwh_sum, traction_kwh_sum",
     )
     .eq("user_id", userId)
     .match(vehicleFilter)
