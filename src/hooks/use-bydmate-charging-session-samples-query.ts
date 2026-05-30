@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/query-keys";
+import { isDevMockChargingSessionId } from "@/lib/dev/build-mock-charging-session";
 import type { BydmateDiplus, BydmateTelemetry, SessionStatus } from "@/types/database";
 
 export type ChargingSessionTelemetrySample = {
@@ -42,6 +43,7 @@ export function useBydmateChargingSessionSamplesQuery(
   return useQuery({
     queryKey: queryKeys.bydmateChargingSessionSamples(sessionId, vehicleId),
     queryFn: () => fetchChargingSessionSamples(sessionId, vehicleId),
+    enabled: Boolean(sessionId) && !isDevMockChargingSessionId(sessionId),
     staleTime: isActiveChargingSession ? 10_000 : 60_000,
     refetchInterval: isActiveChargingSession ? 15_000 : false,
     refetchIntervalInBackground: isActiveChargingSession,

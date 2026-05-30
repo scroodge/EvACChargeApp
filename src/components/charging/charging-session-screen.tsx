@@ -8,6 +8,10 @@ import { toast } from "sonner";
 
 import { sendChargeCompletedPush } from "@/actions/push";
 import { ChargingDeltaCard } from "@/components/charging/charging-delta-card";
+import {
+  useChargingDevLiveOverride,
+  useChargingDevSource,
+} from "@/components/dev/charging-dev-source-context";
 import { Button } from "@/components/ui/button";
 import {
   costFromGridEnergy,
@@ -22,6 +26,7 @@ import {
 } from "@/lib/charging-math";
 import { formatCurrencyAmount } from "@/lib/i18n";
 import { isDevAppRoute } from "@/lib/dev/dev-fetch";
+import { isDevMockChargingSessionId } from "@/lib/dev/build-mock-charging-session";
 import { createClient } from "@/lib/supabase/client";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
@@ -110,8 +115,14 @@ export function ChargingSessionScreen({
 
   const { data: session, error, isLoading } = useSessionQuery(sessionId);
   const { data: bydmateLive = [] } = useBydmateLiveQuery();
+  const devSource = useChargingDevSource();
+  const devOverrideActive = devSource?.isOverrideActive ?? false;
   const completingRef = useRef(false);
   const completionNoticeRef = useRef(false);
+
+  const clockActive = session?.status === "charging";
+  const nowMs = useTickingClock(clockActive);
+  const effectiveBydmateLive = useChargingDevLiveOverride(bydmateLive, session, nowMs);
 
   useEffect(() => {
     if (isDevAppRoute()) return;
@@ -183,17 +194,20 @@ export function ChargingSessionScreen({
 
       const params = toParams(row);
       const startedAtMs = Date.parse(row.started_at);
-      const hasLiveSocSource = bydmateLive.some((snapshot) => snapshotSoc(snapshot) != null);
+      const liveSnapshots = devSource?.resolveLiveSnapshots
+        ? devSource.resolveLiveSnapshots(bydmateLive, row, now)
+        : bydmateLive;
+      const hasLiveSocSource = liveSnapshots.some((snapshot) => snapshotSoc(snapshot) != null);
       const liveChargingState =
         deriveLiveChargingState({
-          snapshot: findFreshChargingSnapshot(bydmateLive, now),
+          snapshot: findFreshChargingSnapshot(liveSnapshots, now),
           params,
           startedAtMs,
           nowMs: now,
         });
       const liveCompletionState = hasLiveSocSource
         ? deriveLiveChargingState({
-            snapshot: findFreshSocSnapshot(bydmateLive, now),
+            snapshot: findFreshSocSnapshot(liveSnapshots, now),
             params,
             startedAtMs,
             nowMs: now,
@@ -203,6 +217,8 @@ export function ChargingSessionScreen({
       const mathState = deriveChargingState(params, startedAtMs, now);
       const d = liveChargingState ?? liveCompletionState ?? mathState;
       setLiveDerived(d);
+
+      if (devOverrideActive) return;
 
       const completionState = hasLiveSocSource ? liveCompletionState : d;
       if (completionState?.isComplete && !completingRef.current) {
@@ -278,11 +294,10 @@ export function ChargingSessionScreen({
     setLiveDerived,
     supabase,
     bydmateLive,
+    devOverrideActive,
+    devSource,
     t,
   ]);
-
-  const clockActive = session?.status === "charging";
-  const nowMs = useTickingClock(clockActive);
 
   const derived: DerivedChargingState | null = useMemo(() => {
     if (!session) return null;
@@ -292,7 +307,7 @@ export function ChargingSessionScreen({
       const startedAtMs = Date.parse(session.started_at);
       return (
         deriveLiveChargingState({
-          snapshot: findFreshChargingSnapshot(bydmateLive, nowMs),
+          snapshot: findFreshChargingSnapshot(effectiveBydmateLive, nowMs),
           params,
           startedAtMs,
           nowMs,
@@ -313,7 +328,21 @@ export function ChargingSessionScreen({
       remainingSeconds: 0,
       isComplete: session.status === "completed",
     } satisfies DerivedChargingState;
-  }, [session, liveDerived, nowMs, bydmateLive]);
+  }, [session, liveDerived, nowMs, effectiveBydmateLive]);
+
+  const displayUsesLiveSoc = useMemo(() => {
+    if (!session || session.status !== "charging" || !session.started_at) return false;
+    const params = toParams(session);
+    const startedAtMs = Date.parse(session.started_at);
+    return (
+      deriveLiveChargingState({
+        snapshot: findFreshChargingSnapshot(effectiveBydmateLive, nowMs),
+        params,
+        startedAtMs,
+        nowMs,
+      }) != null
+    );
+  }, [session, effectiveBydmateLive, nowMs]);
 
   const pctForBar =
     session && derived ? derived.currentPercent : session?.current_percent ?? 0;
@@ -332,12 +361,19 @@ export function ChargingSessionScreen({
 
   const stopSession = useCallback(async () => {
     if (!session?.started_at) return;
+    if (isDevMockChargingSessionId(sessionId)) {
+      toast.message("Dev preview — session not saved");
+      return;
+    }
     const now = Date.now();
     const params = toParams(session);
     const startedAtMs = Date.parse(session.started_at);
+    const liveSnapshots = devSource?.resolveLiveSnapshots
+      ? devSource.resolveLiveSnapshots(bydmateLive, session, now)
+      : bydmateLive;
     const d =
       deriveLiveChargingState({
-        snapshot: findFreshChargingSnapshot(bydmateLive, now),
+        snapshot: findFreshChargingSnapshot(liveSnapshots, now),
         params,
         startedAtMs,
         nowMs: now,
@@ -369,7 +405,7 @@ export function ChargingSessionScreen({
     });
     qc.invalidateQueries({ queryKey: queryKeys.sessions });
     toast.message(t("charging.saved") as string);
-  }, [bydmateLive, qc, session, sessionId, supabase, t]);
+  }, [bydmateLive, devSource, qc, session, sessionId, supabase, t]);
 
   if (isLoading) {
     return (
@@ -486,6 +522,18 @@ export function ChargingSessionScreen({
               start: session.start_percent.toFixed(0),
             })}
           </p>
+          {charging && !historyMode ? (
+            <span
+              className={
+                "mt-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] " +
+                (displayUsesLiveSoc
+                  ? "border border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
+                  : "border border-white/10 bg-white/[0.04] text-muted-foreground")
+              }
+            >
+              {displayUsesLiveSoc ? "Mate SOC" : "Estimate"}
+            </span>
+          ) : null}
         </div>
 
         <div className="relative mt-8">
@@ -530,35 +578,36 @@ export function ChargingSessionScreen({
               : "—"
           }
         />
+        <StatCard
+          label={t("charging.acPower") as string}
+          value={`${session.charger_power_kw.toFixed(1)} kW`}
+        />
+        <StatCard
+          label={t("charging.batteryPack") as string}
+          value={`${session.battery_capacity_kwh} kWh`}
+        />
+        {!historyMode && charging && estimatedFinishMs != null ? (
+          <StatCard
+            label={t("charging.estimatedFinish") as string}
+            value={new Date(estimatedFinishMs).toLocaleTimeString(
+              locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US",
+              { hour: "2-digit", minute: "2-digit" },
+            )}
+          />
+        ) : null}
+        {!historyMode && charging && projectedSocAtMorning != null ? (
+          <StatCard
+            label={t("charging.projectedAtSeven") as string}
+            value={`${projectedSocAtMorning.toFixed(1)}%`}
+          />
+        ) : null}
+        {!historyMode && charging && secondsToTarget != null && secondsToTarget > 0 ? (
+          <StatCard
+            label={t("charging.secondsToTarget") as string}
+            value={formatDuration(secondsToTarget)}
+          />
+        ) : null}
       </div>
-
-      <CardRow
-        label={t("charging.acPower") as string}
-        value={`${session.charger_power_kw.toFixed(1)} kW`}
-      />
-      <CardRow label={t("charging.batteryPack") as string} value={`${session.battery_capacity_kwh} kWh`} />
-
-      {!historyMode && charging && estimatedFinishMs != null ? (
-        <CardRow
-          label={t("charging.estimatedFinish") as string}
-          value={new Date(estimatedFinishMs).toLocaleTimeString(locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        />
-      ) : null}
-      {!historyMode && charging && projectedSocAtMorning != null ? (
-        <CardRow
-          label={t("charging.projectedAtSeven") as string}
-          value={`${projectedSocAtMorning.toFixed(1)}%`}
-        />
-      ) : null}
-      {!historyMode && charging && secondsToTarget != null && secondsToTarget > 0 ? (
-        <CardRow
-          label={t("charging.secondsToTarget") as string}
-          value={formatDuration(secondsToTarget)}
-        />
-      ) : null}
 
       <ChargingDeltaCard session={session} />
 
@@ -596,15 +645,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <p className="mt-3 text-xl font-semibold tabular-nums tracking-tight">
         {value}
       </p>
-    </div>
-  );
-}
-
-function CardRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-card flex min-h-[56px] items-center justify-between rounded-2xl border border-white/[0.08] px-5 py-4">
-      <span className="text-muted-foreground text-sm">{label}</span>
-      <span className="text-lg font-semibold tabular-nums">{value}</span>
     </div>
   );
 }

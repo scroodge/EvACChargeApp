@@ -11,7 +11,7 @@ import type { ChargingSessionRow } from "@/types/database";
 export async function fetchSessions(): Promise<ChargingSessionRow[]> {
   if (isDevAppRoute()) {
     const response = await devFetch("/api/vehicle/sessions");
-    if (!response.ok) throw new Error("Unauthorized");
+    if (!response.ok) return [];
     const payload = (await response.json()) as { sessions?: ChargingSessionRow[] };
     return payload.sessions ?? [];
   }

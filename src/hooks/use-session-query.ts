@@ -3,6 +3,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
+import {
+  buildMockChargingSession,
+  isDevMockChargingSessionId,
+} from "@/lib/dev/build-mock-charging-session";
 import { createClient } from "@/lib/supabase/client";
 import { mapChargingSession } from "@/lib/db-map";
 import { queryKeys } from "@/lib/query-keys";
@@ -11,6 +15,10 @@ import type { ChargingSessionRow } from "@/types/database";
 export async function fetchSessionById(
   sessionId: string,
 ): Promise<ChargingSessionRow> {
+  if (isDevMockChargingSessionId(sessionId) && isDevAppRoute()) {
+    return buildMockChargingSession();
+  }
+
   if (isDevAppRoute()) {
     const response = await devFetch(`/api/vehicle/session/${sessionId}?dev=1`);
     if (!response.ok) throw new Error("Unauthorized");

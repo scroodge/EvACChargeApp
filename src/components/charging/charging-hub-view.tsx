@@ -8,8 +8,11 @@ import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChargingSessionScreen } from "@/components/charging/charging-session-screen";
 import { useTranslation } from "@/hooks/use-translation";
 import { fetchSessions } from "@/hooks/use-sessions-query";
+import { DEV_MOCK_CHARGING_SESSION_ID } from "@/lib/dev/build-mock-charging-session";
+import { isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { useAppPath } from "@/lib/dev/dev-path";
 import { formatDuration } from "@/lib/charging-math";
 import { queryKeys } from "@/lib/query-keys";
@@ -73,6 +76,10 @@ export function ChargingHubView() {
         </Button>
       </div>
     );
+  }
+
+  if (isDevAppRoute()) {
+    return <ChargingSessionScreen sessionId={DEV_MOCK_CHARGING_SESSION_ID} />;
   }
 
   // Idle state — no active session
