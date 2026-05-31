@@ -720,6 +720,7 @@ const MIN_FORECAST_CONSUMPTION_KWH_100KM = 8;
 const MAX_FORECAST_CONSUMPTION_KWH_100KM = 42;
 const ROUTE_LINE_COLOR = "#1e40af";
 const ROUTE_STROKE_WIDTH = 4;
+const ROUTE_HIT_RADIUS = 10;
 const REGEN_POWER_THRESHOLD_KW = 0.05;
 const COAST_POWER_COLOR = "#475569";
 const ROUTE_LAYER_OPTIONS: Array<{
@@ -2480,11 +2481,102 @@ function buildMetricGradientStroke(
   });
 }
 
-function buildSolidRoutePath(
-  route: ReturnType<typeof prepareRoute>,
-  routeMap: ReturnType<typeof prepareRouteMap>,
+type MappedRoutePoint = { x: number; y: number };
+
+function clientToRouteMapPoint(svg: SVGSVGElement, clientX: number, clientY: number) {
+  const rect = svg.getBoundingClientRect();
+  return {
+    x: ((clientX - rect.left) / rect.width) * MAP_VIEW_WIDTH,
+    y: ((clientY - rect.top) / rect.height) * MAP_VIEW_HEIGHT,
+  };
+}
+
+function distanceSquared(ax: number, ay: number, bx: number, by: number) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy;
+}
+
+function closestPointOnSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
 ) {
-  return buildPathFromMappedPoints(route.points.map((point) => routeMap.mapPoint(point)));
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) {
+    return { x: ax, y: ay, t: 0 };
+  }
+
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSquared));
+  return {
+    x: ax + t * dx,
+    y: ay + t * dy,
+    t,
+  };
+}
+
+function findNearestRoutePoint(
+  mappedPoints: MappedRoutePoint[],
+  svgX: number,
+  svgY: number,
+  hitRadius = ROUTE_HIT_RADIUS,
+) {
+  const hitRadiusSquared = hitRadius * hitRadius;
+  let bestDistanceSquared = hitRadiusSquared;
+  let bestIndex = -1;
+  let bestX = 0;
+  let bestY = 0;
+
+  for (let index = 0; index < mappedPoints.length - 1; index += 1) {
+    const start = mappedPoints[index];
+    const end = mappedPoints[index + 1];
+    const closest = closestPointOnSegment(svgX, svgY, start.x, start.y, end.x, end.y);
+    const distance = distanceSquared(svgX, svgY, closest.x, closest.y);
+    if (distance >= bestDistanceSquared) continue;
+
+    bestDistanceSquared = distance;
+    bestIndex = closest.t <= 0.5 ? index : index + 1;
+    bestX = closest.x;
+    bestY = closest.y;
+  }
+
+  if (bestIndex < 0) return null;
+  return { index: bestIndex, x: bestX, y: bestY };
+}
+
+function RoutePointTooltip({
+  point,
+  position,
+  tx,
+}: {
+  point: RoutePoint;
+  position: { x: number; y: number };
+  tx: Translator;
+}) {
+  const left = (position.x / MAP_VIEW_WIDTH) * 100;
+  const top = (position.y / MAP_VIEW_HEIGHT) * 100;
+
+  return (
+    <div
+      className="pointer-events-none absolute z-20 min-w-[9rem] -translate-x-1/2 -translate-y-[calc(100%+0.5rem)] rounded-lg border border-border bg-background/95 px-2.5 py-1.5 text-[11px] shadow-lg backdrop-blur"
+      style={{ left: `${left}%`, top: `${top}%` }}
+    >
+      <p className="font-semibold text-foreground">{formatClock(point.time)}</p>
+      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-muted-foreground">
+        <dt>{tx("vehicle.route.hoverSoc" as TranslationKey)}</dt>
+        <dd className="text-right text-foreground">{fmt(point.soc, 0)}%</dd>
+        <dt>{tx("vehicle.route.hoverSpeed" as TranslationKey)}</dt>
+        <dd className="text-right text-foreground">{fmt(point.speedKmh, 0)} km/h</dd>
+        <dt>{tx("vehicle.route.hoverPower" as TranslationKey)}</dt>
+        <dd className="text-right text-foreground">{fmt(point.powerKw, 1)} kW</dd>
+      </dl>
+    </div>
+  );
 }
 
 export function RouteMap({
@@ -2752,11 +2844,16 @@ function InteractiveRouteCanvas({
   const tx = t as Translator;
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const gradientId = useId().replace(/:/g, "");
+  const [hoveredPoint, setHoveredPoint] = useState<{ index: number; x: number; y: number } | null>(null);
   const allowMapInteraction = isFullscreen || showToolbarControls;
   const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
+  const mappedRoutePoints = useMemo(
+    () => route.points.map((point) => routeMap.mapPoint(point)),
+    [route.points, routeMap],
+  );
   const solidRoutePath = useMemo(
-    () => buildSolidRoutePath(route, routeMap),
-    [route, routeMap],
+    () => buildPathFromMappedPoints(mappedRoutePoints),
+    [mappedRoutePoints],
   );
   const metricGradientStroke = useMemo(() => {
     if (selectedLayer === "power" || selectedLayer === "speed" || selectedLayer === "soc") {
@@ -2766,6 +2863,26 @@ function InteractiveRouteCanvas({
   }, [route, routeMap, selectedLayer]);
   const mappedStart = route.start ? routeMap.mapPoint(route.start) : null;
   const mappedEnd = route.end ? routeMap.mapPoint(route.end) : null;
+  const activeRoutePoint = hoveredPoint ? route.points[hoveredPoint.index] ?? null : null;
+
+  const updateRouteHover = (clientX: number, clientY: number, element: SVGSVGElement) => {
+    if (dragRef.current) return;
+
+    const pointer = clientToRouteMapPoint(element, clientX, clientY);
+    const nearest = findNearestRoutePoint(mappedRoutePoints, pointer.x, pointer.y);
+    setHoveredPoint((current) => {
+      if (!nearest) return current ? null : current;
+      if (
+        current &&
+        current.index === nearest.index &&
+        current.x === nearest.x &&
+        current.y === nearest.y
+      ) {
+        return current;
+      }
+      return nearest;
+    });
+  };
 
   const dragMap = (clientX: number, clientY: number, element: SVGSVGElement) => {
     const previous = dragRef.current;
@@ -2845,24 +2962,30 @@ function InteractiveRouteCanvas({
           </MapIconButton>
         ) : null}
       </div>
+      {activeRoutePoint && hoveredPoint ? (
+        <RoutePointTooltip point={activeRoutePoint} position={hoveredPoint} tx={tx} />
+      ) : null}
       <svg
-        className={`size-full touch-none ${allowMapInteraction ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
+        className={`size-full touch-none ${allowMapInteraction ? "cursor-grab active:cursor-grabbing" : hoveredPoint ? "cursor-crosshair" : "cursor-default"}`}
         viewBox="0 0 320 180"
         role="img"
         aria-label={tx("vehicle.route.aria")}
         onPointerDown={
           allowMapInteraction
             ? (event) => {
+                setHoveredPoint(null);
                 dragRef.current = { x: event.clientX, y: event.clientY };
                 event.currentTarget.setPointerCapture(event.pointerId);
               }
             : undefined
         }
-        onPointerMove={
-          allowMapInteraction
-            ? (event) => dragMap(event.clientX, event.clientY, event.currentTarget)
-            : undefined
-        }
+        onPointerMove={(event) => {
+          if (allowMapInteraction && dragRef.current) {
+            dragMap(event.clientX, event.clientY, event.currentTarget);
+            return;
+          }
+          updateRouteHover(event.clientX, event.clientY, event.currentTarget);
+        }}
         onPointerUp={
           allowMapInteraction
             ? (event) => {
@@ -2871,7 +2994,14 @@ function InteractiveRouteCanvas({
               }
             : undefined
         }
-        onPointerCancel={allowMapInteraction ? () => { dragRef.current = null; } : undefined}
+        onPointerCancel={
+          allowMapInteraction
+            ? () => {
+                dragRef.current = null;
+              }
+            : undefined
+        }
+        onPointerLeave={() => setHoveredPoint(null)}
         onWheel={
           allowMapInteraction
             ? (event) => {
@@ -2953,6 +3083,17 @@ function InteractiveRouteCanvas({
           <circle cx={mappedEnd.x} cy={mappedEnd.y} r="5" fill="#facc15" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
             <title>{tx("vehicle.route.end")}</title>
           </circle>
+        ) : null}
+        {hoveredPoint ? (
+          <circle
+            cx={hoveredPoint.x}
+            cy={hoveredPoint.y}
+            r="4.5"
+            fill="#ffffff"
+            stroke={ROUTE_LINE_COLOR}
+            strokeWidth="2"
+            pointerEvents="none"
+          />
         ) : null}
       </svg>
     </div>

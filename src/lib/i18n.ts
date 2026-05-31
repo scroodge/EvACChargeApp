@@ -455,6 +455,9 @@ export const dictionaries = {
           speed: "km/h",
           soc: "SOC",
         },
+        hoverSoc: "SOC",
+        hoverSpeed: "Speed",
+        hoverPower: "Power",
       },
       location: {
         title: "Location",
@@ -1039,6 +1042,9 @@ export const dictionaries = {
           speed: "км/г",
           soc: "SOC",
         },
+        hoverSoc: "SOC",
+        hoverSpeed: "Хуткасць",
+        hoverPower: "Магутнасць",
       },
       location: {
         title: "Лакацыя",
@@ -1622,6 +1628,9 @@ export const dictionaries = {
           speed: "км/ч",
           soc: "SOC",
         },
+        hoverSoc: "SOC",
+        hoverSpeed: "Скорость",
+        hoverPower: "Мощность",
       },
       location: {
         title: "Геопозиция",
