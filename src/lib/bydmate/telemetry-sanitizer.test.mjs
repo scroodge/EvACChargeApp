@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  filterDisplayTripTrackPoints,
   sanitizeLocation,
   sanitizePayloadLocations,
   sanitizeTripTrackPoints,
@@ -148,4 +149,36 @@ test("filters persisted trip track points for legacy dirty trips", () => {
   assert.equal(result.points.length, 2);
   assert.equal(result.points[0].device_time, "2026-05-21T17:17:28.592Z");
   assert.equal(result.points[1].device_time, "2026-05-21T17:17:30.926Z");
+});
+
+test("keeps persisted trip track points for map display without jump re-filtering", () => {
+  const result = filterDisplayTripTrackPoints([
+    {
+      device_time: "2026-05-21T17:17:28.592Z",
+      lat: 53.92644457,
+      lon: 27.63840415,
+      accuracy_m: 3.7900924682617188,
+      bearing_deg: 105,
+      speed_kmh: 25,
+    },
+    {
+      device_time: "2026-05-21T17:17:29.782Z",
+      lat: 53.927393,
+      lon: 27.639089,
+      accuracy_m: 90.0999984741211,
+      bearing_deg: null,
+      speed_kmh: 27,
+    },
+    {
+      device_time: "2026-05-21T17:17:30.926Z",
+      lat: 53.92642939,
+      lon: 27.63861885,
+      accuracy_m: 3.7900924682617188,
+      bearing_deg: 95.19999694824219,
+      speed_kmh: 30,
+    },
+  ]);
+
+  assert.equal(result.droppedPointCount, 0);
+  assert.equal(result.points.length, 3);
 });

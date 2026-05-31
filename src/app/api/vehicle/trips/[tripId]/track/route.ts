@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { sanitizeTripTrackPoints } from "@/lib/bydmate/telemetry-sanitizer";
+import { filterDisplayTripTrackPoints } from "@/lib/bydmate/telemetry-sanitizer";
 import { resolveVehicleApiAccess } from "@/lib/dev/dev-api-auth";
 
 type RouteContext = {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Failed to load trip track" }, { status: 500 });
   }
 
-  const track = sanitizeTripTrackPoints(data ?? []);
+  const track = filterDisplayTripTrackPoints(data ?? []);
 
   return NextResponse.json({
     tripId,

@@ -330,6 +330,25 @@ export function sanitizeTripTrackPoints<T extends TripTrackPointLike>(points: T[
   return { points: sanitized, droppedPointCount };
 }
 
+/** Keep all persisted track points for map display; only drop invalid coordinates. */
+export function filterDisplayTripTrackPoints<T extends TripTrackPointLike>(points: T[]) {
+  let droppedPointCount = 0;
+  const filtered: T[] = [];
+
+  for (const point of points) {
+    const lat = finiteNumber(point.lat);
+    const lon = finiteNumber(point.lon);
+    if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180 || (lat === 0 && lon === 0)) {
+      droppedPointCount += 1;
+      continue;
+    }
+
+    filtered.push(point);
+  }
+
+  return { points: filtered, droppedPointCount };
+}
+
 export function sanitizePayloadTelemetry(
   payloads: TelemetryPayload[],
   previousTelemetry: Map<string, AcceptedTelemetry>,

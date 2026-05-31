@@ -711,9 +711,13 @@ const TRIP_GAP_MS = 5 * 60 * 1000;
 const MAX_CHART_POINTS = 240;
 const MAX_CHART_MARKERS = 80;
 const MAX_DELTA_BY_SOC_POINTS = 240;
-const MAX_ROUTE_POINTS = 400;
+const MAX_ROUTE_POINTS = 2000;
 const MAP_VIEW_WIDTH = 320;
 const MAP_VIEW_HEIGHT = 180;
+const ROUTE_MAP_PAD_X = 16;
+const ROUTE_MAP_PAD_Y = 12;
+const ROUTE_MAP_INNER_WIDTH = MAP_VIEW_WIDTH - ROUTE_MAP_PAD_X * 2;
+const ROUTE_MAP_INNER_HEIGHT = MAP_VIEW_HEIGHT - ROUTE_MAP_PAD_Y * 2;
 const MAP_TILE_SIZE = 256;
 const MAX_MAP_ZOOM = 18;
 const MIN_MAP_ZOOM = 2;
@@ -2231,7 +2235,7 @@ function chooseRouteZoom(route: ReturnType<typeof prepareRoute>) {
 
   for (let zoom = MAX_MAP_ZOOM; zoom >= MIN_MAP_ZOOM; zoom -= 1) {
     const bounds = routeBoundsAtZoom(route, zoom);
-    if (bounds.width <= 288 && bounds.height <= 132) {
+    if (bounds.width <= ROUTE_MAP_INNER_WIDTH && bounds.height <= ROUTE_MAP_INNER_HEIGHT) {
       return zoom;
     }
   }
@@ -2273,8 +2277,8 @@ function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: num
   const mapPoint = (point: RoutePoint) => {
     const projected = projectMercator(point.lat, point.lon, zoom);
     return {
-      x: 16 + ((projected.x - topLeftX - 16) / (MAP_VIEW_WIDTH - 32)) * (MAP_VIEW_WIDTH - 32),
-      y: 8 + ((projected.y - topLeftY - 8) / (MAP_VIEW_HEIGHT - 24)) * (MAP_VIEW_HEIGHT - 24),
+      x: ROUTE_MAP_PAD_X + ((projected.x - topLeftX - ROUTE_MAP_PAD_X) / ROUTE_MAP_INNER_WIDTH) * ROUTE_MAP_INNER_WIDTH,
+      y: ROUTE_MAP_PAD_Y + ((projected.y - topLeftY - ROUTE_MAP_PAD_Y) / ROUTE_MAP_INNER_HEIGHT) * ROUTE_MAP_INNER_HEIGHT,
     };
   };
 
