@@ -16,7 +16,6 @@ import {
 } from "@/lib/bydmate/telemetry-buckets";
 import type { TelemetryHistoryPoint } from "@/lib/bydmate/telemetry-history";
 import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
-import type { RouteInsight } from "@/lib/bydmate/route-insights";
 
 type Translator = (key: TranslationKey, values?: Record<string, string | number>) => string;
 
@@ -144,14 +143,6 @@ type BarSeries = {
   values: number[];
 };
 
-type SecondaryAxis = {
-  label: string;
-  unit: string;
-  valueDigits: number;
-  color: string;
-  values: number[];
-};
-
 type BarChartModel = {
   title: string;
   unit: string;
@@ -162,7 +153,11 @@ type BarChartModel = {
   bandMax?: number[];
   subtitle?: string;
   referenceLine?: { value: number; label: string };
-  secondaryAxis?: SecondaryAxis;
+  /** Fixed Y-axis floor (e.g. 10 kWh/100 for efficiency). Bars anchor to this baseline. */
+  yAxisMin?: number;
+  /** Per-bucket text rendered inside bars (e.g. distance km). */
+  barInsideText?: (string | null)[];
+  barInsideLegend?: string;
 };
 
 function buildBarCharts(
@@ -272,6 +267,7 @@ function buildBarCharts(
     title: tx("vehicle.analytics.efficiencyTitle"),
     unit: "kWh/100",
     valueDigits: 1,
+    yAxisMin: 10,
     labels,
     subtitle:
       periodAvgConsumption != null
@@ -289,13 +285,11 @@ function buildBarCharts(
         return row && row.weight > 0 ? row.sum / row.weight : 0;
       }),
     }],
-    secondaryAxis: {
-      label: tx("vehicle.trips.distance"),
-      unit: "km",
-      valueDigits: 0,
-      color: "var(--voltflow-cyan)",
-      values: labels.map((label) => distanceByLabel.get(label) ?? 0),
-    },
+    barInsideText: labels.map((label) => {
+      const km = distanceByLabel.get(label) ?? 0;
+      return km > 0 ? `${fmt(km, 0)} km` : null;
+    }),
+    barInsideLegend: `${tx("vehicle.trips.distance")} · ${tx("vehicle.analytics.inBar")}`,
   });
 
   return charts.filter((chart) => {
@@ -324,17 +318,17 @@ function IconButton({ label, onClick, disabled, children }: { label: string; onC
 export function ChartSeriesLegend({
   series,
   referenceLine,
-  secondaryAxis,
+  barInsideLegend,
   unit,
   valueDigits = 1,
 }: {
   series: { label: string; color: string }[];
   referenceLine?: { value: number; label: string };
-  secondaryAxis?: { label: string; color: string };
+  barInsideLegend?: string;
   unit?: string;
   valueDigits?: number;
 }) {
-  if (series.length === 0 && !referenceLine && !secondaryAxis) return null;
+  if (series.length === 0 && !referenceLine && !barInsideLegend) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -344,15 +338,8 @@ export function ChartSeriesLegend({
           {item.label}
         </span>
       ))}
-      {secondaryAxis ? (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span
-            className="inline-block h-0 w-4 border-t-2"
-            style={{ borderColor: secondaryAxis.color }}
-            aria-hidden
-          />
-          {secondaryAxis.label}
-        </span>
+      {barInsideLegend ? (
+        <span className="text-xs text-muted-foreground">{barInsideLegend}</span>
       ) : null}
       {referenceLine ? (
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -370,7 +357,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
   const tx = t as Translator;
   const [isOpen, setIsOpen] = useState(false);
 
-  const { title, unit, valueDigits, labels, series, bandMin, bandMax, subtitle, referenceLine, secondaryAxis } = chart;
+  const { title, unit, valueDigits, labels, series, bandMin, bandMax, subtitle, referenceLine, barInsideText, barInsideLegend, yAxisMin } = chart;
   const count = labels.length;
   const hasBand = bandMin != null && bandMax != null;
 
@@ -379,11 +366,11 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
       ...values,
       ...(includeReference != null && includeReference > 0 ? [includeReference] : []),
     ].filter((v) => v > 0);
-    const minValue = allValues.length ? Math.min(...allValues) : 0;
-    const maxValue = allValues.length ? Math.max(...allValues) : 1;
-    const pad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
-    const yMin = Math.max(0, minValue - pad);
-    const yMax = maxValue + pad;
+    const dataMin = allValues.length ? Math.min(...allValues) : 0;
+    const dataMax = allValues.length ? Math.max(...allValues) : 1;
+    const pad = Math.max((dataMax - dataMin) * 0.12, dataMax === dataMin ? 1 : 0);
+    const yMin = yAxisMin ?? Math.max(0, dataMin - pad);
+    const yMax = Math.max(yMin + 1, dataMax + pad);
     const yScale = (value: number) => {
       if (yMax === yMin) return 60;
       return 104 - ((value - yMin) / (yMax - yMin)) * 88;
@@ -393,7 +380,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
       { label: fmt((yMin + yMax) / 2, digits), value: (yMin + yMax) / 2 },
       { label: fmt(yMin, digits), value: yMin },
     ];
-    return { minValue, maxValue, yScale, yTicks };
+    return { yMin, yMax, dataMin, dataMax, yScale, yTicks };
   }
 
   const primaryValues = [
@@ -406,10 +393,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
     valueDigits,
     referenceLine?.value ?? null,
   );
-  const secondaryScale = secondaryAxis
-    ? buildScale(secondaryAxis.values, secondaryAxis.valueDigits)
-    : null;
-  const rangeSubtitle = `${fmt(compactScale.minValue, valueDigits)}–${fmt(compactScale.maxValue, valueDigits)} ${unit}`;
+  const rangeSubtitle = `${fmt(compactScale.yMin, valueDigits)}–${fmt(compactScale.yMax, valueDigits)} ${unit}`;
 
   const slotCenter = (index: number) => {
     const slotW = 284 / Math.max(count, 1);
@@ -424,9 +408,6 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
     <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={title}>
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
-      {secondaryScale ? (
-        <line x1="318" x2="318" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
-      ) : null}
       {scale.yTicks.map((tick, index) => (
         <g key={`${title}-y-${index}`}>
           <line
@@ -444,15 +425,6 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
           </text>
         </g>
       ))}
-      {secondaryScale
-        ? secondaryScale.yTicks.map((tick, index) => (
-            <g key={`${title}-y2-${index}`}>
-              <text x="323" y={secondaryScale.yScale(tick.value) + 3} textAnchor="start" className="fill-muted-foreground text-[8px]">
-                {tick.label}
-              </text>
-            </g>
-          ))
-        : null}
       {showReference && referenceLine && referenceLine.value > 0 ? (
         <g>
           <line
@@ -467,33 +439,11 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
           />
         </g>
       ) : null}
-      {secondaryAxis && secondaryScale
-        ? (() => {
-            const points = labels
-              .map((label, index) => {
-                const value = secondaryAxis.values[index] ?? 0;
-                if (value <= 0) return null;
-                return { x: slotCenter(index), y: secondaryScale.yScale(value), value, label };
-              })
-              .filter((p): p is NonNullable<typeof p> => p != null);
-            const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
-            return (
-              <g>
-                {points.length > 1 ? (
-                  <path d={d} fill="none" stroke={secondaryAxis.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
-                ) : null}
-                {points.map((p) => (
-                  <circle key={`${title}-dist-${p.label}`} cx={p.x} cy={p.y} r="3" fill={secondaryAxis.color} />
-                ))}
-              </g>
-            );
-          })()
-        : null}
       {labels.map((label, index) => {
         const cx = slotCenter(index);
         const barW = Math.min((284 / Math.max(count, 1)) * 0.55, 24);
         const { yScale } = scale;
-        const distKm = secondaryAxis?.values[index] ?? 0;
+        const insideText = barInsideText?.[index] ?? null;
 
         if (hasBand && bandMin && bandMax) {
           const minBand = bandMin[index] ?? 0;
@@ -518,11 +468,6 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
                 </text>
               ) : null}
               <text x={cx} y="124" textAnchor="middle" className="fill-muted-foreground text-[8px]">{label}</text>
-              {distKm > 0 ? (
-                <text x={cx} y="134" textAnchor="middle" className="fill-muted-foreground text-[7px] opacity-80">
-                  {fmt(distKm, 0)} km
-                </text>
-              ) : null}
             </g>
           );
         }
@@ -532,24 +477,37 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
             {series.map((item, seriesIndex) => {
               const offset = (seriesIndex - (series.length - 1) / 2) * (barW / Math.max(series.length, 1));
               const value = item.values[index] ?? 0;
+              const baseline = yScale(scale.yMin);
               const top = yScale(value);
+              const barHeight = Math.max(0, baseline - top);
               const barSliceW = barW / Math.max(series.length, 1) - 1;
               const barX = cx - barW / 2 + offset;
               const barCenterX = barX + barSliceW / 2;
+              const showInside = value > scale.yMin && insideText && barHeight >= 14;
               return (
                 <g key={`${item.label}-${label}`}>
-                  {value > 0 ? (
+                  {value > scale.yMin ? (
                     <rect
                       x={barX}
                       y={top}
                       width={barSliceW}
-                      height={104 - top}
+                      height={barHeight}
                       rx="2"
                       fill={item.color}
                       fillOpacity="0.85"
                     />
                   ) : null}
-                  {value > 0 ? (
+                  {showInside ? (
+                    <text
+                      x={barCenterX}
+                      y={top + barHeight / 2 + 3}
+                      textAnchor="middle"
+                      className="fill-white text-[7px] font-semibold"
+                    >
+                      {insideText}
+                    </text>
+                  ) : null}
+                  {value > scale.yMin ? (
                     <text x={barCenterX} y={top - 3} textAnchor="middle" className="fill-foreground text-[7px] font-medium">
                       {fmt(value, valueDigits)}
                     </text>
@@ -558,20 +516,10 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
               );
             })}
             <text x={cx} y="124" textAnchor="middle" className="fill-muted-foreground text-[8px]">{label}</text>
-            {distKm > 0 ? (
-              <text x={cx} y="134" textAnchor="middle" className="fill-muted-foreground text-[7px] opacity-80">
-                {fmt(distKm, 0)} km
-              </text>
-            ) : null}
           </g>
         );
       })}
       <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">{unit}</text>
-      {secondaryAxis ? (
-        <text x="334" y="60" textAnchor="middle" transform="rotate(90 334 60)" className="fill-muted-foreground text-[9px]">
-          {secondaryAxis.unit}
-        </text>
-      ) : null}
     </svg>
   );
 
@@ -602,11 +550,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
           <div className="px-1 pt-1">
             <ChartSeriesLegend
               series={series}
-              secondaryAxis={
-                secondaryAxis
-                  ? { label: secondaryAxis.label, color: secondaryAxis.color }
-                  : undefined
-              }
+              barInsideLegend={barInsideLegend}
               referenceLine={referenceLine}
               unit={unit}
               valueDigits={valueDigits}
@@ -652,74 +596,6 @@ export function TempConsumptionBarChart({ buckets }: { buckets: TempConsumptionB
   };
 
   return <TelemetryBarChart chart={chart} />;
-}
-
-export function RouteInsightsSection({
-  routes,
-  isLoading,
-}: {
-  routes: RouteInsight[];
-  isLoading: boolean;
-}) {
-  const { t } = useTranslation();
-  const tx = t as Translator;
-
-  if (isLoading) {
-    return <Skeleton className="h-32 rounded-2xl" />;
-  }
-
-  if (routes.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">{tx("vehicle.analytics.routeInsightsEmpty")}</p>
-    );
-  }
-
-  return (
-    <div id="route-insights" className="mt-4 grid gap-3">
-      {routes.map((route) => (
-        <article key={route.routeId} className="rounded-2xl border border-border bg-white/[0.02] p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h3 className="font-heading text-base font-semibold tracking-tight">{route.label}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {tx("vehicle.analytics.routeTripCount", { value: route.tripCount })}
-              </p>
-            </div>
-            {!route.unlocked ? (
-              <span className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                {tx("vehicle.analytics.routeUnlock", { value: route.tripsNeeded })}
-              </span>
-            ) : null}
-          </div>
-          {route.unlocked ? (
-            <div className="mt-3 grid gap-2">
-              <p className="text-sm tabular-nums">
-                {fmt(route.medianConsumptionKwh100, 1)} kWh/100 · {fmt(route.minConsumptionKwh100, 1)}–{fmt(route.maxConsumptionKwh100, 1)}
-              </p>
-              {route.predictedConsumptionKwh100 ? (
-                <p className="text-sm text-primary">
-                  {tx("vehicle.analytics.routePrediction", {
-                    low: fmt(route.predictedConsumptionKwh100.low, 1),
-                    high: fmt(route.predictedConsumptionKwh100.high, 1),
-                  })}
-                </p>
-              ) : null}
-              {route.tempBuckets.length >= 2 ? (
-                <TempConsumptionBarChart
-                  buckets={route.tempBuckets.map((b) => ({
-                    tempLabel: b.label,
-                    tempMid: b.tempC,
-                    tripCount: b.count,
-                    avgConsumptionKwh100: b.avgConsumptionKwh100,
-                  }))}
-                />
-              ) : null}
-            </div>
-          ) : null}
-        </article>
-      ))}
-    </div>
-  );
 }
 
 export function useAnalyticsBarCharts(

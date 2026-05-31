@@ -17,12 +17,22 @@ export type RouteTripRef = {
   regenKwh: number | null;
 };
 
+export type RouteInsightTrackPoint = {
+  lat: number;
+  lon: number;
+  device_time: string;
+  power_kw?: number | null;
+  speed_kmh?: number | null;
+  soc?: number | null;
+};
+
 export type RouteInsight = {
   routeId: string;
   label: string;
   tripCount: number;
   tripsNeeded: number;
   unlocked: boolean;
+  trackPoints: RouteInsightTrackPoint[];
   medianConsumptionKwh100: number | null;
   minConsumptionKwh100: number | null;
   maxConsumptionKwh100: number | null;
@@ -46,6 +56,76 @@ function routeKey(startLat: number, startLon: number, endLat: number, endLon: nu
 
 function routeLabel(startLat: number, startLon: number, endLat: number, endLon: number) {
   return `${startLat.toFixed(2)},${startLon.toFixed(2)} → ${endLat.toFixed(2)},${endLon.toFixed(2)}`;
+}
+
+const MAX_ROUTE_INSIGHT_TRACK_POINTS = 150;
+
+function downsampleTrackPoints<T>(points: T[], maxPoints: number): T[] {
+  if (points.length <= maxPoints) return points;
+  const out: T[] = [];
+  const step = (points.length - 1) / (maxPoints - 1);
+  for (let i = 0; i < maxPoints; i += 1) {
+    out.push(points[Math.round(i * step)]);
+  }
+  return out;
+}
+
+function toRouteTrackPoints(
+  track: { lat: number; lon: number; device_time?: string | null; power_kw?: number | null; speed_kmh?: number | null; soc?: number | null }[],
+  fallbackTime: string,
+): RouteInsightTrackPoint[] {
+  return track.map((point) => ({
+    lat: point.lat,
+    lon: point.lon,
+    device_time: point.device_time ?? fallbackTime,
+    power_kw: point.power_kw ?? null,
+    speed_kmh: point.speed_kmh ?? null,
+    soc: point.soc ?? null,
+  }));
+}
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const earthRadiusM = 6_371_000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * earthRadiusM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/** True when GPS track has enough spread to render a meaningful route map. */
+export function isRouteTrackDisplayable(
+  points: { lat: number; lon: number }[],
+  minPoints = 2,
+  minSpanMeters = 75,
+) {
+  const valid = points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  if (valid.length < minPoints) return false;
+
+  let minLat = valid[0].lat;
+  let maxLat = valid[0].lat;
+  let minLon = valid[0].lon;
+  let maxLon = valid[0].lon;
+  let pathMeters = 0;
+
+  for (let i = 0; i < valid.length; i += 1) {
+    const point = valid[i];
+    minLat = Math.min(minLat, point.lat);
+    maxLat = Math.max(maxLat, point.lat);
+    minLon = Math.min(minLon, point.lon);
+    maxLon = Math.max(maxLon, point.lon);
+    if (i > 0) {
+      const prev = valid[i - 1];
+      pathMeters += haversineMeters(prev.lat, prev.lon, point.lat, point.lon);
+    }
+  }
+
+  const latSpanM = haversineMeters(minLat, minLon, maxLat, minLon);
+  const lonSpanM = haversineMeters(minLat, minLon, minLat, maxLon);
+
+  return pathMeters >= minSpanMeters || latSpanM >= minSpanMeters || lonSpanM >= minSpanMeters;
 }
 
 function median(values: number[]) {
@@ -139,12 +219,12 @@ export async function fetchRouteInsights({
   if (tripsError) throw tripsError;
 
   const tripRows = (trips ?? []) as BydmateTripRow[];
-  const clusters = new Map<string, { label: string; trips: RouteTripRef[] }>();
+  const clusters = new Map<string, { label: string; trips: RouteTripRef[]; trackPoints: RouteInsightTrackPoint[] }>();
 
   for (const trip of tripRows) {
     const { data: track, error: trackError } = await supabase
       .from("bydmate_trip_track_points")
-      .select("lat, lon")
+      .select("lat, lon, device_time, power_kw, speed_kmh, soc")
       .eq("user_id", userId)
       .eq("trip_id", trip.id)
       .order("device_time", { ascending: true })
@@ -156,6 +236,10 @@ export async function fetchRouteInsights({
     const last = track[track.length - 1];
     const key = routeKey(first.lat, first.lon, last.lat, last.lon);
     const label = routeLabel(first.lat, first.lon, last.lat, last.lon);
+    const mappedTrack = downsampleTrackPoints(
+      toRouteTrackPoints(track, trip.started_at),
+      MAX_ROUTE_INSIGHT_TRACK_POINTS,
+    );
 
     const temps = await tripOutsideTempAvg(supabase, userId, vehicleId, trip);
 
@@ -170,8 +254,11 @@ export async function fetchRouteInsights({
       regenKwh: trip.regen_energy_kwh ?? null,
     };
 
-    const cluster = clusters.get(key) ?? { label, trips: [] };
+    const cluster = clusters.get(key) ?? { label, trips: [], trackPoints: [] };
     cluster.trips.push(ref);
+    if (isRouteTrackDisplayable(mappedTrack) && mappedTrack.length > cluster.trackPoints.length) {
+      cluster.trackPoints = mappedTrack;
+    }
     clusters.set(key, cluster);
   }
 
@@ -210,6 +297,7 @@ export async function fetchRouteInsights({
       tripCount: cluster.trips.length,
       tripsNeeded: Math.max(0, MIN_ROUTE_TRIPS - cluster.trips.length),
       unlocked,
+      trackPoints: isRouteTrackDisplayable(cluster.trackPoints) ? cluster.trackPoints : [],
       medianConsumptionKwh100: med,
       minConsumptionKwh100: consumptions.length ? Math.min(...consumptions) : null,
       maxConsumptionKwh100: consumptions.length ? Math.max(...consumptions) : null,

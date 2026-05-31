@@ -43,6 +43,7 @@ import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAppPath } from "@/lib/dev/dev-path";
 import { calculateCumulativeRegenPoints, calculateTripEnergy } from "@/lib/bydmate/trip-energy";
+import { isRouteTrackDisplayable } from "@/lib/bydmate/route-insights";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
   BydmateLiveSnapshotRow,
@@ -2486,6 +2487,80 @@ export function RouteMap({
   );
 }
 
+export function RouteMapPreview({
+  trackPoints,
+  className = "h-40",
+}: {
+  trackPoints: BydmateTripTrackPointRow[];
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const route = useMemo(() => prepareRouteFromTrack(trackPoints), [trackPoints]);
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
+  const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("regen");
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+
+  if (!isRouteTrackDisplayable(trackPoints) || route.totalPoints < 2) return null;
+
+  const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
+  const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
+  const resetView = () => {
+    setZoomOffset(0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const canvasProps = {
+    route,
+    zoomOffset,
+    pan,
+    onPanChange: setPan,
+    onZoomIn: zoomIn,
+    onZoomOut: zoomOut,
+    onResetView: resetView,
+    selectedLayer,
+    onLayerChange: setSelectedLayer,
+  };
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-xl border border-border bg-background">
+        <InteractiveRouteCanvas
+          {...canvasProps}
+          onOpenFullscreen={() => setIsFullscreenOpen(true)}
+          showLayerLegend={false}
+          showToolbarControls={false}
+          className={className}
+        />
+      </div>
+      <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
+          <DialogTitle className="sr-only">{tx("vehicle.route.dialogTitle")}</DialogTitle>
+          <InteractiveRouteCanvas
+            {...canvasProps}
+            onCloseFullscreen={() => setIsFullscreenOpen(false)}
+            showLayerLegend
+            className="min-h-0 flex-1 rounded-lg"
+            isFullscreen
+          />
+          <div className="text-[11px] text-muted-foreground">
+            {tx("vehicle.route.mapData")} &copy;{" "}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              OpenStreetMap contributors
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function InteractiveRouteCanvas({
   route,
   zoomOffset,
@@ -2500,6 +2575,8 @@ function InteractiveRouteCanvas({
   onLayerChange,
   className = "h-64",
   isFullscreen = false,
+  showLayerLegend = true,
+  showToolbarControls = true,
 }: {
   route: ReturnType<typeof prepareRoute>;
   zoomOffset: number;
@@ -2514,10 +2591,13 @@ function InteractiveRouteCanvas({
   onLayerChange: (layer: RouteLayer) => void;
   className?: string;
   isFullscreen?: boolean;
+  showLayerLegend?: boolean;
+  showToolbarControls?: boolean;
 }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const allowMapInteraction = isFullscreen || showToolbarControls;
   const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
   const routeSegments = useMemo(
     () => buildRouteSegments(route, routeMap, selectedLayer),
@@ -2539,43 +2619,49 @@ function InteractiveRouteCanvas({
 
   return (
     <div className={`relative overflow-hidden bg-background ${className}`}>
-      <div className="absolute left-2 top-2 z-10 grid w-[10rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-5 sm:rounded-full">
-        {ROUTE_LAYER_OPTIONS.map((option) => {
-          const selected = option.id === selectedLayer;
-          const label = tx(`vehicle.route.layers.${option.id}` as TranslationKey);
-          const shortLabel = tx(`vehicle.route.layerShort.${option.id}` as TranslationKey);
+      {showLayerLegend ? (
+        <div className="absolute left-2 top-2 z-10 grid w-[10rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-5 sm:rounded-full">
+          {ROUTE_LAYER_OPTIONS.map((option) => {
+            const selected = option.id === selectedLayer;
+            const label = tx(`vehicle.route.layers.${option.id}` as TranslationKey);
+            const shortLabel = tx(`vehicle.route.layerShort.${option.id}` as TranslationKey);
 
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onLayerChange(option.id)}
-              className={
-                "inline-flex h-7 min-w-0 items-center justify-center gap-1 rounded-full px-2 text-[10px] font-semibold uppercase tracking-normal transition sm:h-8 sm:px-2.5 sm:text-[11px] " +
-                (selected
-                  ? "bg-primary/15 text-foreground"
-                  : "text-muted-foreground hover:bg-white/10 hover:text-foreground")
-              }
-              aria-pressed={selected}
-              aria-label={label}
-              title={label}
-            >
-              <span className="size-1.5 shrink-0 rounded-full sm:size-2" style={{ backgroundColor: option.color }} />
-              <span className="truncate">{shortLabel}</span>
-            </button>
-          );
-        })}
-      </div>
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onLayerChange(option.id)}
+                className={
+                  "inline-flex h-7 min-w-0 items-center justify-center gap-1 rounded-full px-2 text-[10px] font-semibold uppercase tracking-normal transition sm:h-8 sm:px-2.5 sm:text-[11px] " +
+                  (selected
+                    ? "bg-primary/15 text-foreground"
+                    : "text-muted-foreground hover:bg-white/10 hover:text-foreground")
+                }
+                aria-pressed={selected}
+                aria-label={label}
+                title={label}
+              >
+                <span className="size-1.5 shrink-0 rounded-full sm:size-2" style={{ backgroundColor: option.color }} />
+                <span className="truncate">{shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="absolute right-2 top-2 z-10 flex gap-1.5 sm:right-3 sm:top-3 sm:gap-2">
-        <MapIconButton label={tx("vehicle.route.zoomIn")} onClick={onZoomIn}>
-          <Plus className="size-4" aria-hidden />
-        </MapIconButton>
-        <MapIconButton label={tx("vehicle.route.zoomOut")} onClick={onZoomOut}>
-          <Minus className="size-4" aria-hidden />
-        </MapIconButton>
-        <MapIconButton label={tx("vehicle.route.resetMap")} onClick={onResetView}>
-          <MapPin className="size-4" aria-hidden />
-        </MapIconButton>
+        {showToolbarControls ? (
+          <>
+            <MapIconButton label={tx("vehicle.route.zoomIn")} onClick={onZoomIn}>
+              <Plus className="size-4" aria-hidden />
+            </MapIconButton>
+            <MapIconButton label={tx("vehicle.route.zoomOut")} onClick={onZoomOut}>
+              <Minus className="size-4" aria-hidden />
+            </MapIconButton>
+            <MapIconButton label={tx("vehicle.route.resetMap")} onClick={onResetView}>
+              <MapPin className="size-4" aria-hidden />
+            </MapIconButton>
+          </>
+        ) : null}
         {!isFullscreen && onOpenFullscreen ? (
           <MapIconButton label={tx("vehicle.route.fullscreen")} onClick={onOpenFullscreen}>
             <Maximize2 className="size-4" aria-hidden />
@@ -2588,30 +2674,44 @@ function InteractiveRouteCanvas({
         ) : null}
       </div>
       <svg
-        className="size-full touch-none cursor-grab active:cursor-grabbing"
+        className={`size-full touch-none ${allowMapInteraction ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
         viewBox="0 0 320 180"
         role="img"
         aria-label={tx("vehicle.route.aria")}
-        onPointerDown={(event) => {
-          dragRef.current = { x: event.clientX, y: event.clientY };
-          event.currentTarget.setPointerCapture(event.pointerId);
-        }}
-        onPointerMove={(event) => dragMap(event.clientX, event.clientY, event.currentTarget)}
-        onPointerUp={(event) => {
-          dragRef.current = null;
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        }}
-        onPointerCancel={() => {
-          dragRef.current = null;
-        }}
-        onWheel={(event) => {
-          event.preventDefault();
-          if (event.deltaY < 0) {
-            onZoomIn();
-          } else if (event.deltaY > 0) {
-            onZoomOut();
-          }
-        }}
+        onPointerDown={
+          allowMapInteraction
+            ? (event) => {
+                dragRef.current = { x: event.clientX, y: event.clientY };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+            : undefined
+        }
+        onPointerMove={
+          allowMapInteraction
+            ? (event) => dragMap(event.clientX, event.clientY, event.currentTarget)
+            : undefined
+        }
+        onPointerUp={
+          allowMapInteraction
+            ? (event) => {
+                dragRef.current = null;
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+            : undefined
+        }
+        onPointerCancel={allowMapInteraction ? () => { dragRef.current = null; } : undefined}
+        onWheel={
+          allowMapInteraction
+            ? (event) => {
+                event.preventDefault();
+                if (event.deltaY < 0) {
+                  onZoomIn();
+                } else if (event.deltaY > 0) {
+                  onZoomOut();
+                }
+              }
+            : undefined
+        }
       >
         <defs>
           <filter id="route-line-shadow" x="-20%" y="-20%" width="140%" height="140%">

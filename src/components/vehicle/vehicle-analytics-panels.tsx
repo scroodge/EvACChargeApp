@@ -6,10 +6,10 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AnalyticsSummaryStats,
   PhantomDrainBarChart,
-  RouteInsightsSection,
   TempConsumptionBarChart,
   useAnalyticsBarCharts,
 } from "@/components/vehicle/telemetry-analytics-charts";
+import { RouteInsightsSection } from "@/components/vehicle/route-insights-section";
 import { TelemetryHistoryCharts, RouteMap } from "@/components/vehicle/vehicle-live-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
