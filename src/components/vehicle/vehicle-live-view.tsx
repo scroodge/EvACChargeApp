@@ -2236,6 +2236,22 @@ function chooseRouteZoom(route: ReturnType<typeof prepareRoute>) {
   return MIN_MAP_ZOOM;
 }
 
+function stepRouteMapZoom(zoomOffset: number, pan: MapPan, delta: number) {
+  const nextOffset = Math.max(
+    MIN_MAP_ZOOM_OFFSET,
+    Math.min(MAX_MAP_ZOOM_OFFSET, zoomOffset + delta),
+  );
+  if (nextOffset === zoomOffset) {
+    return { zoomOffset, pan };
+  }
+
+  const scale = 2 ** (nextOffset - zoomOffset);
+  return {
+    zoomOffset: nextOffset,
+    pan: { x: pan.x * scale, y: pan.y * scale },
+  };
+}
+
 function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: number, pan: MapPan) {
   const zoom = Math.max(
     MIN_MAP_ZOOM,
@@ -2270,8 +2286,8 @@ function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: num
   const mapPoint = (point: RoutePoint) => {
     const projected = projectMercator(point.lat, point.lon, zoom);
     return {
-      x: ROUTE_MAP_PAD_X + ((projected.x - topLeftX - ROUTE_MAP_PAD_X) / ROUTE_MAP_INNER_WIDTH) * ROUTE_MAP_INNER_WIDTH,
-      y: ROUTE_MAP_PAD_Y + ((projected.y - topLeftY - ROUTE_MAP_PAD_Y) / ROUTE_MAP_INNER_HEIGHT) * ROUTE_MAP_INNER_HEIGHT,
+      x: projected.x - topLeftX,
+      y: projected.y - topLeftY,
     };
   };
 
@@ -2497,11 +2513,22 @@ export function RouteMap({
   const end = route.end;
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
+  const panRef = useRef(pan);
+  panRef.current = pan;
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("route");
 
-  const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
-  const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
+  const zoomBy = (delta: number) => {
+    setZoomOffset((offset) => {
+      const next = stepRouteMapZoom(offset, panRef.current, delta);
+      if (next.zoomOffset !== offset) {
+        setPan(next.pan);
+      }
+      return next.zoomOffset;
+    });
+  };
+  const zoomIn = () => zoomBy(1);
+  const zoomOut = () => zoomBy(-1);
   const resetView = () => {
     setZoomOffset(0);
     setPan({ x: 0, y: 0 });
@@ -2616,13 +2643,24 @@ export function RouteMapPreview({
   const route = useMemo(() => prepareRouteFromTrack(trackPoints), [trackPoints]);
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
+  const panRef = useRef(pan);
+  panRef.current = pan;
   const [selectedLayer, setSelectedLayer] = useState<RouteLayer>("route");
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
   if (!isRouteTrackDisplayable(trackPoints) || route.totalPoints < 2) return null;
 
-  const zoomIn = () => setZoomOffset((value) => Math.min(MAX_MAP_ZOOM_OFFSET, value + 1));
-  const zoomOut = () => setZoomOffset((value) => Math.max(MIN_MAP_ZOOM_OFFSET, value - 1));
+  const zoomBy = (delta: number) => {
+    setZoomOffset((offset) => {
+      const next = stepRouteMapZoom(offset, panRef.current, delta);
+      if (next.zoomOffset !== offset) {
+        setPan(next.pan);
+      }
+      return next.zoomOffset;
+    });
+  };
+  const zoomIn = () => zoomBy(1);
+  const zoomOut = () => zoomBy(-1);
   const resetView = () => {
     setZoomOffset(0);
     setPan({ x: 0, y: 0 });
