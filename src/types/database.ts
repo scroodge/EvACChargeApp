@@ -214,3 +214,13 @@ export type BydmateTripTrackPointRow = {
   power_kw: number | null;
   soc: number | null;
 };
+
+export type BydmateRouteLabelRow = {
+  user_id: string;
+  vehicle_id: string;
+  route_id: string;
+  name: string | null;
+  is_park: boolean;
+  created_at: string;
+  updated_at: string;
+};

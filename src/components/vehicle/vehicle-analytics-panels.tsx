@@ -19,7 +19,7 @@ import { useBydmateTelemetryHistoryQuery } from "@/hooks/use-bydmate-telemetry-h
 import { useTranslation } from "@/hooks/use-translation";
 import { buildAnalyticsSummary, consumptionByOutsideTemp } from "@/lib/bydmate/telemetry-buckets";
 import { resolveTelemetryWindow, snapAnchorDateForRange, isoWeekValueFromDate, isoWeekValueToAnchorDate, monthValueFromDate, monthValueToAnchorDate, quarterValueFromDate, quarterValueToAnchorDate, yearValueFromDate, yearValueToAnchorDate, type TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
-import type { RouteInsight } from "@/lib/bydmate/route-insights";
+import type { RouteInsightsResult } from "@/lib/bydmate/route-insights";
 import { devFetch, isDevAppRoute, withDevApiParams } from "@/lib/dev/dev-fetch";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type { BydmateTripRow, BydmateTripTrackPointRow } from "@/types/database";
@@ -229,7 +229,7 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
       if (currentOutsideTemp != null) {
         params.set("outside_temp", String(currentOutsideTemp));
       }
-      return fetchAnalytics<{ routes: RouteInsight[] }>(`/api/vehicle/analytics?${params.toString()}`);
+      return fetchAnalytics<RouteInsightsResult>(`/api/vehicle/analytics?${params.toString()}`);
     },
   });
 
@@ -407,7 +407,9 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
         <p className="mt-1 text-sm text-muted-foreground">{t("vehicle.analytics.routeInsightsSubtitle")}</p>
         <RouteInsightsSection
           routes={routeInsightsQuery.data?.routes ?? []}
+          parkedRoutes={routeInsightsQuery.data?.parkedRoutes ?? []}
           isLoading={routeInsightsQuery.isLoading}
+          vehicleId={vehicleId}
         />
       </section>
 

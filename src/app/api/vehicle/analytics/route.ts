@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         vehicleId,
         currentOutsideTempC: Number.isFinite(parsedTemp) ? parsedTemp : null,
       });
-      return NextResponse.json({ routes });
+      return NextResponse.json(routes);
     }
 
     return NextResponse.json({ error: "Unknown analytics type" }, { status: 400 });

@@ -1,11 +1,23 @@
 "use client";
 
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Pencil } from "lucide-react";
+
 import { RouteMapPreview } from "@/components/vehicle/vehicle-live-view";
 import { TempConsumptionBarChart } from "@/components/vehicle/telemetry-analytics-charts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/lib/i18n";
-import { isRouteTrackDisplayable, type RouteInsight } from "@/lib/bydmate/route-insights";
+import {
+  isRouteTrackDisplayable,
+  type ParkedRouteInsight,
+  type RouteInsight,
+} from "@/lib/bydmate/route-insights";
+import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
+import { cn } from "@/lib/utils";
 import type { BydmateTripTrackPointRow } from "@/types/database";
 
 type Translator = (key: TranslationKey, values?: Record<string, string | number>) => string;
@@ -14,50 +26,160 @@ function fmt(value: number | null | undefined, digits = 1) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
-export function RouteInsightsSection({
-  routes,
-  isLoading,
+async function saveRoutePreference({
+  vehicleId,
+  routeId,
+  name,
+  isPark,
 }: {
-  routes: RouteInsight[];
-  isLoading: boolean;
+  vehicleId: string;
+  routeId: string;
+  name?: string;
+  isPark?: boolean;
 }) {
-  const { t } = useTranslation();
-  const tx = t as Translator;
+  const response = isDevAppRoute()
+    ? await devFetch("/api/vehicle/route-labels", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vehicle_id: vehicleId, route_id: routeId, name, is_park: isPark }),
+      })
+    : await fetch("/api/vehicle/route-labels", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vehicle_id: vehicleId, route_id: routeId, name, is_park: isPark }),
+      });
 
-  if (isLoading) {
-    return <Skeleton className="h-32 rounded-2xl" />;
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Failed to save route preference");
   }
 
-  if (routes.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">{tx("vehicle.analytics.routeInsightsEmpty")}</p>
-    );
-  }
+  return response.json() as Promise<{ name: string | null; isPark: boolean }>;
+}
+
+function invalidateRouteInsights(queryClient: ReturnType<typeof useQueryClient>, vehicleId: string) {
+  queryClient.invalidateQueries({ queryKey: ["vehicle-analytics", "route-insights", vehicleId] });
+}
+
+function RouteInsightCard({
+  route,
+  vehicleId,
+  tx,
+}: {
+  route: RouteInsight;
+  vehicleId: string;
+  tx: Translator;
+}) {
+  const queryClient = useQueryClient();
+  const [expanded, setExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState(route.name ?? "");
+
+  const displayTitle = route.name?.trim() || route.label;
+  const showMap = expanded && isRouteTrackDisplayable(route.trackPoints);
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: { name?: string; isPark?: boolean }) =>
+      saveRoutePreference({ vehicleId, routeId: route.routeId, ...payload }),
+    onSuccess: () => {
+      invalidateRouteInsights(queryClient, vehicleId);
+      setIsEditing(false);
+    },
+  });
+
+  const startEditing = () => {
+    setDraftName(route.name ?? "");
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setDraftName(route.name ?? "");
+    setIsEditing(false);
+  };
 
   return (
-    <div id="route-insights" className="mt-4 grid gap-3">
-      {routes.map((route) => {
-        const showMap = isRouteTrackDisplayable(route.trackPoints);
-        return (
-        <article key={route.routeId} className="rounded-2xl border border-border bg-white/[0.02] p-4">
-          {showMap ? (
-            <RouteMapPreview
-              trackPoints={route.trackPoints as BydmateTripTrackPointRow[]}
-              className="h-44"
-            />
-          ) : null}
-          <div className={`flex flex-wrap items-start justify-between gap-2 ${showMap ? "mt-3" : ""}`}>
-            <p className="text-xs text-muted-foreground">
-              {tx("vehicle.analytics.routeTripCount", { value: route.tripCount })}
-            </p>
+    <article className="rounded-2xl border border-border bg-white/[0.02] p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          {isEditing ? (
+            <div className="grid gap-2">
+              <Input
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder={tx("vehicle.analytics.routeNamePlaceholder")}
+                maxLength={80}
+                autoFocus
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={saveMutation.isPending}
+                  onClick={() => saveMutation.mutate({ name: draftName })}
+                >
+                  {tx("vehicle.analytics.routeNameSave")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={cancelEditing}>
+                  {tx("vehicle.analytics.routeNameCancel")}
+                </Button>
+              </div>
+              {saveMutation.isError ? (
+                <p className="text-xs text-destructive">{saveMutation.error.message}</p>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="w-full text-left"
+              aria-expanded={expanded}
+            >
+              <h3 className="font-heading text-base font-semibold tracking-tight">{displayTitle}</h3>
+              {route.name ? (
+                <p className="mt-0.5 text-xs text-muted-foreground">{route.label}</p>
+              ) : null}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tx("vehicle.analytics.routeTripCount", { value: route.tripCount })}
+              </p>
+            </button>
+          )}
+        </div>
+        {!isEditing ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={startEditing}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-white/[0.03] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+              aria-label={tx("vehicle.analytics.routeNameRename")}
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-white/[0.03] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+              aria-label={expanded ? tx("vehicle.analytics.routeCollapse") : tx("vehicle.analytics.routeExpand")}
+            >
+              <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} aria-hidden />
+            </button>
             {!route.unlocked ? (
               <span className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                 {tx("vehicle.analytics.routeUnlock", { value: route.tripsNeeded })}
               </span>
             ) : null}
           </div>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div className="mt-3 grid gap-3">
+          {showMap ? (
+            <RouteMapPreview
+              trackPoints={route.trackPoints as BydmateTripTrackPointRow[]}
+              className="h-44"
+            />
+          ) : null}
           {route.unlocked ? (
-            <div className="mt-3 grid gap-2">
+            <div className="grid gap-2">
               <p className="text-sm tabular-nums">
                 {fmt(route.medianConsumptionKwh100, 1)} kWh/100 · {fmt(route.minConsumptionKwh100, 1)}–{fmt(route.maxConsumptionKwh100, 1)}
               </p>
@@ -71,19 +193,130 @@ export function RouteInsightsSection({
               ) : null}
               {route.tempBuckets.length >= 2 ? (
                 <TempConsumptionBarChart
-                  buckets={route.tempBuckets.map((b) => ({
-                    tempLabel: b.label,
-                    tempMid: b.tempC,
-                    tripCount: b.count,
-                    avgConsumptionKwh100: b.avgConsumptionKwh100,
+                  buckets={route.tempBuckets.map((bucket) => ({
+                    tempLabel: bucket.label,
+                    tempMid: bucket.tempC,
+                    tripCount: bucket.count,
+                    avgConsumptionKwh100: bucket.avgConsumptionKwh100,
                   }))}
                 />
               ) : null}
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {tx("vehicle.analytics.routeUnlock", { value: route.tripsNeeded })}
+            </p>
+          )}
+          <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
+            <p className="text-xs text-muted-foreground">{tx("vehicle.analytics.routeParkHint")}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate({ isPark: true })}
+            >
+              {tx("vehicle.analytics.routeMarkPark")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ParkedRouteCard({
+  route,
+  vehicleId,
+  tx,
+}: {
+  route: ParkedRouteInsight;
+  vehicleId: string;
+  tx: Translator;
+}) {
+  const queryClient = useQueryClient();
+  const displayTitle = route.name?.trim() || route.label;
+
+  const restoreMutation = useMutation({
+    mutationFn: () => saveRoutePreference({ vehicleId, routeId: route.routeId, isPark: false }),
+    onSuccess: () => invalidateRouteInsights(queryClient, vehicleId),
+  });
+
+  return (
+    <article className="rounded-2xl border border-dashed border-border bg-white/[0.01] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="font-heading text-sm font-semibold tracking-tight">{displayTitle}</h3>
+          {route.name ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">{route.label}</p>
           ) : null}
-        </article>
-        );
-      })}
+          <p className="mt-1 text-xs text-muted-foreground">{tx("vehicle.analytics.routeParkedNote")}</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={restoreMutation.isPending}
+          onClick={() => restoreMutation.mutate()}
+        >
+          {tx("vehicle.analytics.routeUnmarkPark")}
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+export function RouteInsightsSection({
+  routes,
+  parkedRoutes,
+  isLoading,
+  vehicleId,
+}: {
+  routes: RouteInsight[];
+  parkedRoutes: ParkedRouteInsight[];
+  isLoading: boolean;
+  vehicleId: string;
+}) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const [parkedOpen, setParkedOpen] = useState(parkedRoutes.length > 0);
+
+  if (isLoading) {
+    return <Skeleton className="h-32 rounded-2xl" />;
+  }
+
+  if (routes.length === 0 && parkedRoutes.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">{tx("vehicle.analytics.routeInsightsEmpty")}</p>
+    );
+  }
+
+  return (
+    <div id="route-insights" className="mt-4 grid gap-3">
+      {routes.map((route) => (
+        <RouteInsightCard key={route.routeId} route={route} vehicleId={vehicleId} tx={tx} />
+      ))}
+
+      {parkedRoutes.length > 0 ? (
+        <section className="mt-1">
+          <button
+            type="button"
+            onClick={() => setParkedOpen((value) => !value)}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-white/[0.02] px-3 py-2 text-left"
+          >
+            <span className="text-sm font-medium">
+              {tx("vehicle.analytics.routeParkedTitle", { value: parkedRoutes.length })}
+            </span>
+            <ChevronDown className={cn("size-4 shrink-0 transition-transform", parkedOpen && "rotate-180")} aria-hidden />
+          </button>
+          {parkedOpen ? (
+            <div className="mt-2 grid gap-2">
+              {parkedRoutes.map((route) => (
+                <ParkedRouteCard key={route.routeId} route={route} vehicleId={vehicleId} tx={tx} />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

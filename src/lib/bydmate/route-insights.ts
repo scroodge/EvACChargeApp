@@ -28,7 +28,10 @@ export type RouteInsightTrackPoint = {
 
 export type RouteInsight = {
   routeId: string;
+  /** Coordinate fallback label when no user name is saved. */
   label: string;
+  /** User-defined route name, if saved. */
+  name: string | null;
   tripCount: number;
   tripsNeeded: number;
   unlocked: boolean;
@@ -39,6 +42,22 @@ export type RouteInsight = {
   tempBuckets: { tempC: number; label: string; avgConsumptionKwh100: number; count: number }[];
   predictedConsumptionKwh100: { low: number; high: number } | null;
   currentOutsideTempC: number | null;
+};
+
+export type ParkedRouteInsight = {
+  routeId: string;
+  label: string;
+  name: string | null;
+};
+
+export type RouteInsightsResult = {
+  routes: RouteInsight[];
+  parkedRoutes: ParkedRouteInsight[];
+};
+
+type RoutePreference = {
+  name: string | null;
+  isPark: boolean;
 };
 
 function roundGrid(value: number) {
@@ -56,6 +75,12 @@ function routeKey(startLat: number, startLon: number, endLat: number, endLon: nu
 
 function routeLabel(startLat: number, startLon: number, endLat: number, endLon: number) {
   return `${startLat.toFixed(2)},${startLon.toFixed(2)} → ${endLat.toFixed(2)},${endLon.toFixed(2)}`;
+}
+
+export function formatRouteIdLabel(routeId: string) {
+  const parts = routeId.split(":").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return routeId;
+  return routeLabel(parts[0], parts[1], parts[2], parts[3]);
 }
 
 const MAX_ROUTE_INSIGHT_TRACK_POINTS = 150;
@@ -126,6 +151,120 @@ export function isRouteTrackDisplayable(
   const lonSpanM = haversineMeters(minLat, minLon, minLat, maxLon);
 
   return pathMeters >= minSpanMeters || latSpanM >= minSpanMeters || lonSpanM >= minSpanMeters;
+}
+
+async function fetchRoutePreferences(
+  supabase: SupabaseClient,
+  userId: string,
+  vehicleId: string,
+) {
+  const { data, error } = await supabase
+    .from("bydmate_route_labels")
+    .select("route_id, name, is_park")
+    .eq("user_id", userId)
+    .eq("vehicle_id", vehicleId);
+
+  if (error) throw error;
+
+  const map = new Map<string, RoutePreference>();
+  for (const row of data ?? []) {
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    map.set(row.route_id, {
+      name: name || null,
+      isPark: Boolean(row.is_park),
+    });
+  }
+  return map;
+}
+
+export async function saveRoutePreference({
+  supabase,
+  userId,
+  vehicleId,
+  routeId,
+  name,
+  isPark,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  vehicleId: string;
+  routeId: string;
+  name?: string;
+  isPark?: boolean;
+}) {
+  const { data: existing, error: readError } = await supabase
+    .from("bydmate_route_labels")
+    .select("name, is_park")
+    .eq("user_id", userId)
+    .eq("vehicle_id", vehicleId)
+    .eq("route_id", routeId)
+    .maybeSingle();
+
+  if (readError) throw readError;
+
+  let nextName = typeof existing?.name === "string" ? existing.name.trim() || null : null;
+  let nextPark = Boolean(existing?.is_park);
+
+  if (name !== undefined) {
+    const trimmed = name.trim();
+    nextName = trimmed || null;
+  }
+  if (isPark !== undefined) {
+    nextPark = isPark;
+  }
+
+  if (!nextName && !nextPark) {
+    const { error } = await supabase
+      .from("bydmate_route_labels")
+      .delete()
+      .eq("user_id", userId)
+      .eq("vehicle_id", vehicleId)
+      .eq("route_id", routeId);
+    if (error) throw error;
+    return { name: null, isPark: false };
+  }
+
+  if (nextName && nextName.length > 80) {
+    throw new Error("Route name too long");
+  }
+
+  const { data, error } = await supabase
+    .from("bydmate_route_labels")
+    .upsert(
+      {
+        user_id: userId,
+        vehicle_id: vehicleId,
+        route_id: routeId,
+        name: nextName,
+        is_park: nextPark,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,vehicle_id,route_id" },
+    )
+    .select("name, is_park")
+    .single();
+
+  if (error) throw error;
+
+  const savedName = typeof data?.name === "string" ? data.name.trim() || null : null;
+  return { name: savedName, isPark: Boolean(data?.is_park) };
+}
+
+/** @deprecated Use saveRoutePreference */
+export async function saveRouteLabel({
+  supabase,
+  userId,
+  vehicleId,
+  routeId,
+  name,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  vehicleId: string;
+  routeId: string;
+  name: string;
+}) {
+  return saveRoutePreference({ supabase, userId, vehicleId, routeId, name });
 }
 
 function median(values: number[]) {
@@ -206,7 +345,7 @@ export async function fetchRouteInsights({
   vehicleId: string;
   currentOutsideTempC?: number | null;
   tripLimit?: number;
-}): Promise<RouteInsight[]> {
+}): Promise<RouteInsightsResult> {
   const { data: trips, error: tripsError } = await supabase
     .from("bydmate_trips")
     .select("*")
@@ -217,6 +356,13 @@ export async function fetchRouteInsights({
     .limit(tripLimit);
 
   if (tripsError) throw tripsError;
+
+  const routePreferences = await fetchRoutePreferences(supabase, userId, vehicleId);
+  const parkRouteIds = new Set(
+    [...routePreferences.entries()]
+      .filter(([, pref]) => pref.isPark)
+      .map(([routeId]) => routeId),
+  );
 
   const tripRows = (trips ?? []) as BydmateTripRow[];
   const clusters = new Map<string, { label: string; trips: RouteTripRef[]; trackPoints: RouteInsightTrackPoint[] }>();
@@ -235,6 +381,8 @@ export async function fetchRouteInsights({
     const first = track[0];
     const last = track[track.length - 1];
     const key = routeKey(first.lat, first.lon, last.lat, last.lon);
+    if (parkRouteIds.has(key)) continue;
+
     const label = routeLabel(first.lat, first.lon, last.lat, last.lon);
     const mappedTrack = downsampleTrackPoints(
       toRouteTrackPoints(track, trip.started_at),
@@ -294,6 +442,7 @@ export async function fetchRouteInsights({
     insights.push({
       routeId,
       label: cluster.label,
+      name: routePreferences.get(routeId)?.name ?? null,
       tripCount: cluster.trips.length,
       tripsNeeded: Math.max(0, MIN_ROUTE_TRIPS - cluster.trips.length),
       unlocked,
@@ -309,7 +458,19 @@ export async function fetchRouteInsights({
     });
   }
 
-  return insights.sort((a, b) => b.tripCount - a.tripCount);
+  const parkedRoutes: ParkedRouteInsight[] = [...routePreferences.entries()]
+    .filter(([, pref]) => pref.isPark)
+    .map(([routeId, pref]) => ({
+      routeId,
+      label: formatRouteIdLabel(routeId),
+      name: pref.name,
+    }))
+    .sort((a, b) => (a.name ?? a.label).localeCompare(b.name ?? b.label));
+
+  return {
+    routes: insights.sort((a, b) => b.tripCount - a.tripCount),
+    parkedRoutes,
+  };
 }
 
 export async function fetchPeriodTrips({
