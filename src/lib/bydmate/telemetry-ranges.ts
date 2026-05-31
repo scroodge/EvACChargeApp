@@ -32,6 +32,23 @@ export function resolveTelemetryWindow(range: TelemetryHistoryRange, anchorDate:
   };
 }
 
+/** Median seconds between consecutive ISO timestamps (null when fewer than 2 points). */
+export function medianSampleGapSeconds(deviceTimes: string[]): number | null {
+  if (deviceTimes.length < 2) return null;
+
+  const gaps: number[] = [];
+  for (let index = 1; index < deviceTimes.length; index += 1) {
+    const gapMs = Date.parse(deviceTimes[index]!) - Date.parse(deviceTimes[index - 1]!);
+    if (Number.isFinite(gapMs) && gapMs >= 0) {
+      gaps.push(gapMs / 1000);
+    }
+  }
+
+  if (gaps.length === 0) return null;
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)] ?? null;
+}
+
 export function downsampleByIndex<T>(points: T[], maxPoints: number): T[] {
   if (points.length <= maxPoints) return points;
   if (maxPoints <= 1) return points.slice(0, 1);

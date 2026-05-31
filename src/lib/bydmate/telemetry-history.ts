@@ -25,8 +25,12 @@ type HourlyRow = {
 };
 
 const SUPABASE_PAGE_SIZE = 1000;
+const TELEMETRY_SAMPLE_SELECT =
+  "device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v";
 /** Cap raw day fetches before client downsample (heavy charging days). */
 export const MAX_DAY_RAW_SAMPLES = 5000;
+/** Safety cap for trip detail fetches (~5.5 h at 1 Hz). */
+export const MAX_TRIP_RAW_SAMPLES = 20_000;
 
 export type TelemetryHistoryPoint = {
   device_time: string;
@@ -86,7 +90,7 @@ export async function fetchTelemetryHistory({
       const toIndex = Math.min(fromIndex + SUPABASE_PAGE_SIZE - 1, MAX_DAY_RAW_SAMPLES - 1);
       const { data, error } = await supabase
         .from("bydmate_telemetry_samples")
-        .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
+        .select(TELEMETRY_SAMPLE_SELECT)
         .eq("user_id", userId)
         .match(vehicleFilter)
         .gte("device_time", window.from)
@@ -132,18 +136,14 @@ export async function fetchTelemetryHistory({
     return downsampleByIndex(hourlyPoints, MAX_TELEMETRY_CHART_POINTS);
   }
 
-  const { data: rawData, error: rawError } = await supabase
-    .from("bydmate_telemetry_samples")
-    .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
-    .eq("user_id", userId)
-    .match(vehicleFilter)
-    .gte("device_time", rawFrom)
-    .lte("device_time", window.to)
-    .order("device_time", { ascending: true });
+  const rawPoints = await fetchTelemetrySamplePages({
+    supabase,
+    userId,
+    vehicleId,
+    from: rawFrom,
+    to: window.to,
+  });
 
-  if (rawError) throw rawError;
-
-  const rawPoints = (rawData ?? []) as TelemetryHistoryPoint[];
   const merged = [...hourlyPoints, ...rawPoints].sort(
     (a, b) => Date.parse(a.device_time) - Date.parse(b.device_time),
   );
@@ -172,17 +172,61 @@ export async function fetchTripSamples({
 
   const endAt = trip.ended_at ?? trip.last_device_time;
 
-  const { data, error } = await supabase
-    .from("bydmate_telemetry_samples")
-    .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
-    .eq("user_id", userId)
-    .eq("vehicle_id", trip.vehicle_id)
-    .gte("device_time", trip.started_at)
-    .lte("device_time", endAt)
-    .order("device_time", { ascending: true });
+  return fetchTelemetrySamplePages({
+    supabase,
+    userId,
+    vehicleId: trip.vehicle_id,
+    from: trip.started_at,
+    to: endAt,
+    maxRows: MAX_TRIP_RAW_SAMPLES,
+  });
+}
 
-  if (error) throw error;
-  return downsampleByIndex((data ?? []) as TelemetryHistoryPoint[], MAX_TELEMETRY_CHART_POINTS);
+async function fetchTelemetrySamplePages({
+  supabase,
+  userId,
+  vehicleId,
+  from,
+  to,
+  maxRows,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  vehicleId: string | null;
+  from: string;
+  to: string;
+  maxRows?: number;
+}): Promise<TelemetryHistoryPoint[]> {
+  const rows: TelemetryHistoryPoint[] = [];
+  const vehicleFilter = vehicleId ? { vehicle_id: vehicleId } : {};
+
+  for (let fromIndex = 0; ; fromIndex += SUPABASE_PAGE_SIZE) {
+    const toIndex = fromIndex + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("bydmate_telemetry_samples")
+      .select(TELEMETRY_SAMPLE_SELECT)
+      .eq("user_id", userId)
+      .match(vehicleFilter)
+      .gte("device_time", from)
+      .lte("device_time", to)
+      .order("device_time", { ascending: true })
+      .range(fromIndex, toIndex);
+
+    if (error) throw error;
+
+    const page = (data ?? []) as TelemetryHistoryPoint[];
+    rows.push(...page);
+
+    if (page.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+
+    if (maxRows != null && rows.length >= maxRows) {
+      return rows.slice(0, maxRows);
+    }
+  }
+
+  return maxRows != null ? rows.slice(0, maxRows) : rows;
 }
 
 function isChargingSample(point: TelemetryHistoryPoint) {
@@ -204,29 +248,13 @@ async function fetchChargingTelemetrySamplePages({
   from: string;
   to: string;
 }) {
-  const rows: TelemetryHistoryPoint[] = [];
-
-  for (let fromIndex = 0; ; fromIndex += SUPABASE_PAGE_SIZE) {
-    const toIndex = fromIndex + SUPABASE_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("bydmate_telemetry_samples")
-      .select("device_time, telemetry, diplus, diplus_min_cell_voltage_v, diplus_max_cell_voltage_v, diplus_cell_delta_v")
-      .eq("user_id", userId)
-      .eq("vehicle_id", vehicleId)
-      .gte("device_time", from)
-      .lte("device_time", to)
-      .order("device_time", { ascending: true })
-      .range(fromIndex, toIndex);
-
-    if (error) throw error;
-
-    const page = (data ?? []) as TelemetryHistoryPoint[];
-    rows.push(...page);
-
-    if (page.length < SUPABASE_PAGE_SIZE) {
-      return rows;
-    }
-  }
+  return fetchTelemetrySamplePages({
+    supabase,
+    userId,
+    vehicleId,
+    from,
+    to,
+  });
 }
 
 export async function fetchChargingSessionSamples({

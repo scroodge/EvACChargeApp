@@ -132,6 +132,33 @@ function persistenceError(
   return null;
 }
 
+function parseIngestStats(result: unknown, payloadCount: number) {
+  if (!result || typeof result !== "object") {
+    return {
+      inserted_count: payloadCount,
+      skipped_stale_count: 0,
+      duplicate_count: 0,
+    };
+  }
+
+  const record = result as Record<string, unknown>;
+  const inserted =
+    typeof record.sample_count === "number"
+      ? record.sample_count
+      : record.duplicate === true
+        ? 0
+        : 1;
+  const skippedStale =
+    typeof record.skipped_stale_count === "number" ? record.skipped_stale_count : 0;
+  const duplicate = Math.max(0, payloadCount - inserted - skippedStale);
+
+  return {
+    inserted_count: inserted,
+    skipped_stale_count: skippedStale,
+    duplicate_count: duplicate,
+  };
+}
+
 export async function POST(request: Request) {
   const apiKey = request.headers.get("x-api-key") ?? "";
   const headerVehicleId = request.headers.get("x-vehicle-id")?.trim();
@@ -295,6 +322,7 @@ export async function POST(request: Request) {
       persisted,
       vehicle_id: headerVehicleId,
       sample_count: samples.length,
+      ...parseIngestStats(ingestResult, samples.length),
       dropped_location_count: droppedLocations,
       dropped_telemetry_field_count: droppedTelemetryFields,
       charge_notifications: chargeNotifications,

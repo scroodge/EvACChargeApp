@@ -40,6 +40,7 @@ import {
 } from "@/components/vehicle/chart-interaction";
 import { formatHistoryRangeSubtitle } from "@/lib/bydmate/telemetry-buckets";
 import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
+import { MAX_TELEMETRY_CHART_POINTS, medianSampleGapSeconds } from "@/lib/bydmate/telemetry-ranges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -721,6 +722,7 @@ type TripSegment = {
 
 const TRIP_GAP_MS = 5 * 60 * 1000;
 const MAX_CHART_POINTS = 240;
+const MAX_TRIP_CHART_POINTS = MAX_TELEMETRY_CHART_POINTS;
 const MAX_CHART_MARKERS = 80;
 const MAX_DELTA_BY_SOC_POINTS = 240;
 const MAX_ROUTE_POINTS = 2000;
@@ -1531,9 +1533,10 @@ function prepareDeltaBySoc(
 function prepareTelemetryHistory(
   points: TelemetryChartSource[],
   t: Translator,
-  options?: { includeCellDelta?: boolean },
+  options?: { includeCellDelta?: boolean; maxChartPoints?: number },
 ) {
   const includeCellDelta = options?.includeCellDelta !== false;
+  const maxChartPoints = options?.maxChartPoints ?? MAX_CHART_POINTS;
   const socChart = createChart(t("vehicle.charts.soc"), "%", [
     { label: "SOC", color: "var(--voltflow-cyan)", points: [] },
   ]);
@@ -1566,6 +1569,7 @@ function prepareTelemetryHistory(
   let visiblePointCount = 0;
   let start: string | undefined;
   let end: string | undefined;
+  const deviceTimes: string[] = [];
 
   for (const point of points) {
     if (!point.telemetry) continue;
@@ -1573,6 +1577,7 @@ function prepareTelemetryHistory(
     visiblePointCount += 1;
     start ??= point.device_time;
     end = point.device_time;
+    deviceTimes.push(point.device_time);
 
     const time = pointTimeMs(point);
     const soc = validNumber(point.telemetry.soc);
@@ -1632,11 +1637,12 @@ function prepareTelemetryHistory(
   };
 
   const charts = [socChart, speedPowerChart, temperatureChart, ...(includeCellDelta ? [cellDeltaChart] : [])].map((chart) =>
-    finalizeChart(chart),
+    finalizeChart(chart, maxChartPoints),
   );
 
   return {
     visiblePointCount,
+    medianGapSeconds: medianSampleGapSeconds(deviceTimes),
     start,
     end,
     charts,
@@ -1668,9 +1674,10 @@ export function TelemetryHistoryCharts({
   const tx = t as Translator;
   const includeCellDelta =
     chartMode === "trip" || (chartMode === "analytics" && historyRange === "day");
+  const maxChartPoints = chartMode === "trip" ? MAX_TRIP_CHART_POINTS : MAX_CHART_POINTS;
   const history = useMemo(
-    () => prepareTelemetryHistory(points, tx, { includeCellDelta }),
-    [points, tx, includeCellDelta],
+    () => prepareTelemetryHistory(points, tx, { includeCellDelta, maxChartPoints }),
+    [points, tx, includeCellDelta, maxChartPoints],
   );
   const showLineCharts =
     chartMode === "trip" ||
@@ -1687,13 +1694,22 @@ export function TelemetryHistoryCharts({
       ? formatHistoryRangeSubtitle(historyRange, anchorDate, localeCode(locale))
       : null;
 
-  const subtitle = rangeSubtitle
-    ? `${rangeSubtitle} · ${tx("vehicle.charts.cloudPoints", { value: history.visiblePointCount })}`
-    : `${tx("vehicle.charts.cloudPoints", { value: history.visiblePointCount })}${
-        history.start && history.end && showLineCharts
-          ? ` · ${new Date(history.start).toLocaleTimeString(localeCode(locale))} - ${new Date(history.end).toLocaleTimeString(localeCode(locale))}`
-          : ""
-      }`;
+  const medianGapLabel =
+    history.medianGapSeconds != null
+      ? tx("vehicle.charts.medianGap", { value: history.medianGapSeconds.toFixed(1) })
+      : null;
+
+  const pointsLabel = tx("vehicle.charts.cloudPoints", { value: history.visiblePointCount });
+  const subtitleParts = [
+    rangeSubtitle,
+    pointsLabel,
+    medianGapLabel,
+    history.start && history.end && showLineCharts
+      ? `${new Date(history.start).toLocaleTimeString(localeCode(locale))} - ${new Date(history.end).toLocaleTimeString(localeCode(locale))}`
+      : null,
+  ].filter(Boolean);
+
+  const subtitle = subtitleParts.join(" · ");
 
   return (
     <section className={embedded ? "rounded-2xl border border-border bg-white/[0.02] p-4" : "voltflow-card p-5"}>
