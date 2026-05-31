@@ -34,6 +34,7 @@ import {
   InteractiveChartShell,
   STD_CHART,
   DELTA_SOC_CHART,
+  buildBrokenLinePaths,
   clientToSvg,
   nearestIndexByX,
   nearestPointByTime,
@@ -2199,15 +2200,24 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         </text>
       )}
       {series.map((item, seriesIndex) => {
-        const d = item.points
-          .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(seriesIndex, point.value).toFixed(2)}`)
-          .join(" ");
+        const pathSegments = buildBrokenLinePaths(item.points, (point) => ({
+          x: x(point.time),
+          y: y(seriesIndex, point.value),
+        }));
         const markers = item.points.length <= MAX_CHART_MARKERS ? item.points : [];
         return (
           <g key={item.label}>
-            {item.points.length > 1 ? (
-              <path d={d} fill="none" stroke={item.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            ) : null}
+            {pathSegments.map((d, pathIndex) => (
+              <path
+                key={`${item.label}-path-${pathIndex}`}
+                d={d}
+                fill="none"
+                stroke={item.color}
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
             {item.points.map((point, index) => (
               <circle
                 key={`${item.label}-hit-${point.time}-${index}`}
@@ -2280,16 +2290,6 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
           <p className="mt-1 text-xs text-muted-foreground">
             {hasData ? rangeLabel : tx("vehicle.charts.noValues")}
           </p>
-          {dualAxis ? (
-            <div className="mt-2 flex flex-wrap gap-3">
-              {series.map((item) => (
-                <span key={item.label} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  {item.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center">
           <IconButton label={tx("vehicle.charts.fullscreen")} onClick={() => setIsOpen(true)}>
@@ -2469,12 +2469,14 @@ function DeltaBySocPlot({
     if (maxSoc === minSoc) return 72;
     return 110 - ((soc - minSoc) / (maxSoc - minSoc)) * 92;
   };
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(point.delta).toFixed(2)}`)
-    .join(" ");
-  const socPath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${socY(point.soc).toFixed(2)}`)
-    .join(" ");
+  const linePaths = buildBrokenLinePaths(points, (point) => ({
+    x: x(point.time),
+    y: y(point.delta),
+  }));
+  const socPaths = buildBrokenLinePaths(points, (point) => ({
+    x: x(point.time),
+    y: socY(point.soc),
+  }));
   const markerPoints = points.length <= MAX_CHART_MARKERS ? points : [];
   const hoveredPoint = hoverIndex == null ? null : points[hoverIndex] ?? null;
 
@@ -2530,12 +2532,31 @@ function DeltaBySocPlot({
           {fmt(minSoc, 0)}% SOC
         </text>
         <g clipPath={`url(#${clipId})`}>
-          {points.length > 1 ? (
-            <path d={socPath} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" strokeDasharray="3 5" />
-          ) : null}
-          {points.length > 1 ? (
-            <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.78" />
-          ) : null}
+          {socPaths.map((d, pathIndex) => (
+            <path
+              key={`soc-path-${pathIndex}`}
+              d={d}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.78"
+              strokeDasharray="3 5"
+            />
+          ))}
+          {linePaths.map((d, pathIndex) => (
+            <path
+              key={`delta-path-${pathIndex}`}
+              d={d}
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.78"
+            />
+          ))}
           {markerPoints.map((point, index) => {
             const isLatest = point === latest;
             const highlighted = interactive && hoveredPoint?.time === point.time;

@@ -20,6 +20,50 @@ export const DELTA_SOC_CHART = {
   plotBottom: 110,
 } as const;
 
+/** Break line charts when telemetry gaps exceed this (missing Cloud Sync batches). */
+export const CHART_LINE_GAP_MS = 5_000;
+
+export function splitByTimeGap<T extends { time: number }>(
+  points: T[],
+  maxGapMs = CHART_LINE_GAP_MS,
+): T[][] {
+  if (points.length === 0) return [];
+
+  const segments: T[][] = [];
+  let current: T[] = [points[0]!];
+
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index]!;
+    const previous = points[index - 1]!;
+    if (point.time - previous.time > maxGapMs) {
+      segments.push(current);
+      current = [point];
+    } else {
+      current.push(point);
+    }
+  }
+
+  segments.push(current);
+  return segments;
+}
+
+export function buildBrokenLinePaths<T extends { time: number }>(
+  points: T[],
+  mapPoint: (point: T) => { x: number; y: number },
+  maxGapMs = CHART_LINE_GAP_MS,
+): string[] {
+  return splitByTimeGap(points, maxGapMs)
+    .filter((segment) => segment.length > 1)
+    .map((segment) =>
+      segment
+        .map((point, index) => {
+          const { x, y } = mapPoint(point);
+          return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        })
+        .join(" "),
+    );
+}
+
 export function clientToSvg(
   svg: SVGSVGElement,
   clientX: number,
