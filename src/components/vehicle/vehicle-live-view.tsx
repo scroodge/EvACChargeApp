@@ -648,7 +648,7 @@ type MapPan = {
   y: number;
 };
 
-type RouteLayer = "route" | "regen" | "power" | "speed" | "soc";
+type RouteLayer = "route" | "power" | "speed" | "soc";
 
 type ChartSeries = {
   label: string;
@@ -723,13 +723,13 @@ const MAX_FORECAST_CONSUMPTION_KWH_100KM = 42;
 const ROUTE_LINE_COLOR = "#1e40af";
 const ROUTE_STROKE_WIDTH = 4;
 const REGEN_POWER_THRESHOLD_KW = 0.05;
+const COAST_POWER_COLOR = "#475569";
 const ROUTE_LAYER_OPTIONS: Array<{
   id: RouteLayer;
   label: string;
   color: string;
 }> = [
   { id: "route", label: "Route", color: ROUTE_LINE_COLOR },
-  { id: "regen", label: "Regen", color: "#34d399" },
   { id: "power", label: "Power", color: "#ef4444" },
   { id: "speed", label: "Speed", color: "#22c55e" },
   { id: "soc", label: "SOC", color: "#facc15" },
@@ -2283,7 +2283,6 @@ function prepareRouteMap(route: ReturnType<typeof prepareRoute>, zoomOffset: num
 }
 
 function routeLayerValue(point: RoutePoint, layer: RouteLayer) {
-  if (layer === "regen") return point.powerKw == null ? null : Math.max(0, -point.powerKw);
   if (layer === "power") return point.powerKw == null ? null : Math.abs(point.powerKw);
   if (layer === "speed") return point.speedKmh;
   if (layer === "soc") return point.soc;
@@ -2294,7 +2293,7 @@ function routeLayerColor(layer: RouteLayer) {
   return ROUTE_LAYER_OPTIONS.find((option) => option.id === layer)?.color ?? "var(--voltflow-cyan)";
 }
 
-function routeLayerSegmentColor(layer: RouteLayer, normalized: number) {
+function routeLayerSegmentColor(layer: RouteLayer | "regen", normalized: number) {
   const intensity = Math.max(0, Math.min(1, normalized));
 
   if (layer === "power") {
@@ -2320,8 +2319,43 @@ function layerDisplayRange(layer: RouteLayer, minValue: number, maxValue: number
   if (layer === "soc") return { min: 0, max: 100 };
   if (layer === "speed") return { min: 0, max: Math.max(120, maxValue) };
   if (layer === "power") return { min: 0, max: Math.max(50, maxValue) };
-  if (layer === "regen") return { min: 0, max: Math.max(20, maxValue) };
   return { min: minValue, max: maxValue };
+}
+
+function powerScaleBounds(points: RoutePoint[]) {
+  let maxTraction = 5;
+  let maxRegen = 5;
+
+  for (const point of points) {
+    const powerKw = point.powerKw;
+    if (powerKw == null) continue;
+    if (powerKw > REGEN_POWER_THRESHOLD_KW) {
+      maxTraction = Math.max(maxTraction, powerKw);
+    }
+    if (powerKw < -REGEN_POWER_THRESHOLD_KW) {
+      maxRegen = Math.max(maxRegen, -powerKw);
+    }
+  }
+
+  return {
+    maxTraction: Math.max(50, maxTraction),
+    maxRegen: Math.max(20, maxRegen),
+  };
+}
+
+function combinedPowerColor(
+  powerKw: number | null | undefined,
+  maxTraction: number,
+  maxRegen: number,
+) {
+  if (powerKw == null) return COAST_POWER_COLOR;
+  if (powerKw < -REGEN_POWER_THRESHOLD_KW) {
+    return routeLayerSegmentColor("regen", Math.min(1, (-powerKw) / maxRegen));
+  }
+  if (powerKw > REGEN_POWER_THRESHOLD_KW) {
+    return routeLayerSegmentColor("power", Math.min(1, powerKw / maxTraction));
+  }
+  return COAST_POWER_COLOR;
 }
 
 function normalizeForLayer(
@@ -2357,20 +2391,6 @@ function dedupeGradientStops(stops: Array<{ offset: number; color: string }>) {
   return deduped;
 }
 
-function isRegenSegment(previous: RoutePoint, point: RoutePoint) {
-  const previousRegen = previous.powerKw != null && previous.powerKw < -REGEN_POWER_THRESHOLD_KW;
-  const pointRegen = point.powerKw != null && point.powerKw < -REGEN_POWER_THRESHOLD_KW;
-  return previousRegen || pointRegen;
-}
-
-type GradientRouteStroke = {
-  key: string;
-  d: string;
-  start: { x: number; y: number };
-  end: { x: number; y: number };
-  stops: Array<{ offset: number; color: string }>;
-};
-
 function buildPathFromMappedPoints(mappedPoints: Array<{ x: number; y: number }>) {
   if (mappedPoints.length < 2) return "";
   const [first, ...rest] = mappedPoints;
@@ -2381,11 +2401,19 @@ function buildPathFromMappedPoints(mappedPoints: Array<{ x: number; y: number }>
   return path;
 }
 
+type GradientRouteStroke = {
+  key: string;
+  d: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  stops: Array<{ offset: number; color: string }>;
+};
+
 function buildGradientRouteStroke(
   points: RoutePoint[],
   routeMap: ReturnType<typeof prepareRouteMap>,
-  layer: RouteLayer,
   key: string,
+  colorAtPoint: (point: RoutePoint) => string,
 ): GradientRouteStroke | null {
   if (points.length < 2) return null;
 
@@ -2393,12 +2421,6 @@ function buildGradientRouteStroke(
   const d = buildPathFromMappedPoints(mappedPoints);
   const start = mappedPoints[0];
   const end = mappedPoints[mappedPoints.length - 1];
-
-  const values = points
-    .map((point) => routeLayerValue(point, layer))
-    .filter((value): value is number => value != null);
-  const minValue = values.length ? Math.min(...values) : 0;
-  const maxValue = values.length ? Math.max(...values) : 1;
 
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -2409,10 +2431,9 @@ function buildGradientRouteStroke(
       const mapped = routeMap.mapPoint(point);
       const projection = ((mapped.x - start.x) * dx + (mapped.y - start.y) * dy) / lengthSq;
       const offset = Math.max(0, Math.min(1, projection));
-      const normalized = normalizeForLayer(layer, routeLayerValue(point, layer), minValue, maxValue);
       return {
         offset,
-        color: routeLayerSegmentColor(layer, normalized),
+        color: colorAtPoint(point),
       };
     }),
   );
@@ -2426,43 +2447,24 @@ function buildMetricGradientStroke(
   layer: RouteLayer,
 ) {
   if (route.points.length < 2) return null;
-  return buildGradientRouteStroke(route.points, routeMap, layer, layer);
-}
 
-function buildRegenRouteStrokes(
-  route: ReturnType<typeof prepareRoute>,
-  routeMap: ReturnType<typeof prepareRouteMap>,
-) {
-  if (route.points.length < 2) return [];
-
-  const strokes: GradientRouteStroke[] = [];
-  let runStartIndex = -1;
-
-  const flushRun = (runEndIndex: number) => {
-    if (runStartIndex < 0) return;
-    const slice = route.points.slice(runStartIndex, runEndIndex + 1);
-    const stroke = buildGradientRouteStroke(
-      slice,
-      routeMap,
-      "regen",
-      `regen-${runStartIndex}-${runEndIndex}`,
+  if (layer === "power") {
+    const bounds = powerScaleBounds(route.points);
+    return buildGradientRouteStroke(route.points, routeMap, layer, (point) =>
+      combinedPowerColor(point.powerKw, bounds.maxTraction, bounds.maxRegen),
     );
-    if (stroke) strokes.push(stroke);
-    runStartIndex = -1;
-  };
-
-  for (let index = 0; index < route.points.length - 1; index += 1) {
-    const previous = route.points[index];
-    const point = route.points[index + 1];
-    if (isRegenSegment(previous, point)) {
-      if (runStartIndex < 0) runStartIndex = index;
-      continue;
-    }
-    flushRun(index);
   }
 
-  flushRun(route.points.length - 1);
-  return strokes;
+  const values = route.points
+    .map((point) => routeLayerValue(point, layer))
+    .filter((value): value is number => value != null);
+  const minValue = values.length ? Math.min(...values) : 0;
+  const maxValue = values.length ? Math.max(...values) : 1;
+
+  return buildGradientRouteStroke(route.points, routeMap, layer, (point) => {
+    const normalized = normalizeForLayer(layer, routeLayerValue(point, layer), minValue, maxValue);
+    return routeLayerSegmentColor(layer, normalized);
+  });
 }
 
 function buildSolidRoutePath(
@@ -2725,10 +2727,6 @@ function InteractiveRouteCanvas({
     }
     return null;
   }, [route, routeMap, selectedLayer]);
-  const regenGradientStrokes = useMemo(() => {
-    if (selectedLayer !== "regen") return [];
-    return buildRegenRouteStrokes(route, routeMap);
-  }, [route, routeMap, selectedLayer]);
   const mappedStart = route.start ? routeMap.mapPoint(route.start) : null;
   const mappedEnd = route.end ? routeMap.mapPoint(route.end) : null;
 
@@ -2746,7 +2744,7 @@ function InteractiveRouteCanvas({
   return (
     <div className={`relative overflow-hidden bg-background ${className}`}>
       {showLayerLegend ? (
-        <div className="absolute left-2 top-2 z-10 grid w-[10rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-5 sm:rounded-full">
+        <div className="absolute left-2 top-2 z-10 grid w-[10rem] grid-cols-2 gap-1 rounded-2xl border border-border bg-background/85 p-1 shadow-sm backdrop-blur sm:left-3 sm:top-3 sm:w-auto sm:grid-cols-4 sm:rounded-full">
           {ROUTE_LAYER_OPTIONS.map((option) => {
             const selected = option.id === selectedLayer;
             const label = tx(`vehicle.route.layers.${option.id}` as TranslationKey);
@@ -2767,7 +2765,18 @@ function InteractiveRouteCanvas({
                 aria-label={label}
                 title={label}
               >
-                <span className="size-1.5 shrink-0 rounded-full sm:size-2" style={{ backgroundColor: option.color }} />
+                {option.id === "power" ? (
+                  <span className="flex shrink-0 items-center gap-0.5" aria-hidden>
+                    <span className="size-1.5 rounded-full bg-red-500 sm:size-2" />
+                    <span className="size-1.5 rounded-full bg-emerald-400 sm:size-2" />
+                  </span>
+                ) : (
+                  <span
+                    className="size-1.5 shrink-0 rounded-full sm:size-2"
+                    style={{ backgroundColor: option.color }}
+                    aria-hidden
+                  />
+                )}
                 <span className="truncate">{shortLabel}</span>
               </button>
             );
@@ -2898,39 +2907,6 @@ function InteractiveRouteCanvas({
             />
           </>
         ) : null}
-        {regenGradientStrokes.map((stroke) => {
-          const regenGradientId = `${gradientId}-${stroke.key}`;
-          return (
-            <g key={stroke.key}>
-              <linearGradient
-                id={regenGradientId}
-                gradientUnits="userSpaceOnUse"
-                x1={stroke.start.x}
-                y1={stroke.start.y}
-                x2={stroke.end.x}
-                y2={stroke.end.y}
-              >
-                {stroke.stops.map((stop, index) => (
-                  <stop
-                    key={`${stroke.key}-${index}`}
-                    offset={`${(stop.offset * 100).toFixed(2)}%`}
-                    stopColor={stop.color}
-                  />
-                ))}
-              </linearGradient>
-              <path
-                d={stroke.d}
-                fill="none"
-                stroke={`url(#${regenGradientId})`}
-                strokeWidth={ROUTE_STROKE_WIDTH}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="nonScalingStroke"
-                filter="url(#route-line-shadow)"
-              />
-            </g>
-          );
-        })}
         {mappedStart ? (
           <circle cx={mappedStart.x} cy={mappedStart.y} r="5" fill="#22c55e" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
             <title>{tx("vehicle.route.start")}</title>

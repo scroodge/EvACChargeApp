@@ -445,14 +445,12 @@ export const dictionaries = {
         exitFullscreen: "Exit fullscreen map",
         layers: {
           route: "Route",
-          regen: "Regen",
-          power: "Power",
+          power: "Drive & regen",
           speed: "Speed",
           soc: "SOC",
         },
         layerShort: {
           route: "Route",
-          regen: "Regen",
           power: "kW",
           speed: "km/h",
           soc: "SOC",
@@ -1031,14 +1029,12 @@ export const dictionaries = {
         exitFullscreen: "Выйсці з поўнаэкраннай карты",
         layers: {
           route: "Маршрут",
-          regen: "Рэкуп.",
-          power: "Магутнасць",
+          power: "Рух і рэкуп.",
           speed: "Хуткасць",
           soc: "SOC",
         },
         layerShort: {
           route: "Марш.",
-          regen: "Рэкуп.",
           power: "кВт",
           speed: "км/г",
           soc: "SOC",
@@ -1616,14 +1612,12 @@ export const dictionaries = {
         exitFullscreen: "Закрыть полноэкранную карту",
         layers: {
           route: "Маршрут",
-          regen: "Рекуперация",
-          power: "Мощность",
+          power: "Ход и рекуп.",
           speed: "Скорость",
           soc: "SOC",
         },
         layerShort: {
           route: "Марш.",
-          regen: "Рекуп.",
           power: "кВт",
           speed: "км/ч",
           soc: "SOC",
