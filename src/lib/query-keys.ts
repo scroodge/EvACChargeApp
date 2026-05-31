@@ -8,6 +8,8 @@ export const queryKeys = {
     ["bydmate-latest-trips", vehicleId, limit, lite] as const,
   bydmateTrips: (date: string, vehicleId: string | null) =>
     ["bydmate-trips", date, vehicleId] as const,
+  bydmateTripMonthDates: (year: number, month: number, vehicleId: string | null) =>
+    ["bydmate-trip-month-dates", year, month, vehicleId] as const,
   bydmateTripSamples: (tripId: string) => ["bydmate-trip-samples", tripId] as const,
   bydmateChargingSessionSamples: (sessionId: string, vehicleId: string) =>
     ["bydmate-charging-session-samples", sessionId, vehicleId] as const,

@@ -15,7 +15,7 @@ import { formatDuration } from "@/lib/charging-math";
 import { useAppPath } from "@/lib/dev/dev-path";
 import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useSessionsQuery } from "@/hooks/use-sessions-query";
-import { useLatestBydmateTripsQuery } from "@/hooks/use-bydmate-trips-query";
+import { useLatestBydmateTripsQuery, useBydmateTripsQuery, useTripMonthDatesQuery } from "@/hooks/use-bydmate-trips-query";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/lib/i18n";
 import type { BydmateTripRow, ChargingSessionRow } from "@/types/database";
@@ -623,34 +623,44 @@ function TripAccordionItem({
   );
 }
 
-function TripsTab({ allTrips }: { allTrips: BydmateTripRow[] }) {
+function TripsTab({ vehicleId }: { vehicleId: string | null }) {
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth());
+  const { data: latestTrips = [], isLoading: latestLoading } = useLatestBydmateTripsQuery(vehicleId, 100);
+  const { data: monthDateList = [] } = useTripMonthDatesQuery(calYear, calMonth, vehicleId);
   const [selectedDate, setSelectedDate] = useState<string | null>(() =>
-    pickInitialTripDate(allTrips),
+    pickInitialTripDate(latestTrips),
   );
   const [selectedTripId, setSelectedTripId] = useState<string | null | undefined>(undefined);
+  const { data: dayTrips = [], isLoading: dayLoading } = useBydmateTripsQuery(
+    selectedDate ?? "",
+    vehicleId,
+    Boolean(selectedDate),
+  );
 
   const tripDates = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of allTrips) set.add(localDateKey(t.started_at));
+    const set = new Set(monthDateList);
+    for (const trip of latestTrips) {
+      set.add(localDateKey(trip.started_at));
+    }
     return set;
-  }, [allTrips]);
+  }, [monthDateList, latestTrips]);
 
   useEffect(() => {
-    if (allTrips.length === 0) return;
-    const hasOnSelected = allTrips.some(
-      (t) => !selectedDate || localDateKey(t.started_at) === selectedDate,
-    );
-    if (hasOnSelected) return;
-    setSelectedDate(pickInitialTripDate(allTrips));
-  }, [allTrips, selectedDate]);
+    if (!selectedDate) return;
+    if (monthDateList.includes(selectedDate)) return;
+    if (latestTrips.some((t) => localDateKey(t.started_at) === selectedDate)) return;
+    if (latestTrips.length === 0) return;
+    setSelectedDate(pickInitialTripDate(latestTrips));
+  }, [latestTrips, selectedDate, monthDateList]);
 
   const filteredTrips = useMemo(() => {
-    if (!selectedDate) return allTrips.slice(0, 10);
-    return allTrips.filter((t) => localDateKey(t.started_at) === selectedDate);
-  }, [allTrips, selectedDate]);
+    if (selectedDate) return dayTrips;
+    return latestTrips.slice(0, 10);
+  }, [selectedDate, dayTrips, latestTrips]);
+
+  const tripsLoading = selectedDate ? dayLoading : latestLoading;
 
   const defaultTripId = filteredTrips[0]?.id ?? null;
   const expandedTripId = selectedTripId === undefined ? defaultTripId : selectedTripId;
@@ -687,7 +697,13 @@ function TripsTab({ allTrips }: { allTrips: BydmateTripRow[] }) {
         </p>
       )}
 
-      {filteredTrips.length === 0 ? (
+      {tripsLoading ? (
+        <div className="flex flex-col gap-2.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-2xl" />
+          ))}
+        </div>
+      ) : filteredTrips.length === 0 ? (
         <p className="rounded-2xl border border-border bg-white/[0.02] p-4 text-center text-sm text-muted-foreground">
           No trips on this date.
         </p>
@@ -747,14 +763,14 @@ export function HistoryView() {
   const initialTab = parseHistoryTab(searchParams.get("tab"));
   const [tab, setTab] = useState<HistoryTab>(initialTab);
   const { data: sessions = [], isLoading: sessionsLoading } = useSessionsQuery();
-  const { data: trips = [], isLoading: tripsLoading } = useLatestBydmateTripsQuery(null, 100);
   const { data: liveRows = [], isLoading: liveLoading } = useBydmateLiveQuery();
+  const tripVehicleId = liveRows[0]?.vehicle_id ?? null;
+  const { data: trips = [], isLoading: tripsLoading } = useLatestBydmateTripsQuery(tripVehicleId, 100);
 
   const vehicleId = useMemo(() => {
-    const fromLive = liveRows[0]?.vehicle_id;
-    if (fromLive) return fromLive;
+    if (tripVehicleId) return tripVehicleId;
     return trips[0]?.vehicle_id ?? null;
-  }, [liveRows, trips]);
+  }, [tripVehicleId, trips]);
 
   useEffect(() => {
     setTab(parseHistoryTab(searchParams.get("tab")));
@@ -765,7 +781,7 @@ export function HistoryView() {
     router.replace(appPath(`/history?tab=${nextTab}`), { scroll: false });
   };
 
-  if (sessionsLoading && tripsLoading && tab !== "analytics") {
+  if (sessionsLoading && tab === "charging") {
     return <LoadingSkeleton />;
   }
 
@@ -807,15 +823,8 @@ export function HistoryView() {
         ) : (
           <ChargingTab sessions={sessions} />
         )
-      ) : tripsLoading ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-52 rounded-2xl" />
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-2xl" />
-          ))}
-        </div>
       ) : (
-        <TripsTab allTrips={trips} />
+        <TripsTab vehicleId={tripVehicleId ?? trips[0]?.vehicle_id ?? null} />
       )}
     </div>
   );

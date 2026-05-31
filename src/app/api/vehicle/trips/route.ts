@@ -12,12 +12,42 @@ export async function GET(request: NextRequest) {
 
   const params = request.nextUrl.searchParams;
   const date = params.get("date");
+  const month = params.get("month");
   let vehicleId = params.get("vehicle_id")?.trim() || null;
   if (!vehicleId && access.devMode) {
     vehicleId = devVehicleId(request);
   }
   const limit = Math.min(Math.max(Number(params.get("limit") ?? 1) || 1, 1), 100);
   const lite = params.get("lite") === "1";
+
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    const [yearText, monthText] = month.split("-");
+    const year = Number(yearText);
+    const monthIndex = Number(monthText);
+    const lastDay = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
+    const monthStart = `${month}-01T00:00:00.000Z`;
+    const monthEnd = `${month}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
+
+    let monthQuery = access.supabase
+      .from("bydmate_trips")
+      .select("started_at")
+      .eq("user_id", access.userId)
+      .gte("started_at", monthStart)
+      .lte("started_at", monthEnd);
+
+    if (vehicleId) {
+      monthQuery = monthQuery.eq("vehicle_id", vehicleId);
+    }
+
+    const { data, error } = await monthQuery;
+    if (error) {
+      return NextResponse.json({ error: "Failed to load trip dates" }, { status: 500 });
+    }
+
+    const startedAt = ((data ?? []) as { started_at: string }[]).map((row) => row.started_at);
+
+    return NextResponse.json({ month, startedAt });
+  }
 
   if (!date) {
     const queryLimit = Math.min(limit * 2, 200);
