@@ -650,15 +650,6 @@ type MapPan = {
 
 type RouteLayer = "route" | "regen" | "power" | "speed" | "soc";
 
-type RouteSegment = {
-  key: string;
-  path: string;
-  color: string;
-  opacity: number;
-  title: string;
-  dash?: string;
-};
-
 type ChartSeries = {
   label: string;
   color: string;
@@ -730,6 +721,8 @@ const DEFAULT_CONSUMPTION_KWH_100KM = 18.5;
 const MIN_FORECAST_CONSUMPTION_KWH_100KM = 8;
 const MAX_FORECAST_CONSUMPTION_KWH_100KM = 42;
 const ROUTE_LINE_COLOR = "#1e40af";
+const ROUTE_STROKE_WIDTH = 4;
+const REGEN_POWER_THRESHOLD_KW = 0.05;
 const ROUTE_LAYER_OPTIONS: Array<{
   id: RouteLayer;
   label: string;
@@ -2305,86 +2298,178 @@ function routeLayerSegmentColor(layer: RouteLayer, normalized: number) {
   const intensity = Math.max(0, Math.min(1, normalized));
 
   if (layer === "power") {
-    return `hsl(0 84% ${34 + intensity * 30}%)`;
+    return `hsl(0 84% ${38 + intensity * 24}%)`;
   }
 
   if (layer === "regen") {
-    return `hsl(158 72% ${30 + intensity * 34}%)`;
+    return `hsl(158 72% ${34 + intensity * 28}%)`;
   }
 
   if (layer === "speed") {
-    return `hsl(142 72% ${30 + intensity * 30}%)`;
+    return `hsl(142 72% ${34 + intensity * 26}%)`;
   }
 
   if (layer === "soc") {
-    return `hsl(48 96% ${28 + intensity * 34}%)`;
+    return `hsl(48 96% ${32 + intensity * 30}%)`;
   }
 
   return routeLayerColor(layer);
 }
 
-function buildRouteSegments(
-  route: ReturnType<typeof prepareRoute>,
-  routeMap: ReturnType<typeof prepareRouteMap>,
-  selectedLayer: RouteLayer,
-) {
-  if (route.points.length < 2) return [];
+function layerDisplayRange(layer: RouteLayer, minValue: number, maxValue: number) {
+  if (layer === "soc") return { min: 0, max: 100 };
+  if (layer === "speed") return { min: 0, max: Math.max(120, maxValue) };
+  if (layer === "power") return { min: 0, max: Math.max(50, maxValue) };
+  if (layer === "regen") return { min: 0, max: Math.max(20, maxValue) };
+  return { min: minValue, max: maxValue };
+}
 
-  const values =
-    selectedLayer === "route"
-      ? []
-      : route.points
-          .map((point) => routeLayerValue(point, selectedLayer))
-          .filter((value): value is number => value != null);
+function normalizeForLayer(
+  layer: RouteLayer,
+  value: number | null,
+  minValue: number,
+  maxValue: number,
+) {
+  if (value == null) return 0;
+  const range = layerDisplayRange(layer, minValue, maxValue);
+  if (range.max <= range.min) return 1;
+  return Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+}
+
+function dedupeGradientStops(stops: Array<{ offset: number; color: string }>) {
+  const sorted = [...stops].sort((a, b) => a.offset - b.offset);
+  const deduped: Array<{ offset: number; color: string }> = [];
+
+  for (const stop of sorted) {
+    const last = deduped.at(-1);
+    if (last && Math.abs(last.offset - stop.offset) < 0.001) {
+      last.color = stop.color;
+      continue;
+    }
+    deduped.push({ ...stop });
+  }
+
+  if (deduped.length === 0) return [{ offset: 0, color: routeLayerSegmentColor("power", 0) }];
+  if (deduped[0].offset > 0) deduped.unshift({ offset: 0, color: deduped[0].color });
+  const last = deduped.at(-1)!;
+  if (last.offset < 1) deduped.push({ offset: 1, color: last.color });
+
+  return deduped;
+}
+
+function isRegenSegment(previous: RoutePoint, point: RoutePoint) {
+  const previousRegen = previous.powerKw != null && previous.powerKw < -REGEN_POWER_THRESHOLD_KW;
+  const pointRegen = point.powerKw != null && point.powerKw < -REGEN_POWER_THRESHOLD_KW;
+  return previousRegen || pointRegen;
+}
+
+type GradientRouteStroke = {
+  key: string;
+  d: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  stops: Array<{ offset: number; color: string }>;
+};
+
+function buildPathFromMappedPoints(mappedPoints: Array<{ x: number; y: number }>) {
+  if (mappedPoints.length < 2) return "";
+  const [first, ...rest] = mappedPoints;
+  let path = `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
+  for (const point of rest) {
+    path += ` L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+  }
+  return path;
+}
+
+function buildGradientRouteStroke(
+  points: RoutePoint[],
+  routeMap: ReturnType<typeof prepareRouteMap>,
+  layer: RouteLayer,
+  key: string,
+): GradientRouteStroke | null {
+  if (points.length < 2) return null;
+
+  const mappedPoints = points.map((point) => routeMap.mapPoint(point));
+  const d = buildPathFromMappedPoints(mappedPoints);
+  const start = mappedPoints[0];
+  const end = mappedPoints[mappedPoints.length - 1];
+
+  const values = points
+    .map((point) => routeLayerValue(point, layer))
+    .filter((value): value is number => value != null);
   const minValue = values.length ? Math.min(...values) : 0;
   const maxValue = values.length ? Math.max(...values) : 1;
 
-  return route.points.slice(1).map((point, index): RouteSegment => {
-    const previous = route.points[index];
-    const mappedPrevious = routeMap.mapPoint(previous);
-    const mappedPoint = routeMap.mapPoint(point);
-    const value = routeLayerValue(point, selectedLayer);
-    const normalized =
-      value == null || maxValue === minValue ? 1 : (value - minValue) / (maxValue - minValue);
-    const hasRegen = selectedLayer === "regen" && value != null && value > 0;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy || 1;
 
-    return {
-      key: `${selectedLayer}-${previous.time}-${point.time}-${index}`,
-      path: `M ${mappedPrevious.x.toFixed(2)} ${mappedPrevious.y.toFixed(2)} L ${mappedPoint.x.toFixed(2)} ${mappedPoint.y.toFixed(2)}`,
-      color:
-        selectedLayer === "regen" && !hasRegen
-          ? ROUTE_LINE_COLOR
-          : routeLayerSegmentColor(selectedLayer, normalized),
-      opacity:
-        selectedLayer === "route"
-          ? 1
-          : selectedLayer === "regen"
-            ? hasRegen
-              ? 1
-              : 0.22
-            : value == null
-              ? 0.35
-              : 1,
-      title: `${formatClock(point.time)} · ${point.powerKw == null ? "—" : `${fmt(point.powerKw, 1)} kW`}`,
-      dash: hasRegen ? "7 5" : undefined,
-    };
-  });
+  const stops = dedupeGradientStops(
+    points.map((point) => {
+      const mapped = routeMap.mapPoint(point);
+      const projection = ((mapped.x - start.x) * dx + (mapped.y - start.y) * dy) / lengthSq;
+      const offset = Math.max(0, Math.min(1, projection));
+      const normalized = normalizeForLayer(layer, routeLayerValue(point, layer), minValue, maxValue);
+      return {
+        offset,
+        color: routeLayerSegmentColor(layer, normalized),
+      };
+    }),
+  );
+
+  return { key, d, start, end, stops };
+}
+
+function buildMetricGradientStroke(
+  route: ReturnType<typeof prepareRoute>,
+  routeMap: ReturnType<typeof prepareRouteMap>,
+  layer: RouteLayer,
+) {
+  if (route.points.length < 2) return null;
+  return buildGradientRouteStroke(route.points, routeMap, layer, layer);
+}
+
+function buildRegenRouteStrokes(
+  route: ReturnType<typeof prepareRoute>,
+  routeMap: ReturnType<typeof prepareRouteMap>,
+) {
+  if (route.points.length < 2) return [];
+
+  const strokes: GradientRouteStroke[] = [];
+  let runStartIndex = -1;
+
+  const flushRun = (runEndIndex: number) => {
+    if (runStartIndex < 0) return;
+    const slice = route.points.slice(runStartIndex, runEndIndex + 1);
+    const stroke = buildGradientRouteStroke(
+      slice,
+      routeMap,
+      "regen",
+      `regen-${runStartIndex}-${runEndIndex}`,
+    );
+    if (stroke) strokes.push(stroke);
+    runStartIndex = -1;
+  };
+
+  for (let index = 0; index < route.points.length - 1; index += 1) {
+    const previous = route.points[index];
+    const point = route.points[index + 1];
+    if (isRegenSegment(previous, point)) {
+      if (runStartIndex < 0) runStartIndex = index;
+      continue;
+    }
+    flushRun(index);
+  }
+
+  flushRun(route.points.length - 1);
+  return strokes;
 }
 
 function buildSolidRoutePath(
   route: ReturnType<typeof prepareRoute>,
   routeMap: ReturnType<typeof prepareRouteMap>,
 ) {
-  if (route.points.length < 2) return "";
-
-  const [first, ...rest] = route.points;
-  const mappedFirst = routeMap.mapPoint(first);
-  let path = `M ${mappedFirst.x.toFixed(2)} ${mappedFirst.y.toFixed(2)}`;
-  for (const point of rest) {
-    const mapped = routeMap.mapPoint(point);
-    path += ` L ${mapped.x.toFixed(2)} ${mapped.y.toFixed(2)}`;
-  }
-  return path;
+  return buildPathFromMappedPoints(route.points.map((point) => routeMap.mapPoint(point)));
 }
 
 export function RouteMap({
@@ -2627,16 +2712,23 @@ function InteractiveRouteCanvas({
   const { t } = useTranslation();
   const tx = t as Translator;
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const gradientId = useId().replace(/:/g, "");
   const allowMapInteraction = isFullscreen || showToolbarControls;
   const routeMap = useMemo(() => prepareRouteMap(route, zoomOffset, pan), [pan, route, zoomOffset]);
-  const routeSegments = useMemo(
-    () => buildRouteSegments(route, routeMap, selectedLayer),
-    [route, routeMap, selectedLayer],
-  );
   const solidRoutePath = useMemo(
     () => buildSolidRoutePath(route, routeMap),
     [route, routeMap],
   );
+  const metricGradientStroke = useMemo(() => {
+    if (selectedLayer === "power" || selectedLayer === "speed" || selectedLayer === "soc") {
+      return buildMetricGradientStroke(route, routeMap, selectedLayer);
+    }
+    return null;
+  }, [route, routeMap, selectedLayer]);
+  const regenGradientStrokes = useMemo(() => {
+    if (selectedLayer !== "regen") return [];
+    return buildRegenRouteStrokes(route, routeMap);
+  }, [route, routeMap, selectedLayer]);
   const mappedStart = route.start ? routeMap.mapPoint(route.start) : null;
   const mappedEnd = route.end ? routeMap.mapPoint(route.end) : null;
 
@@ -2764,54 +2856,81 @@ function InteractiveRouteCanvas({
           />
         ))}
         <rect width="320" height="180" fill="rgba(5,10,15,0.16)" />
-        {solidRoutePath && (selectedLayer === "route" || selectedLayer === "regen") ? (
+        {selectedLayer === "route" && solidRoutePath ? (
           <path
             d={solidRoutePath}
             fill="none"
             stroke={ROUTE_LINE_COLOR}
-            strokeWidth="4"
+            strokeWidth={ROUTE_STROKE_WIDTH}
             strokeLinecap="round"
             strokeLinejoin="round"
-            opacity={selectedLayer === "route" ? 1 : 0.22}
+            vectorEffect="nonScalingStroke"
             filter="url(#route-line-shadow)"
           />
         ) : null}
-        {selectedLayer === "regen"
-          ? routeSegments
-              .filter((segment) => segment.dash)
-              .map((segment) => (
-                <path
-                  key={segment.key}
-                  d={segment.path}
-                  fill="none"
-                  stroke={segment.color}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={segment.dash}
-                  filter="url(#route-line-shadow)"
-                >
-                  <title>{segment.title}</title>
-                </path>
-              ))
-          : selectedLayer !== "route"
-            ? routeSegments.map((segment) => (
-                <path
-                  key={segment.key}
-                  d={segment.path}
-                  fill="none"
-                  stroke={segment.color}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={segment.dash}
-                  opacity={segment.opacity}
-                  filter="url(#route-line-shadow)"
-                >
-                  <title>{segment.title}</title>
-                </path>
-              ))
-            : null}
+        {metricGradientStroke ? (
+          <>
+            <linearGradient
+              id={gradientId}
+              gradientUnits="userSpaceOnUse"
+              x1={metricGradientStroke.start.x}
+              y1={metricGradientStroke.start.y}
+              x2={metricGradientStroke.end.x}
+              y2={metricGradientStroke.end.y}
+            >
+              {metricGradientStroke.stops.map((stop, index) => (
+                <stop
+                  key={`${metricGradientStroke.key}-${index}`}
+                  offset={`${(stop.offset * 100).toFixed(2)}%`}
+                  stopColor={stop.color}
+                />
+              ))}
+            </linearGradient>
+            <path
+              d={metricGradientStroke.d}
+              fill="none"
+              stroke={`url(#${gradientId})`}
+              strokeWidth={ROUTE_STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="nonScalingStroke"
+              filter="url(#route-line-shadow)"
+            />
+          </>
+        ) : null}
+        {regenGradientStrokes.map((stroke) => {
+          const regenGradientId = `${gradientId}-${stroke.key}`;
+          return (
+            <g key={stroke.key}>
+              <linearGradient
+                id={regenGradientId}
+                gradientUnits="userSpaceOnUse"
+                x1={stroke.start.x}
+                y1={stroke.start.y}
+                x2={stroke.end.x}
+                y2={stroke.end.y}
+              >
+                {stroke.stops.map((stop, index) => (
+                  <stop
+                    key={`${stroke.key}-${index}`}
+                    offset={`${(stop.offset * 100).toFixed(2)}%`}
+                    stopColor={stop.color}
+                  />
+                ))}
+              </linearGradient>
+              <path
+                d={stroke.d}
+                fill="none"
+                stroke={`url(#${regenGradientId})`}
+                strokeWidth={ROUTE_STROKE_WIDTH}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="nonScalingStroke"
+                filter="url(#route-line-shadow)"
+              />
+            </g>
+          );
+        })}
         {mappedStart ? (
           <circle cx={mappedStart.x} cy={mappedStart.y} r="5" fill="#22c55e" stroke="rgba(0,0,0,0.55)" strokeWidth="2">
             <title>{tx("vehicle.route.start")}</title>
