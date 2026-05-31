@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { Bell, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Code2, Copy, ExternalLink, KeyRound, MessageCircle, RefreshCw, Scale, ShieldCheck } from "lucide-react";
+import {
+  ChevronDown,
+  Code2,
+  Copy,
+  ExternalLink,
+  KeyRound,
+  MessageCircle,
+  RefreshCw,
+  Scale,
+  ShieldCheck,
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -56,6 +66,11 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
   const [email, setEmail] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [bydmateCloudApiKey, setBydmateCloudApiKey] = useState("");
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkExpiresAt, setLinkExpiresAt] = useState<number | null>(null);
+  const [linkCountdownSec, setLinkCountdownSec] = useState<number | null>(null);
+  const [linkCreating, setLinkCreating] = useState(false);
+  const [cloudAdvancedOpen, setCloudAdvancedOpen] = useState(false);
   const defaultPricePerKwh = useAppPreferences((s) => s.defaultPricePerKwh);
   const setDefaultPrice = useAppPreferences((s) => s.setDefaultPricePerKwh);
   const currency = useAppPreferences((s) => s.currency);
@@ -265,6 +280,67 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
       .catch(() => toast.error("Could not copy API key"));
   };
 
+  useEffect(() => {
+    if (!linkExpiresAt) {
+      setLinkCountdownSec(null);
+      return;
+    }
+
+    const tick = () => {
+      const remainingMs = linkExpiresAt - Date.now();
+      if (remainingMs <= 0) {
+        setLinkCountdownSec(0);
+        return;
+      }
+      setLinkCountdownSec(Math.ceil(remainingMs / 1000));
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [linkExpiresAt]);
+
+  const formatLinkCountdown = (totalSec: number) => {
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const handleCreateBydmateLinkCode = () => {
+    if (!profileUserId && !isDevAppRoute()) {
+      toast.error("Sign in before linking BYDMate");
+      return;
+    }
+
+    setLinkCreating(true);
+    const request = isDevAppRoute()
+      ? devFetch("/api/bydmate/link-code", { method: "POST" })
+      : fetch("/api/bydmate/link-code", { method: "POST", credentials: "include" });
+
+    void request
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          code?: string;
+          expires_at?: string;
+          error?: string;
+        };
+        if (!response.ok || !payload.ok || !payload.code || !payload.expires_at) {
+          throw new Error(payload.error ?? String(t("settings.cloud.linkCodeFailed")));
+        }
+        setLinkCode(payload.code);
+        setLinkExpiresAt(new Date(payload.expires_at).getTime());
+      })
+      .catch((error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : String(t("settings.cloud.linkCodeFailed"));
+        toast.error(message);
+        setLinkCode(null);
+        setLinkExpiresAt(null);
+      })
+      .finally(() => setLinkCreating(false));
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
@@ -358,43 +434,120 @@ export function SettingsView({ isAdmin = false }: { isAdmin?: boolean }) {
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-muted-foreground text-base leading-relaxed">
-          {t("settings.cloud.description")}
+            {t("settings.cloud.description")}
           </p>
-          <div className="space-y-2">
-            <Label htmlFor="bydmate-api-key">{t("settings.cloud.apiKey")}</Label>
-            <Input
-              id="bydmate-api-key"
-              value={bydmateCloudApiKey || "No key generated yet"}
-              readOnly
-              className="h-[54px] rounded-2xl font-mono text-sm"
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+
+          {linkCode && linkCountdownSec != null && linkCountdownSec > 0 ? (
+            <div className="space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+              <p className="text-center font-mono text-5xl font-semibold tracking-[0.35em] tabular-nums">
+                {linkCode.slice(0, 3)} {linkCode.slice(3)}
+              </p>
+              <p className="text-muted-foreground text-center text-sm">
+                {t("settings.cloud.linkCodeHint")}
+              </p>
+              <p className="text-center text-sm text-[var(--voltflow-green)]">
+                {t("settings.cloud.linkCodeExpires", {
+                  time: formatLinkCountdown(linkCountdownSec),
+                })}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-[48px] w-full rounded-full"
+                onClick={handleCreateBydmateLinkCode}
+                disabled={linkCreating}
+              >
+                <RefreshCw className="mr-2 size-4" aria-hidden />
+                {t("settings.cloud.linkBydmate")}
+              </Button>
+            </div>
+          ) : linkCode && linkCountdownSec === 0 ? (
+            <div className="space-y-3">
+              <p className="text-muted-foreground text-sm">{t("settings.cloud.linkCodeExpired")}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="h-[54px] w-full rounded-full"
+                onClick={handleCreateBydmateLinkCode}
+                disabled={linkCreating}
+              >
+                <RefreshCw className="mr-2 size-4" aria-hidden />
+                {linkCreating
+                  ? t("settings.cloud.linkCodeCreating")
+                  : t("settings.cloud.linkBydmate")}
+              </Button>
+            </div>
+          ) : (
             <Button
               type="button"
               variant="secondary"
               size="lg"
-              className="h-[54px] rounded-full"
-              onClick={handleGenerateBydmateKey}
+              className="h-[54px] w-full rounded-full"
+              onClick={handleCreateBydmateLinkCode}
+              disabled={linkCreating}
             >
               <RefreshCw className="mr-2 size-4" aria-hidden />
-              {t("settings.cloud.generateKey")}
+              {linkCreating
+                ? t("settings.cloud.linkCodeCreating")
+                : t("settings.cloud.linkBydmate")}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="h-[54px] rounded-full"
-              disabled={!bydmateCloudApiKey}
-              onClick={handleCopyBydmateKey}
-            >
-              <Copy className="mr-2 size-4" aria-hidden />
-              {t("settings.cloud.copyKey")}
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-sm">
-          {t("settings.cloud.endpointURL")} <span className="font-mono">https://volt-flow-beige.vercel.app/api/bydmate/telemetry</span>
-          </p>
+          )}
+
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 py-1 text-left text-sm font-medium"
+            aria-expanded={cloudAdvancedOpen}
+            onClick={() => setCloudAdvancedOpen((open) => !open)}
+          >
+            {t("settings.cloud.advanced")}
+            <ChevronDown
+              className={`size-4 shrink-0 transition-transform ${cloudAdvancedOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+
+          {cloudAdvancedOpen ? (
+            <div className="space-y-4 border-t border-white/[0.08] pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="bydmate-api-key">{t("settings.cloud.apiKey")}</Label>
+                <Input
+                  id="bydmate-api-key"
+                  value={bydmateCloudApiKey || "No key generated yet"}
+                  readOnly
+                  className="h-[54px] rounded-2xl font-mono text-sm"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="lg"
+                  className="h-[54px] rounded-full"
+                  onClick={handleGenerateBydmateKey}
+                >
+                  <RefreshCw className="mr-2 size-4" aria-hidden />
+                  {t("settings.cloud.generateKey")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="h-[54px] rounded-full"
+                  disabled={!bydmateCloudApiKey}
+                  onClick={handleCopyBydmateKey}
+                >
+                  <Copy className="mr-2 size-4" aria-hidden />
+                  {t("settings.cloud.copyKey")}
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                {t("settings.cloud.endpointURL")}{" "}
+                <span className="font-mono">https://volt-flow-beige.vercel.app/api/bydmate/telemetry</span>
+              </p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

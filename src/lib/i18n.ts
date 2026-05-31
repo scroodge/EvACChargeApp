@@ -600,7 +600,15 @@ export const dictionaries = {
       eyebrow: "Settings",
       cloud: {
         name: "VoltFlow Mate",
-        description: "Generate the API key used by the BYDMate Android app when it posts live telemetry to VoltFlow.",
+        description:
+          "Link BYDMate on your car tablet with a short code — no need to copy a long API key.",
+        linkBydmate: "Link BYDMate",
+        linkCodeHint: "Enter this 6-digit code in BYDMate → VoltFlow sync, then tap Connect.",
+        linkCodeExpires: "Code expires in {time}",
+        linkCodeExpired: "Code expired — generate a new one.",
+        linkCodeCreating: "Creating code…",
+        linkCodeFailed: "Could not create linking code",
+        advanced: "Advanced",
         apiKey: "API Key",
         generateKey: "Generate key",
         copyKey: "Copy key",
@@ -1193,12 +1201,21 @@ export const dictionaries = {
     settings: {
       eyebrow: "Налады",
       cloud: {
-        "name": "VoltFlow Mate",
-        "description": "Згенеруйце API-ключ, які выкарыстоўваецца Android-праграмай BYDMate для адпраўкі тэлеметрыі ў рэжыме рэальнага часу ў VoltFlow.",
-        "apiKey": "API-ключ",
-        "generateKey": "Згенераваць ключ",
-        "copyKey": "Капіяваць ключ",
-        "endpointURL": "URL-адрас канчатковай кропкі BYDMate"
+        name: "VoltFlow Mate",
+        description:
+          "Злучыце BYDMate на планшэце аўто кароткім кодам — не трэба капіяваць доўгі API-ключ.",
+        linkBydmate: "Злучыць BYDMate",
+        linkCodeHint:
+          "Увядзіце гэты 6-значны код у BYDMate → сінхранізацыя VoltFlow і націсніце «Злучыць».",
+        linkCodeExpires: "Код састанецца праз {time}",
+        linkCodeExpired: "Тэрмін кода скончыўся — згенеруйце новы.",
+        linkCodeCreating: "Стварэнне кода…",
+        linkCodeFailed: "Не ўдалося стварыць код злучэння",
+        advanced: "Дадаткова",
+        apiKey: "API-ключ",
+        generateKey: "Згенераваць ключ",
+        copyKey: "Капіяваць ключ",
+        endpointURL: "URL-адрас канчатковай кропкі BYDMate",
       },
       title: "Профіль кіроўцы",
       subtitle:
@@ -1786,12 +1803,21 @@ export const dictionaries = {
     settings: {
       eyebrow: "Настройки",
       cloud: {
-        "name": "VoltFlow Mate",
-        "description": "Сгенерируйте API-ключ, который используется Android-приложением BYDMate для отправки телеметрии в реальном времени в VoltFlow.",
-        "apiKey": "API-ключ",
-        "generateKey": "Сгенерировать ключ",
-        "copyKey": "Копировать ключ",
-        "endpointURL": "URL-адрес конечной точки BYDMate"
+        name: "VoltFlow Mate",
+        description:
+          "Подключите BYDMate на планшете авто коротким кодом — не нужно копировать длинный API-ключ.",
+        linkBydmate: "Подключить BYDMate",
+        linkCodeHint:
+          "Введите этот 6-значный код в BYDMate → синхронизация VoltFlow и нажмите «Подключить».",
+        linkCodeExpires: "Код истекает через {time}",
+        linkCodeExpired: "Срок кода истёк — создайте новый.",
+        linkCodeCreating: "Создание кода…",
+        linkCodeFailed: "Не удалось создать код подключения",
+        advanced: "Дополнительно",
+        apiKey: "API-ключ",
+        generateKey: "Сгенерировать ключ",
+        copyKey: "Копировать ключ",
+        endpointURL: "URL-адрес конечной точки BYDMate",
       },
       title: "Профиль водителя",
       subtitle:

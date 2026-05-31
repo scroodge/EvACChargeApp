@@ -1,6 +1,6 @@
 # VoltFlow Mate APK API Contract
 
-Last updated: 2026-05-30
+Last updated: 2026-05-31
 
 This file is the handoff contract for the Android APK. Keep it in sync with
 `src/lib/bydmate/ingest-payload.ts` and `src/app/api/bydmate/telemetry/route.ts`.
@@ -19,6 +19,71 @@ X-Vehicle-Id: <vehicle_id>
 ```
 
 `X-Vehicle-Id` must match every sample `vehicle_id`.
+
+## Device pairing (6-digit code)
+
+Preferred setup: user generates a short code in VoltFlow Settings (logged in),
+then enters it in BYDMate. The APK redeems the code once and stores the full
+`bydmate_cloud_api_key` locally. Existing installs that already pasted the API
+key keep working unchanged.
+
+### Create code (VoltFlow web, authenticated)
+
+```http
+POST https://<voltflow-domain>/api/bydmate/link-code
+```
+
+Requires a logged-in Supabase session (browser cookie) or dev bypass in local
+preview.
+
+Success:
+
+```json
+{
+  "ok": true,
+  "code": "482913",
+  "expires_at": "2026-05-31T12:10:00.000Z"
+}
+```
+
+- Code is 6 numeric digits, valid for 10 minutes, single use.
+- Creating a new code invalidates previous unused codes for that user.
+- Ensures `profiles.bydmate_cloud_api_key` exists (auto-generates if missing).
+
+### Redeem code (BYDMate APK, public)
+
+```http
+POST https://<voltflow-domain>/api/bydmate/link-code/redeem
+Content-Type: application/json
+
+{ "code": "482913" }
+```
+
+Success:
+
+```json
+{
+  "ok": true,
+  "api_key": "<profile bydmate_cloud_api_key>",
+  "endpoint_url": "https://<voltflow-domain>/api/bydmate/telemetry"
+}
+```
+
+Errors:
+
+```json
+{ "ok": false, "error": "Invalid or expired code" }
+```
+
+```json
+{ "ok": false, "error": "Too many attempts" }
+```
+
+Rate limit: failed redeems per client IP (hashed server-side), 10 failures per
+15 minutes. After success, use `api_key` as `X-API-Key` on the telemetry
+endpoint above.
+
+Manual API key paste remains supported in BYDMate Advanced settings.
 
 ## Sample Shape
 
