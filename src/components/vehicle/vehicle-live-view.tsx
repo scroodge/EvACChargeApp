@@ -2434,6 +2434,8 @@ export function RouteMap({
             onOpenFullscreen={() => setIsFullscreenOpen(true)}
             selectedLayer={selectedLayer}
             onLayerChange={setSelectedLayer}
+            showLayerLegend={false}
+            showToolbarControls={false}
             className="h-64"
           />
           <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
@@ -2465,6 +2467,7 @@ export function RouteMap({
                 selectedLayer={selectedLayer}
                 onLayerChange={setSelectedLayer}
                 onCloseFullscreen={() => setIsFullscreenOpen(false)}
+                showLayerLegend
                 className="min-h-0 flex-1 rounded-lg"
                 isFullscreen
               />
