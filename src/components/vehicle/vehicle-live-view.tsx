@@ -710,12 +710,10 @@ const ROUTE_MAP_PAD_Y = 12;
 const ROUTE_MAP_INNER_WIDTH = MAP_VIEW_WIDTH - ROUTE_MAP_PAD_X * 2;
 const ROUTE_MAP_INNER_HEIGHT = MAP_VIEW_HEIGHT - ROUTE_MAP_PAD_Y * 2;
 const MAP_TILE_SIZE = 256;
-const MAX_MAP_ZOOM = 18;
+const MAX_MAP_ZOOM = 19;
 const MIN_MAP_ZOOM = 2;
 const DEFAULT_MAP_ZOOM = 15;
 const WEB_MERCATOR_MAX_LAT = 85.05112878;
-const MAX_MAP_ZOOM_OFFSET = 3;
-const MIN_MAP_ZOOM_OFFSET = -3;
 const DEFAULT_USABLE_BATTERY_KWH = 45.1;
 const DEFAULT_CONSUMPTION_KWH_100KM = 18.5;
 const MIN_FORECAST_CONSUMPTION_KWH_100KM = 8;
@@ -2236,11 +2234,10 @@ function chooseRouteZoom(route: ReturnType<typeof prepareRoute>) {
   return MIN_MAP_ZOOM;
 }
 
-function stepRouteMapZoom(zoomOffset: number, pan: MapPan, delta: number) {
-  const nextOffset = Math.max(
-    MIN_MAP_ZOOM_OFFSET,
-    Math.min(MAX_MAP_ZOOM_OFFSET, zoomOffset + delta),
-  );
+function stepRouteMapZoom(baseZoom: number, zoomOffset: number, pan: MapPan, delta: number) {
+  const minOffset = MIN_MAP_ZOOM - baseZoom;
+  const maxOffset = MAX_MAP_ZOOM - baseZoom;
+  const nextOffset = Math.max(minOffset, Math.min(maxOffset, zoomOffset + delta));
   if (nextOffset === zoomOffset) {
     return { zoomOffset, pan };
   }
@@ -2511,6 +2508,7 @@ export function RouteMap({
   }, [points, trackPoints]);
   const start = route.start;
   const end = route.end;
+  const baseZoom = useMemo(() => chooseRouteZoom(route), [route]);
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
   const panRef = useRef(pan);
@@ -2520,7 +2518,7 @@ export function RouteMap({
 
   const zoomBy = (delta: number) => {
     setZoomOffset((offset) => {
-      const next = stepRouteMapZoom(offset, panRef.current, delta);
+      const next = stepRouteMapZoom(baseZoom, offset, panRef.current, delta);
       if (next.zoomOffset !== offset) {
         setPan(next.pan);
       }
@@ -2641,6 +2639,7 @@ export function RouteMapPreview({
   const { t } = useTranslation();
   const tx = t as Translator;
   const route = useMemo(() => prepareRouteFromTrack(trackPoints), [trackPoints]);
+  const baseZoom = useMemo(() => chooseRouteZoom(route), [route]);
   const [zoomOffset, setZoomOffset] = useState(0);
   const [pan, setPan] = useState<MapPan>({ x: 0, y: 0 });
   const panRef = useRef(pan);
@@ -2652,7 +2651,7 @@ export function RouteMapPreview({
 
   const zoomBy = (delta: number) => {
     setZoomOffset((offset) => {
-      const next = stepRouteMapZoom(offset, panRef.current, delta);
+      const next = stepRouteMapZoom(baseZoom, offset, panRef.current, delta);
       if (next.zoomOffset !== offset) {
         setPan(next.pan);
       }
