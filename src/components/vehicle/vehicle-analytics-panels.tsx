@@ -18,7 +18,7 @@ import { useBydmateLiveQuery } from "@/hooks/use-bydmate-live-query";
 import { useBydmateTelemetryHistoryQuery } from "@/hooks/use-bydmate-telemetry-history-query";
 import { useTranslation } from "@/hooks/use-translation";
 import { buildAnalyticsSummary, consumptionByOutsideTemp } from "@/lib/bydmate/telemetry-buckets";
-import { resolveTelemetryWindow, type TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
+import { resolveTelemetryWindow, snapAnchorDateForRange, isoWeekValueFromDate, isoWeekValueToAnchorDate, monthValueFromDate, monthValueToAnchorDate, quarterValueFromDate, quarterValueToAnchorDate, yearValueFromDate, yearValueToAnchorDate, type TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
 import type { RouteInsight } from "@/lib/bydmate/route-insights";
 import { devFetch, isDevAppRoute, withDevApiParams } from "@/lib/dev/dev-fetch";
 import type { Locale, TranslationKey } from "@/lib/i18n";
@@ -42,11 +42,116 @@ async function fetchAnalytics<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+const anchorSelectClassName =
+  "h-8 min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30";
+
+function AnalyticsRangeAnchorPicker({
+  range,
+  anchorDate,
+  onAnchorDateChange,
+  tx,
+}: {
+  range: TelemetryHistoryRange;
+  anchorDate: string;
+  onAnchorDateChange: (value: string) => void;
+  tx: Translator;
+}) {
+  const weekPickerValue = useMemo(() => isoWeekValueFromDate(anchorDate), [anchorDate]);
+  const monthPickerValue = useMemo(() => monthValueFromDate(anchorDate), [anchorDate]);
+  const quarterPickerValue = useMemo(() => quarterValueFromDate(anchorDate), [anchorDate]);
+  const yearPickerValue = useMemo(() => yearValueFromDate(anchorDate), [anchorDate]);
+
+  const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(quarterPickerValue);
+  const quarterYear = quarterMatch ? Number(quarterMatch[1]) : new Date().getUTCFullYear();
+  const quarterNum = quarterMatch ? Number(quarterMatch[2]) : 1;
+
+  const labelKey =
+    range === "week"
+      ? "vehicle.analytics.anchorWeek"
+      : range === "month"
+        ? "vehicle.analytics.anchorMonth"
+        : range === "quarter"
+          ? "vehicle.analytics.anchorQuarter"
+          : range === "year"
+            ? "vehicle.analytics.anchorYear"
+            : "vehicle.trips.date";
+
+  return (
+    <label className="mt-4 grid gap-1 text-sm text-muted-foreground">
+      {tx(labelKey)}
+      {range === "week" ? (
+        <Input
+          type="week"
+          value={weekPickerValue}
+          onChange={(event) => onAnchorDateChange(isoWeekValueToAnchorDate(event.target.value))}
+          className="w-52"
+        />
+      ) : range === "month" ? (
+        <Input
+          type="month"
+          value={monthPickerValue}
+          onChange={(event) => onAnchorDateChange(monthValueToAnchorDate(event.target.value))}
+          className="w-44"
+        />
+      ) : range === "quarter" ? (
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={quarterNum}
+            onChange={(event) =>
+              onAnchorDateChange(
+                quarterValueToAnchorDate(`${quarterYear}-Q${event.target.value}`),
+              )
+            }
+            className={`${anchorSelectClassName} w-24`}
+            aria-label={tx("vehicle.analytics.anchorQuarter")}
+          >
+            <option value={1}>Q1</option>
+            <option value={2}>Q2</option>
+            <option value={3}>Q3</option>
+            <option value={4}>Q4</option>
+          </select>
+          <Input
+            type="number"
+            min={2018}
+            max={2100}
+            value={quarterYear}
+            onChange={(event) =>
+              onAnchorDateChange(
+                quarterValueToAnchorDate(`${event.target.value}-Q${quarterNum}`),
+              )
+            }
+            className="w-28"
+            aria-label={tx("vehicle.analytics.anchorYear")}
+          />
+        </div>
+      ) : range === "year" ? (
+        <Input
+          type="number"
+          min={2018}
+          max={2100}
+          value={yearPickerValue}
+          onChange={(event) => onAnchorDateChange(yearValueToAnchorDate(event.target.value))}
+          className="w-28"
+        />
+      ) : (
+        <Input
+          type="date"
+          value={anchorDate}
+          onChange={(event) => onAnchorDateChange(event.target.value)}
+          className="w-44"
+        />
+      )}
+    </label>
+  );
+}
+
 export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
   const { locale, t } = useTranslation();
   const tx = t as Translator;
   const [historyRange, setHistoryRange] = useState<TelemetryHistoryRange>("week");
-  const [anchorDate, setAnchorDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [anchorDate, setAnchorDate] = useState(() =>
+    snapAnchorDateForRange("week", new Date().toISOString().slice(0, 10)),
+  );
   const [monthKey, setMonthKey] = useState(() => new Date().toISOString().slice(0, 7));
   const [costFrom, setCostFrom] = useState(() =>
     new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
@@ -155,6 +260,11 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
     tx,
   );
 
+  const handleRangeChange = (range: TelemetryHistoryRange) => {
+    setHistoryRange(range);
+    setAnchorDate((current) => snapAnchorDateForRange(range, current));
+  };
+
   const tempConsumptionBuckets = useMemo(
     () => consumptionByOutsideTemp(periodTrips),
     [periodTrips],
@@ -187,7 +297,7 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
               <button
                 key={range}
                 type="button"
-                onClick={() => setHistoryRange(range)}
+                onClick={() => handleRangeChange(range)}
                 className={
                   "rounded-full border px-3 py-1.5 text-sm capitalize transition " +
                   (historyRange === range
@@ -200,13 +310,15 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
             ))}
           </div>
         </div>
-        <label className="mt-4 grid gap-1 text-sm text-muted-foreground">
-          {t("vehicle.trips.date")}
-          <Input type="date" value={anchorDate} onChange={(event) => setAnchorDate(event.target.value)} className="w-44" />
-        </label>
+        <AnalyticsRangeAnchorPicker
+          range={historyRange}
+          anchorDate={anchorDate}
+          onAnchorDateChange={setAnchorDate}
+          tx={tx}
+        />
 
         {periodTripsQuery.isLoading ? (
-          <Skeleton className="mt-4 h-20 rounded-2xl" />
+          <Skeleton className="mt-4 h-36 rounded-2xl" />
         ) : (
           <AnalyticsSummaryStats summary={summary} />
         )}

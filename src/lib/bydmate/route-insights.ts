@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { enrichTripsWithEnergy } from "@/lib/bydmate/attach-trip-energy";
 import type { BydmateTripRow } from "@/types/database";
 
 const MIN_ROUTE_TRIPS = 3;
@@ -265,11 +266,17 @@ export async function fetchPeriodTripsEnriched({
   enrichLimit?: number;
 }): Promise<(BydmateTripRow & { outside_temp_avg?: number | null })[]> {
   const trips = await fetchPeriodTrips({ supabase, userId, vehicleId, from, to });
+  const withEnergy = await enrichTripsWithEnergy({
+    supabase,
+    userId,
+    trips,
+    vehicleId,
+  });
   const enriched = await Promise.all(
-    trips.slice(0, enrichLimit).map(async (trip) => {
+    withEnergy.slice(0, enrichLimit).map(async (trip) => {
       const temps = await tripOutsideTempAvg(supabase, userId, vehicleId, trip);
       return { ...trip, outside_temp_avg: temps?.outsideTempAvg ?? null };
     }),
   );
-  return [...enriched, ...trips.slice(enrichLimit)];
+  return [...enriched, ...withEnergy.slice(enrichLimit)];
 }

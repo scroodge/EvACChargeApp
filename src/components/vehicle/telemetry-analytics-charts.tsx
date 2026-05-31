@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import type { Locale, TranslationKey } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import {
   aggregateTelemetryBuckets,
   type AnalyticsSummary,
@@ -27,6 +28,14 @@ function localeCode(locale: Locale) {
   return locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US";
 }
 
+type SummaryStat = {
+  id: string;
+  labelKey: TranslationKey;
+  value: string;
+  unit?: string;
+  accent?: boolean;
+};
+
 export function AnalyticsSummaryStats({
   summary,
   chargedKwh,
@@ -37,36 +46,95 @@ export function AnalyticsSummaryStats({
   const { t } = useTranslation();
   const tx = t as Translator;
 
-  const items = [
-    { label: tx("vehicle.analytics.trips"), value: String(summary.tripCount) },
-    { label: tx("vehicle.trips.distance"), value: `${fmt(summary.distanceKm, 0)} km` },
-    { label: tx("vehicle.trips.regen"), value: `${fmt(summary.regenKwh, 2)} kWh` },
+  const rawItems: Array<SummaryStat | null> = [
+    { id: "trips", labelKey: "vehicle.analytics.summary.trips", value: String(summary.tripCount) },
+    {
+      id: "distance",
+      labelKey: "vehicle.analytics.summary.distance",
+      value: fmt(summary.distanceKm, 0),
+      unit: "km",
+      accent: true,
+    },
+    {
+      id: "regen",
+      labelKey: "vehicle.analytics.summary.regen",
+      value: fmt(summary.regenKwh, 2),
+      unit: "kWh",
+      accent: true,
+    },
     chargedKwh != null
-      ? { label: tx("vehicle.analytics.charged"), value: `${fmt(chargedKwh, 1)} kWh` }
+      ? {
+          id: "charged",
+          labelKey: "vehicle.analytics.charged",
+          value: fmt(chargedKwh, 1),
+          unit: "kWh",
+        }
       : null,
     summary.avgConsumptionKwh100 != null
-      ? { label: tx("vehicle.trips.consumption"), value: `${fmt(summary.avgConsumptionKwh100, 1)} kWh/100` }
+      ? {
+          id: "consumption",
+          labelKey: "vehicle.analytics.summary.consumption",
+          value: fmt(summary.avgConsumptionKwh100, 1),
+          unit: "kWh/100",
+          accent: true,
+        }
       : null,
     summary.maxSpeedKmh != null
-      ? { label: tx("vehicle.trips.maxSpeed"), value: `${fmt(summary.maxSpeedKmh, 0)} km/h` }
+      ? {
+          id: "maxSpeed",
+          labelKey: "vehicle.analytics.summary.maxSpeed",
+          value: fmt(summary.maxSpeedKmh, 0),
+          unit: "km/h",
+        }
       : null,
     summary.socSwing != null
-      ? { label: tx("vehicle.analytics.socSwing"), value: `${fmt(summary.socSwing, 0)}%` }
+      ? {
+          id: "socSwing",
+          labelKey: "vehicle.analytics.summary.socSwing",
+          value: fmt(summary.socSwing, 0),
+          unit: "%",
+        }
       : null,
-    { label: tx("vehicle.charts.points"), value: String(summary.telemetryPoints) },
-  ].filter((item): item is { label: string; value: string } => item != null && item.value !== "—" && item.value !== "— km" && item.value !== "— kWh" && item.value !== "— kWh/100");
+    {
+      id: "telemetry",
+      labelKey: "vehicle.analytics.summary.telemetry",
+      value: String(summary.telemetryPoints),
+    },
+  ];
+
+  const items = rawItems.filter((item): item is SummaryStat => {
+    if (item == null) return false;
+    if (item.value === "—") return false;
+    return true;
+  });
 
   if (items.length === 0) return null;
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-2 min-[430px]:grid-cols-4">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-2xl border border-border bg-white/[0.02] p-3">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
-          <p className="mt-1 font-heading text-lg font-semibold tabular-nums">{item.value}</p>
-        </div>
-      ))}
-    </div>
+    <section className="mt-4" aria-label={tx("vehicle.analytics.summaryTitle")}>
+      <p className="mb-2.5 text-xs font-medium text-muted-foreground">{tx("vehicle.analytics.summaryTitle")}</p>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={cn(
+              "flex min-h-[4.75rem] min-w-0 flex-col justify-between rounded-2xl border p-3",
+              item.accent
+                ? "border-primary/20 bg-primary/[0.06]"
+                : "border-border bg-white/[0.02]",
+            )}
+          >
+            <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{tx(item.labelKey)}</p>
+            <p className="mt-2 font-heading text-xl font-bold leading-none tabular-nums tracking-tight">
+              <span className="text-foreground">{item.value}</span>
+              {item.unit ? (
+                <span className="ml-1 text-[11px] font-semibold text-muted-foreground">{item.unit}</span>
+              ) : null}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -238,22 +306,61 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
   const yMin = Math.max(0, minValue - pad);
   const yMax = maxValue + pad;
 
+  const yScale = (value: number) => 104 - ((value - yMin) / (yMax - yMin)) * 88;
+  const yTicks = [
+    { label: fmt(yMax, valueDigits), value: yMax },
+    { label: fmt((yMin + yMax) / 2, valueDigits), value: (yMin + yMax) / 2 },
+    { label: fmt(yMin, valueDigits), value: yMin },
+  ];
+
   const plot = (heightClass: string) => (
     <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={title}>
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
+      {yTicks.map((tick, index) => (
+        <g key={`${title}-y-${index}`}>
+          <line
+            x1="34"
+            x2="318"
+            y1={yScale(tick.value)}
+            y2={yScale(tick.value)}
+            stroke="currentColor"
+            className="text-border/60"
+            strokeWidth="1"
+            strokeDasharray="4 6"
+          />
+          <text x="29" y={yScale(tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[8px]">
+            {tick.label}
+          </text>
+        </g>
+      ))}
       {labels.map((label, index) => {
         const slotW = 284 / Math.max(count, 1);
         const cx = 34 + slotW * index + slotW / 2;
         const barW = Math.min(slotW * 0.55, 24);
-        const y = (value: number) => 104 - ((value - yMin) / (yMax - yMin)) * 88;
 
         if (hasBand && bandMin && bandMax) {
-          const lo = y(bandMin[index] ?? 0);
-          const hi = y(bandMax[index] ?? 0);
+          const minBand = bandMin[index] ?? 0;
+          const maxBand = bandMax[index] ?? 0;
+          const lo = yScale(minBand);
+          const hi = yScale(maxBand);
+          const bandTop = Math.min(lo, hi);
           return (
             <g key={`${title}-band-${label}`}>
-              <rect x={cx - barW / 2} y={Math.min(lo, hi)} width={barW} height={Math.abs(hi - lo) || 1} rx="2" fill="var(--voltflow-cyan)" fillOpacity="0.35" />
+              <rect
+                x={cx - barW / 2}
+                y={bandTop}
+                width={barW}
+                height={Math.abs(hi - lo) || 1}
+                rx="2"
+                fill="var(--voltflow-cyan)"
+                fillOpacity="0.35"
+              />
+              {maxBand > 0 ? (
+                <text x={cx} y={bandTop - 3} textAnchor="middle" className="fill-muted-foreground text-[7px]">
+                  {fmt(minBand, valueDigits)}–{fmt(maxBand, valueDigits)}
+                </text>
+              ) : null}
               <text x={cx} y="124" textAnchor="middle" className="fill-muted-foreground text-[8px]">{label}</text>
             </g>
           );
@@ -264,18 +371,29 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
             {series.map((item, seriesIndex) => {
               const offset = (seriesIndex - (series.length - 1) / 2) * (barW / Math.max(series.length, 1));
               const value = item.values[index] ?? 0;
-              const top = y(value);
+              const top = yScale(value);
+              const barSliceW = barW / Math.max(series.length, 1) - 1;
+              const barX = cx - barW / 2 + offset;
+              const barCenterX = barX + barSliceW / 2;
               return (
-                <rect
-                  key={`${item.label}-${label}`}
-                  x={cx - barW / 2 + offset}
-                  y={top}
-                  width={barW / Math.max(series.length, 1) - 1}
-                  height={104 - top}
-                  rx="2"
-                  fill={item.color}
-                  fillOpacity="0.85"
-                />
+                <g key={`${item.label}-${label}`}>
+                  {value > 0 ? (
+                    <rect
+                      x={barX}
+                      y={top}
+                      width={barSliceW}
+                      height={104 - top}
+                      rx="2"
+                      fill={item.color}
+                      fillOpacity="0.85"
+                    />
+                  ) : null}
+                  {value > 0 ? (
+                    <text x={barCenterX} y={top - 3} textAnchor="middle" className="fill-foreground text-[7px] font-medium">
+                      {fmt(value, valueDigits)}
+                    </text>
+                  ) : null}
+                </g>
               );
             })}
             <text x={cx} y="124" textAnchor="middle" className="fill-muted-foreground text-[8px]">{label}</text>

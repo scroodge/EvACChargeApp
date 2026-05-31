@@ -234,6 +234,12 @@ export function buildAnalyticsSummary({
     }
   }
 
+  if (regenKwh === 0 && points.length > 0) {
+    for (const point of points) {
+      regenKwh += point.regen_kwh_sum ?? 0;
+    }
+  }
+
   return {
     tripCount: trips.length,
     distanceKm,
