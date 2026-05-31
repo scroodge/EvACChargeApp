@@ -287,6 +287,37 @@ New read/export endpoints (authenticated, RLS-scoped):
 
 UI: **History → Analytics** tab (`/history?tab=analytics`) hosts `vehicle-analytics-panels.tsx`. The Vehicle page shows a teaser linking here when VoltFlow Mate is connected; dev fixtures at `/dev/vehicle` render the panels inline.
 
+### Trip list and calendar
+
+`GET /api/vehicle/trips` accepts optional `?month=YYYY-MM` to return distinct local dates that have trips (for History calendar green dots). Per-day trip lists use the same endpoint with `?date=YYYY-MM-DD`.
+
+Track read path uses `filterDisplayTripTrackPoints()` so stored GPS points are not dropped on display-only sanitization; maps may show up to 2000 downsampled points.
+
+### Trip charts (History trip detail, dev fixtures)
+
+Built in `vehicle-live-view.tsx` → `prepareTelemetryHistory()` from trip samples or hourly rows:
+
+| Chart | Type | Notes |
+| --- | --- | --- |
+| SOC | Line | % over trip time |
+| Speed & power | Dual-axis line | km/h (left) and kW (right) on one card |
+| Recovered energy | Bar | Incremental regen per telemetry interval via `calculateRegenRecoverySegments()` / `prepareRegenRecoveryBars()` in `trip-energy.ts`; X-axis prefers `current_trip_distance_km` (or odometer delta), else time; bins to ~72 bars when dense |
+| Temperatures | Multi-series line | Battery, outside, cabin |
+| Cell delta | Line | Optional; trip and day analytics |
+| Cell delta by SOC | Scatter/line | SOC vs delta; fullscreen supports hover |
+
+**Fullscreen hover (all trip and analytics charts):** shared helpers in `chart-interaction.tsx` — vertical crosshair, floating tooltip with series values. Compact card previews do not enable hover.
+
+### Route map (trip detail, route insights, analytics day)
+
+`RouteMap` / `RouteMapPreview` in `vehicle-live-view.tsx`:
+
+- OpenStreetMap raster tiles (`tile.openstreetmap.org`), zoom clamped to **z2–z19** (no app-side ±step cap beyond OSM range).
+- Initial fit uses route bounding box; **zoom in/out keeps the viewport center fixed** (pan scales with zoom level).
+- Layers: solid route line; **kW** combined drive (red) + regen (green) gradient; speed; SOC.
+- Hover near the route line shows tooltip: time, SOC, speed, power (works on compact map and fullscreen).
+- Fullscreen adds layer legend, zoom/pan/reset; compact preview is maximize-only.
+
 ### `bydmate_route_labels`
 
 Migration `20260530124000` stores per-user route preferences for route insights:
@@ -307,6 +338,18 @@ Applied in app code and migrations `20260530120000`–`20260530123000`:
 - **Live Realtime:** `useBydmateLiveQuery` subscribes to `bydmate_live_snapshots` postgres changes.
 - **Batch push writes:** charge notification state upserts once per vehicle per ingest batch (not per sample).
 - **Trip energy at close:** `bydmate_ingest_telemetry` updates hourly regen/traction sums and finalizes trip energy on trip close (charging gap + 5 min gap).
+- **Trip chart regen bars:** client integrates negative-power intervals from raw samples (`trip-energy.ts`); hourly rollup path uses `regen_kwh_sum` per bucket when day analytics has no raw power series.
+
+## Trip energy helpers (`src/lib/bydmate/trip-energy.ts`)
+
+| Function | Purpose |
+| --- | --- |
+| `calculateTripEnergy()` | Total regen/traction kWh for a trip from power samples (trapezoid, max 180 s gap) |
+| `calculateCumulativeRegenPoints()` | Legacy cumulative regen line (superseded by bar chart in UI) |
+| `calculateRegenRecoverySegments()` | Per-interval regen kWh with optional trip distance km |
+| `prepareRegenRecoveryBars()` | Bin segments for bar chart; chooses distance vs time X-axis |
+
+Tests: `src/lib/bydmate/trip-energy.test.mjs`.
 
 ## Charging session UX additions
 

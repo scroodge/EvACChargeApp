@@ -96,18 +96,23 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types -
 
 ### Vehicle Analytics Skill
 
-Know these files before changing History analytics or route insights:
+Know these files before changing History analytics, trip charts, or route maps:
 
-- `src/components/history/history-view.tsx` — History tabs including `?tab=analytics`
+- `src/components/history/history-view.tsx` — History tabs including `?tab=analytics`; trips calendar uses `?month=` dates query
 - `src/components/vehicle/vehicle-analytics-panels.tsx` — analytics host (ranges, KPIs, charts, export)
-- `src/components/vehicle/telemetry-analytics-charts.tsx` — summary stats, bar charts, loading states
+- `src/components/vehicle/vehicle-live-view.tsx` — `TelemetryHistoryCharts`, `RouteMap`, `RouteMapPreview`, trip chart prep, route map layers and hover
+- `src/components/vehicle/chart-interaction.tsx` — fullscreen crosshair + tooltip helpers shared by line/bar charts
+- `src/components/vehicle/telemetry-analytics-charts.tsx` — summary stats, bar charts, loading states, fullscreen bar hover
 - `src/components/vehicle/route-insights-section.tsx` — route cards, rename, park, map preview
 - `src/components/vehicle/vehicle-analytics-teaser.tsx` — Vehicle page link to History analytics
 - `src/lib/bydmate/telemetry-buckets.ts` — daily/weekly aggregation and period summary
 - `src/lib/bydmate/route-insights.ts` — GPS fingerprint clustering, park filter, API helpers
+- `src/lib/bydmate/trip-energy.ts` — regen/traction integration and regen recovery bar segments
+- `src/lib/bydmate/telemetry-sanitizer.ts` — `filterDisplayTripTrackPoints()` for map read path
 - `src/lib/vehicle-analytics.ts` — monthly, phantom, cost-per-km queries
 - `src/app/api/vehicle/analytics/route.ts`
 - `src/app/api/vehicle/route-labels/route.ts`
+- `src/app/api/vehicle/trips/route.ts` — optional `month=` for calendar dates
 
 Preserve these behaviors:
 
@@ -115,6 +120,9 @@ Preserve these behaviors:
 - Week+ ranges use client-side daily/weekly bucket aggregation and bar charts; day range keeps line charts.
 - Period summary waits for both telemetry history and period-trips queries before rendering KPIs.
 - Route insights exclude parked fingerprints and routes with fewer than three trips from the main list.
+- Trip charts: Speed & power on one dual-axis card; regen as distance/time bar chart, not cumulative line.
+- Route map zoom anchors to **viewport center** after pan; OSM zoom limits only (z2–z19).
+- Chart hover tooltips and crosshair are **fullscreen dialog only** — do not add heavy hover to compact card previews without an explicit UX request.
 - When VoltFlow Mate live SOC exists, do not auto-complete charging sessions from math (see Charging Skill).
 
 The full project test command is:
@@ -242,7 +250,7 @@ Do not accidentally regress:
 - Delayed VoltFlow Mate completion sample preservation.
 - Trip inference excluding charging samples.
 - Trip API endpoints returning list, samples, and GPS track for each trip.
-- History analytics tab, period summary KPIs, route insights clustering, and route label persistence.
+- History analytics tab, period summary KPIs, route insights clustering, route label persistence, trip charts (speed/power merge, regen bars), route map layers/hover, and fullscreen chart hover tooltips.
 - Telegram knowledge home, categories, articles, FAQ, calculators, accessories, and spare parts.
 - Admin knowledge CMS forms.
 - Semantic search fallback behavior.

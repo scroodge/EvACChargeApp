@@ -5,6 +5,14 @@ import { Maximize2, Loader2 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ChartDataTooltip,
+  ChartHoverCrosshair,
+  InteractiveChartShell,
+  STD_CHART,
+  clientToSvg,
+  nearestIndexByX,
+} from "@/components/vehicle/chart-interaction";
 import { useTranslation } from "@/hooks/use-translation";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -389,6 +397,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const [isOpen, setIsOpen] = useState(false);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const { title, unit, valueDigits, labels, series, bandMin, bandMax, subtitle, referenceLine, barInsideText, barInsideLegend, yAxisMin } = chart;
   const count = labels.length;
@@ -437,8 +446,47 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
     heightClass: string,
     scale: ReturnType<typeof buildScale>,
     showReference: boolean,
-  ) => (
-    <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={title}>
+    interactive = false,
+  ) => {
+    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+      const pointer = clientToSvg(event.currentTarget, event.clientX, event.clientY, STD_CHART.width, STD_CHART.height);
+      if (pointer.x < STD_CHART.plotLeft || pointer.x > STD_CHART.plotRight || count === 0) {
+        setHoverIndex(null);
+        return;
+      }
+      const xCenters = labels.map((_, index) => slotCenter(index));
+      setHoverIndex(nearestIndexByX(pointer.x, xCenters));
+    };
+
+    const hoveredLabel = hoverIndex == null ? null : labels[hoverIndex] ?? null;
+    const tooltipRows =
+      hoverIndex == null
+        ? []
+        : hasBand && bandMin && bandMax
+          ? [
+              {
+                label: title,
+                value: `${fmt(bandMin[hoverIndex] ?? 0, valueDigits)}–${fmt(bandMax[hoverIndex] ?? 0, valueDigits)} ${unit}`,
+                color: "var(--voltflow-cyan)",
+              },
+            ]
+          : series
+              .map((item) => ({
+                label: item.label,
+                value: `${fmt(item.values[hoverIndex] ?? 0, valueDigits)} ${unit}`,
+                color: item.color,
+              }))
+              .filter((row) => row.value !== `— ${unit}`);
+
+    const svg = (
+      <svg
+        className={`${interactive ? "size-full" : heightClass} w-full overflow-visible ${interactive ? "cursor-crosshair" : ""}`}
+        viewBox="0 0 340 158"
+        role="img"
+        aria-label={title}
+        onMouseMove={interactive ? handleMouseMove : undefined}
+        onMouseLeave={interactive ? () => setHoverIndex(null) : undefined}
+      >
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       {scale.yTicks.map((tick, index) => (
@@ -477,6 +525,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
         const barW = Math.min((284 / Math.max(count, 1)) * 0.55, 24);
         const { yScale } = scale;
         const insideText = barInsideText?.[index] ?? null;
+        const highlighted = interactive && hoverIndex === index;
 
         if (hasBand && bandMin && bandMax) {
           const minBand = bandMin[index] ?? 0;
@@ -493,7 +542,9 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
                 height={Math.abs(hi - lo) || 1}
                 rx="2"
                 fill="var(--voltflow-cyan)"
-                fillOpacity="0.35"
+                fillOpacity={highlighted ? 0.5 : 0.35}
+                stroke={highlighted ? "#ffffff" : "none"}
+                strokeWidth={highlighted ? 1.5 : 0}
               />
               {maxBand > 0 ? (
                 <text x={cx} y={bandTop - 3} textAnchor="middle" className="fill-muted-foreground text-[7px]">
@@ -527,7 +578,9 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
                       height={barHeight}
                       rx="2"
                       fill={item.color}
-                      fillOpacity="0.85"
+                      fillOpacity={highlighted ? 1 : 0.85}
+                      stroke={highlighted ? "#ffffff" : "none"}
+                      strokeWidth={highlighted ? 1.5 : 0}
                     />
                   ) : null}
                   {showInside ? (
@@ -552,9 +605,38 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
           </g>
         );
       })}
+      {interactive && hoverIndex != null ? (
+        <ChartHoverCrosshair
+          snapX={slotCenter(hoverIndex)}
+          plotTop={STD_CHART.plotTop}
+          plotBottom={STD_CHART.plotBottom}
+        />
+      ) : null}
       <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">{unit}</text>
-    </svg>
-  );
+      </svg>
+    );
+
+    return (
+      <InteractiveChartShell
+        heightClass={heightClass}
+        interactive={interactive}
+        tooltip={
+          interactive && hoveredLabel && tooltipRows.length > 0 ? (
+            <ChartDataTooltip
+              title={hoveredLabel}
+              rows={tooltipRows}
+              viewBoxX={slotCenter(hoverIndex ?? 0)}
+              viewBoxY={STD_CHART.plotTop + 8}
+              viewBoxWidth={STD_CHART.width}
+              viewBoxHeight={STD_CHART.height}
+            />
+          ) : null
+        }
+      >
+        {svg}
+      </InteractiveChartShell>
+    );
+  };
 
   return (
     <article className="rounded-2xl border border-border bg-white/[0.02] p-4">
@@ -570,7 +652,13 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
         </div>
       </div>
       <div className="mt-4">{plot("h-44", compactScale, false)}</div>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) setHoverIndex(null);
+        }}
+      >
         <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <div className="px-1">
@@ -579,7 +667,7 @@ export function TelemetryBarChart({ chart }: { chart: BarChartModel }) {
               {referenceLine && subtitle ? subtitle : rangeSubtitle}
             </p>
           </div>
-          {plot("h-[60dvh]", fullScale, Boolean(referenceLine))}
+          {plot("h-[60dvh]", fullScale, Boolean(referenceLine), true)}
           <div className="px-1 pt-1">
             <ChartSeriesLegend
               series={series}

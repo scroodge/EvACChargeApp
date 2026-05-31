@@ -28,6 +28,16 @@ import { LogoFull } from "@/components/brand/LogoFull";
 import { useVehicleDevSnapshotOverride } from "@/components/dev/vehicle-dev-snapshot-context";
 import { VehicleAnalyticsTeaser } from "@/components/vehicle/vehicle-analytics-teaser";
 import { ChartSeriesLegend, TelemetryBarChart, type BarChartModel } from "@/components/vehicle/telemetry-analytics-charts";
+import {
+  ChartDataTooltip,
+  ChartHoverCrosshair,
+  InteractiveChartShell,
+  STD_CHART,
+  DELTA_SOC_CHART,
+  clientToSvg,
+  nearestIndexByX,
+  nearestPointByTime,
+} from "@/components/vehicle/chart-interaction";
 import { formatHistoryRangeSubtitle } from "@/lib/bydmate/telemetry-buckets";
 import type { TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1825,6 +1835,7 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const [isOpen, setIsOpen] = useState(false);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const { title, unit, valueDigits, xAxis, segments, hasData } = chart;
   const regenColor = "#34d399";
   const totalRegen = segments.reduce((sum, segment) => sum + segment.regenKwh, 0);
@@ -1874,9 +1885,28 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
   const barWidth = segments.length
     ? Math.min(10, Math.max(3, (284 / Math.max(segments.length, 1)) * 0.7))
     : 4;
+  const hoveredSegment = hoverIndex == null ? null : segments[hoverIndex] ?? null;
 
-  const plot = (heightClass: string) => (
-    <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
+  const plot = (heightClass: string, interactive = false) => {
+    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+      const pointer = clientToSvg(event.currentTarget, event.clientX, event.clientY, STD_CHART.width, STD_CHART.height);
+      if (pointer.x < STD_CHART.plotLeft || pointer.x > STD_CHART.plotRight) {
+        setHoverIndex(null);
+        return;
+      }
+      const xPositions = segments.map((segment) => xScale(segment.x));
+      setHoverIndex(nearestIndexByX(pointer.x, xPositions));
+    };
+
+    const svg = (
+      <svg
+        className={interactive ? "size-full overflow-visible" : `${heightClass} w-full overflow-visible`}
+        viewBox="0 0 340 158"
+        role="img"
+        aria-label={tx("vehicle.charts.chartAria", { title })}
+        onMouseMove={interactive ? handleMouseMove : undefined}
+        onMouseLeave={interactive ? () => setHoverIndex(null) : undefined}
+      >
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       {yTicks.map((tick, index) => (
@@ -1907,6 +1937,7 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
         const top = yScale(segment.regenKwh);
         const height = Math.max(0, baseline - top);
         const tooltip = `${formatRegenRecoveryXLabel(xAxis, segment.x)}\n${fmt(segment.regenKwh, valueDigits)} ${unit}`;
+        const highlighted = interactive && hoverIndex === index;
         return (
           <g key={`${segment.x}-${index}`}>
             <rect
@@ -1916,9 +1947,11 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
               height={height}
               rx="2"
               fill={regenColor}
-              fillOpacity="0.85"
+              fillOpacity={highlighted ? 1 : 0.85}
+              stroke={highlighted ? "#ffffff" : "none"}
+              strokeWidth={highlighted ? 1.5 : 0}
             >
-              <title>{tooltip}</title>
+              {!interactive ? <title>{tooltip}</title> : null}
             </rect>
             {height >= 12 ? (
               <text x={cx} y={top - 3} textAnchor="middle" className="fill-foreground text-[7px] font-medium">
@@ -1928,8 +1961,37 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
           </g>
         );
       })}
-    </svg>
-  );
+      {interactive && hoveredSegment ? (
+        <ChartHoverCrosshair
+          snapX={xScale(hoveredSegment.x)}
+          plotTop={STD_CHART.plotTop}
+          plotBottom={STD_CHART.plotBottom}
+        />
+      ) : null}
+      </svg>
+    );
+
+    return (
+      <InteractiveChartShell
+        heightClass={heightClass}
+        interactive={interactive}
+        tooltip={
+          hoveredSegment ? (
+            <ChartDataTooltip
+              title={formatRegenRecoveryXLabel(xAxis, hoveredSegment.x)}
+              rows={[{ label: tx("vehicle.trips.regen"), value: `${fmt(hoveredSegment.regenKwh, valueDigits)} ${unit}`, color: regenColor }]}
+              viewBoxX={xScale(hoveredSegment.x)}
+              viewBoxY={STD_CHART.plotTop + 8}
+              viewBoxWidth={STD_CHART.width}
+              viewBoxHeight={STD_CHART.height}
+            />
+          ) : null
+        }
+      >
+        {svg}
+      </InteractiveChartShell>
+    );
+  };
 
   return (
     <article className="rounded-2xl border border-border bg-white/[0.02] p-4">
@@ -1947,14 +2009,20 @@ function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
 
       <div className="mt-4">{plot("h-44")}</div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) setHoverIndex(null);
+        }}
+      >
         <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <div className="px-1">
             <h3 className="font-heading text-xl font-semibold tracking-tight">{title}</h3>
             <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
           </div>
-          {plot("h-[60dvh]")}
+          {plot("h-[60dvh]", true)}
         </DialogContent>
       </Dialog>
     </article>
@@ -1965,6 +2033,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const [isOpen, setIsOpen] = useState(false);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
   const { title, unit, valueDigits, series, hasData, minValue, maxValue, minTime, maxTime } = chart;
   const dualAxis = chartUsesDualAxis(series, unit);
   const valuePad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
@@ -1981,6 +2050,10 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
     ),
   );
   const rangeLabel = formatChartRange(series, unit, valueDigits, tx);
+  const chartTimes = useMemo(
+    () => [...new Set(series.flatMap((item) => item.points.map((point) => point.time)))].sort((a, b) => a - b),
+    [series],
+  );
 
   const x = (time: number) => {
     if (maxTime === minTime) return 160;
@@ -2016,8 +2089,45 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
     return `${item.label}: ${fmt(point.value, digits)}${pointUnit ? ` ${pointUnit}` : ""}\n${elapsedMin}m · ${clock}${power}`;
   };
 
-  const plot = (heightClass: string) => (
-    <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
+  const hoverRows =
+    hoverTime == null
+      ? []
+      : series
+          .map((item, seriesIndex) => {
+            const point = nearestPointByTime(item.points, hoverTime);
+            if (!point) return null;
+            const digits = item.valueDigits ?? valueDigits;
+            const pointUnit = seriesUnit(item, unit);
+            return {
+              label: item.label,
+              value: `${fmt(point.value, digits)}${pointUnit ? ` ${pointUnit}` : ""}`,
+              color: item.color,
+              y: y(seriesIndex, point.value),
+            };
+          })
+          .filter((row): row is NonNullable<typeof row> => row != null);
+
+  const plot = (heightClass: string, interactive = false) => {
+    const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+      const pointer = clientToSvg(event.currentTarget, event.clientX, event.clientY, STD_CHART.width, STD_CHART.height);
+      if (pointer.x < STD_CHART.plotLeft || pointer.x > STD_CHART.plotRight || chartTimes.length === 0) {
+        setHoverTime(null);
+        return;
+      }
+      const xPositions = chartTimes.map((time) => x(time));
+      const index = nearestIndexByX(pointer.x, xPositions);
+      setHoverTime(chartTimes[index] ?? null);
+    };
+
+    const svg = (
+      <svg
+        className={interactive ? "size-full overflow-visible" : `${heightClass} w-full overflow-visible`}
+        viewBox="0 0 340 158"
+        role="img"
+        aria-label={tx("vehicle.charts.chartAria", { title })}
+        onMouseMove={interactive ? handleMouseMove : undefined}
+        onMouseLeave={interactive ? () => setHoverTime(null) : undefined}
+      >
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       {dualAxis ? <line x1="318" x2="318" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" /> : null}
@@ -2090,19 +2200,61 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
                 r="7"
                 fill="transparent"
               >
-                <title>{pointTitle(item, point)}</title>
+                {!interactive ? <title>{pointTitle(item, point)}</title> : null}
               </circle>
             ))}
             {markers.map((point, index) => (
               <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(seriesIndex, point.value)} r="3.5" fill={item.color}>
-                <title>{pointTitle(item, point)}</title>
+                {!interactive ? <title>{pointTitle(item, point)}</title> : null}
               </circle>
             ))}
+            {interactive && hoverTime != null
+              ? (() => {
+                  const point = nearestPointByTime(item.points, hoverTime);
+                  if (!point) return null;
+                  return (
+                    <circle
+                      cx={x(point.time)}
+                      cy={y(seriesIndex, point.value)}
+                      r="5"
+                      fill="#ffffff"
+                      stroke={item.color}
+                      strokeWidth="2"
+                      pointerEvents="none"
+                    />
+                  );
+                })()
+              : null}
           </g>
         );
       })}
-    </svg>
-  );
+      {interactive && hoverTime != null ? (
+        <ChartHoverCrosshair snapX={x(hoverTime)} plotTop={STD_CHART.plotTop} plotBottom={STD_CHART.plotBottom} />
+      ) : null}
+      </svg>
+    );
+
+    return (
+      <InteractiveChartShell
+        heightClass={heightClass}
+        interactive={interactive}
+        tooltip={
+          interactive && hoverTime != null && hoverRows.length > 0 ? (
+            <ChartDataTooltip
+              title={formatClock(hoverTime)}
+              rows={hoverRows.map(({ label, value, color }) => ({ label, value, color }))}
+              viewBoxX={x(hoverTime)}
+              viewBoxY={Math.min(...hoverRows.map((row) => row.y)) - 8}
+              viewBoxWidth={STD_CHART.width}
+              viewBoxHeight={STD_CHART.height}
+            />
+          ) : null
+        }
+      >
+        {svg}
+      </InteractiveChartShell>
+    );
+  };
 
   return (
     <article className="rounded-2xl border border-border bg-white/[0.02] p-4">
@@ -2132,7 +2284,13 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
 
       <div className="mt-4">{plot("h-44")}</div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) setHoverTime(null);
+        }}
+      >
         <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
           <DialogTitle className="sr-only">{title}</DialogTitle>
           <div className="px-1">
@@ -2141,7 +2299,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
               {hasData ? rangeLabel : tx("vehicle.charts.noValues")}
             </p>
           </div>
-          {plot("h-[60dvh]")}
+          {plot("h-[60dvh]", true)}
           <div className="px-1 pt-1">
             <ChartSeriesLegend series={series} />
           </div>
@@ -2197,7 +2355,12 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
         />
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+        }}
+      >
         <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
           <DialogTitle className="sr-only">{tx("vehicle.charts.deltaBySoc")}</DialogTitle>
           <div className="flex flex-wrap items-start justify-between gap-3 px-1">
@@ -2236,7 +2399,7 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
             </div>
           </div>
           <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_15rem]">
-            <DeltaBySocPlot chart={chart} zoom={zoom} heightClassName="h-full min-h-[22rem]" />
+            <DeltaBySocPlot chart={chart} zoom={zoom} heightClassName="h-full min-h-[22rem]" interactive />
             <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <DeltaBySocStat label={tx("vehicle.charts.points")} value={points.length.toString()} />
               <DeltaBySocStat label={tx("vehicle.charts.socRange")} value={`${fmt(chart.minSoc, 0)}-${fmt(chart.maxSoc, 0)}%`} />
@@ -2256,14 +2419,17 @@ function DeltaBySocChart({ chart }: { chart: DeltaBySocChartModel }) {
 function DeltaBySocPlot({
   chart,
   heightClassName,
+  interactive = false,
 }: {
   chart: DeltaBySocChartModel;
-  zoom: number;
+  zoom?: number;
   heightClassName: string;
+  interactive?: boolean;
 }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const clipId = useId();
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const { points, latest } = chart;
   const visibleMinDelta = Math.min(...points.map((point) => point.delta));
   const visibleMaxDelta = Math.max(...points.map((point) => point.delta));
@@ -2294,10 +2460,33 @@ function DeltaBySocPlot({
     .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${socY(point.soc).toFixed(2)}`)
     .join(" ");
   const markerPoints = points.length <= MAX_CHART_MARKERS ? points : [];
+  const hoveredPoint = hoverIndex == null ? null : points[hoverIndex] ?? null;
 
-  return (
-    <div className="rounded-2xl border border-border bg-background/30 p-3">
-      <svg className={`${heightClassName} w-full overflow-hidden`} viewBox="0 0 320 142" role="img" aria-label={tx("vehicle.charts.deltaBySoc")}>
+  const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
+    const pointer = clientToSvg(
+      event.currentTarget,
+      event.clientX,
+      event.clientY,
+      DELTA_SOC_CHART.width,
+      DELTA_SOC_CHART.height,
+    );
+    if (pointer.x < DELTA_SOC_CHART.plotLeft || pointer.x > DELTA_SOC_CHART.plotRight || points.length === 0) {
+      setHoverIndex(null);
+      return;
+    }
+    const xPositions = points.map((point) => x(point.time));
+    setHoverIndex(nearestIndexByX(pointer.x, xPositions));
+  };
+
+  const svg = (
+    <svg
+      className={interactive ? "size-full overflow-hidden" : `${heightClassName} w-full overflow-hidden`}
+      viewBox="0 0 320 142"
+      role="img"
+      aria-label={tx("vehicle.charts.deltaBySoc")}
+      onMouseMove={interactive ? handleMouseMove : undefined}
+      onMouseLeave={interactive ? () => setHoverIndex(null) : undefined}
+    >
         <defs>
           <clipPath id={clipId}>
             <rect x="24" y="18" width="272" height="92" />
@@ -2333,19 +2522,54 @@ function DeltaBySocPlot({
           ) : null}
           {markerPoints.map((point, index) => {
             const isLatest = point === latest;
+            const highlighted = interactive && hoveredPoint?.time === point.time;
             return (
               <circle
                 key={`${point.time}-${index}`}
                 cx={x(point.time)}
                 cy={y(point.delta)}
-                r={isLatest ? 4 : 3}
-                fill={isLatest ? "#facc15" : "#fb7185"}
-                opacity={isLatest ? 1 : 0.78}
+                r={highlighted ? 4.5 : isLatest ? 4 : 3}
+                fill={highlighted ? "#ffffff" : isLatest ? "#facc15" : "#fb7185"}
+                stroke={highlighted ? "#38bdf8" : "none"}
+                strokeWidth={highlighted ? 2 : 0}
+                opacity={isLatest || highlighted ? 1 : 0.78}
               />
             );
           })}
         </g>
+        {interactive && hoveredPoint ? (
+          <ChartHoverCrosshair
+            snapX={x(hoveredPoint.time)}
+            plotTop={DELTA_SOC_CHART.plotTop}
+            plotBottom={DELTA_SOC_CHART.plotBottom}
+          />
+        ) : null}
       </svg>
+  );
+
+  return (
+    <div className="rounded-2xl border border-border bg-background/30 p-3">
+      <InteractiveChartShell
+        heightClass={heightClassName}
+        interactive={interactive}
+        tooltip={
+          interactive && hoveredPoint ? (
+            <ChartDataTooltip
+              title={formatClock(hoveredPoint.time)}
+              rows={[
+                { label: tx("vehicle.charts.soc"), value: `${fmt(hoveredPoint.soc, 0)}%`, color: "#22c55e" },
+                { label: tx("vehicle.charts.cellDelta"), value: `${fmt(hoveredPoint.delta, 3)} V`, color: "#38bdf8" },
+              ]}
+              viewBoxX={x(hoveredPoint.time)}
+              viewBoxY={y(hoveredPoint.delta)}
+              viewBoxWidth={DELTA_SOC_CHART.width}
+              viewBoxHeight={DELTA_SOC_CHART.height}
+            />
+          ) : null
+        }
+      >
+        {svg}
+      </InteractiveChartShell>
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-[#38bdf8]" />

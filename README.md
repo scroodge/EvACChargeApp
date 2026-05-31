@@ -49,8 +49,8 @@ VoltFlow helps EV drivers model and track AC charging sessions without talking d
 - **Semantic knowledge search** powered by OpenAI embeddings.
 - **VoltFlow Mate live telemetry** ingestion for vehicle snapshots, history, and trip tracks.
 - **VoltFlow Mate charging history** with delayed completion sample preservation for SOC/cell-voltage tails.
-- **Trip history** with per-trip energy summary, sample timeline, and GPS track viewer.
-- **Vehicle analytics** — day/week/month/quarter/year telemetry charts with period KPI summary, bar charts for week+, mileage, efficiency, phantom drain, consumption vs outside temp, SOH trend, monthly stats, cost/km, lifetime map, route insights (repeat-trip clustering, maps, rename, parking spots), CSV/JSON export. Primary entry: **History → Analytics** (`/history?tab=analytics`); Vehicle page links via teaser when VoltFlow Mate is connected.
+- **Trip history** with per-trip energy summary, sample timeline, GPS track viewer, and interactive trip charts (SOC, speed & power, regen bars, temperatures, cell delta).
+- **Vehicle analytics** — day/week/month/quarter/year telemetry charts with period KPI summary, bar charts for week+, mileage, efficiency, phantom drain, consumption vs outside temp, SOH trend, monthly stats, cost/km, lifetime map, route insights (repeat-trip clustering, maps, rename, parking spots), CSV/JSON export. Primary entry: **History → Analytics** (`/history?tab=analytics`); Vehicle page links via teaser when VoltFlow Mate is connected. Fullscreen charts support crosshair hover tooltips.
 - **Home charger geofence** — auto-apply home tariff when charging starts inside configured GPS radius.
 - **Charge finish projection** — estimated finish time and SOC-at-07:00 on the active charging screen.
 - **Knowledge search** standalone page at `/knowledge/search` for full-text article lookup.
@@ -82,8 +82,10 @@ This repository already contains the main production surface of VoltFlow. Future
 - Vehicle profile management: create and edit cars with battery, wallbox, efficiency, tariff, and currency preferences.
 - Charging cockpit: active session screen, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback calculations, and realtime session sync.
 - Charging history: session list, detail screen, and VoltFlow Mate session-sample charts through `/api/vehicle/charging-sessions/[sessionId]/samples`.
-- Trip history: trip list with energy summary via `/api/vehicle/trips`, per-trip sample timeline via `/api/vehicle/trips/[tripId]/samples`, and GPS track via `/api/vehicle/trips/[tripId]/track`.
-- **History analytics tab:** full telemetry analytics in `VehicleAnalyticsPanels` at `/history?tab=analytics` — range picker (day/week/month/quarter/year), period summary KPIs with loading states, line charts (day) and daily/weekly bar charts (week+), phantom drain, consumption vs outside temp, SOH, monthly stats, route insights, cost/km, lifetime map, and export.
+- Trip history: trip list with energy summary via `/api/vehicle/trips` (optional `?month=YYYY-MM` for calendar dates), per-trip sample timeline via `/api/vehicle/trips/[tripId]/samples`, and GPS track via `/api/vehicle/trips/[tripId]/track`.
+- **Per-trip charts** (`TelemetryHistoryCharts` in trip detail): SOC line; **Speed & power** dual-axis line (km/h + kW); **Recovered energy** bar chart (incremental regen per interval, X-axis prefers trip distance in km when available, else time); temperature and cell-delta lines. **Fullscreen only:** crosshair + tooltip on hover for all line and bar charts.
+- **Route map** (trip detail, route insights, analytics day view): OpenStreetMap tiles (zoom z2–z19), metric layers (route, combined kW drive/regen gradient, speed, SOC), pan/zoom anchored to viewport center, route-line hover tooltip (time, SOC, speed, power), compact preview with maximize to fullscreen controls.
+- **History analytics tab:** full telemetry analytics in `VehicleAnalyticsPanels` at `/history?tab=analytics` — range picker (day/week/month/quarter/year), period summary KPIs with loading states, line charts (day) and daily/weekly bar charts (week+), phantom drain, consumption vs outside temp, SOH, monthly stats, route insights, cost/km, lifetime map, and export. Fullscreen bar/line charts include hover tooltips.
 - **Route insights:** GPS track fingerprint clustering (`GET /api/vehicle/analytics?type=route-insights`), user route names and parking-spot flags in `bydmate_route_labels` (`PUT /api/vehicle/route-labels`), collapsible cards with map preview and per-route consumption vs temp stats.
 - Vehicle page: analytics teaser linking to History when Mate is connected; analytics panels also render on `/dev/vehicle` fixtures and remain accessible when live telemetry is stale.
 - Knowledge search: standalone page at `/knowledge/search` with full-text lookup backed by `GET /api/knowledge/search`.
@@ -392,7 +394,8 @@ VoltFlow помогает владельцам электромобилей мо
 - **VoltFlow Mate live telemetry** для live-снимков автомобиля, истории и треков поездок.
 - **История зарядки VoltFlow Mate** с сохранением отложенных completion-сэмплов для SOC и хвоста cell-voltage.
 - **История поездок** с energy summary, timeline сэмплов и просмотром GPS-трека.
-- **Аналитика автомобиля** — графики телеметрии за день/неделю/месяц/квартал/год с KPI-сводкой за период, bar charts для week+, пробег, эффективность, phantom drain, расход vs внешняя температура, тренд SOH, месячная сводка, стоимость/км, карта поездок, route insights (кластеризация повторяющихся маршрутов, карты, переименование, парковки), экспорт CSV/JSON. Основной вход: **История → Аналитика** (`/history?tab=analytics`); со страницы автомобиля — teaser при подключённом VoltFlow Mate.
+- **История поездок** с energy summary, timeline сэмплов, GPS-треком и интерактивными графиками (SOC, скорость и мощность, regen bars, температуры, cell delta).
+- **Аналитика автомобиля** — графики телеметрии за день/неделю/месяц/квартал/год с KPI-сводкой за период, bar charts для week+, пробег, эффективность, phantom drain, расход vs внешняя температура, тренд SOH, месячная сводка, стоимость/км, карта поездок, route insights (кластеризация повторяющихся маршрутов, карты, переименование, парковки), экспорт CSV/JSON. Основной вход: **История → Аналитика** (`/history?tab=analytics`); со страницы автомобиля — teaser при подключённом VoltFlow Mate. В полноэкранных графиках — crosshair и tooltip при наведении.
 - **Геозона домашней зарядки** — автоматический домашний тариф при старте зарядки внутри заданного GPS-радиуса.
 - **Прогноз окончания зарядки** — оценочное время завершения и SOC в 07:00 на экране активной сессии.
 - **Поиск по базе знаний** на отдельной странице `/knowledge/search`.
@@ -424,8 +427,10 @@ VoltFlow помогает владельцам электромобилей мо
 - Профили автомобилей: создание и редактирование машины с батареей, wallbox, эффективностью AC-зарядки, тарифом и валютой.
 - Экран зарядки: активная сессия, progress ring, stats, start/stop actions, charging delta card, deterministic wall-clock fallback и realtime-синхронизация.
 - История зарядок: список, detail screen и графики VoltFlow Mate samples через `/api/vehicle/charging-sessions/[sessionId]/samples`.
-- История поездок: список с energy summary через `/api/vehicle/trips`, timeline сэмплов через `/api/vehicle/trips/[tripId]/samples`, GPS-трек через `/api/vehicle/trips/[tripId]/track`.
-- **Вкладка «Аналитика» в Истории:** полная аналитика в `VehicleAnalyticsPanels` на `/history?tab=analytics` — выбор периода, KPI-сводка с loading-состояниями, line/bar charts, phantom drain, расход vs температура, SOH, месячная сводка, route insights, стоимость/км, lifetime map и экспорт.
+- История поездок: список через `/api/vehicle/trips` (опционально `?month=YYYY-MM` для календаря), timeline через `/api/vehicle/trips/[tripId]/samples`, GPS-трек через `/api/vehicle/trips/[tripId]/track`.
+- **Графики поездки:** SOC; **Speed & power** (две оси); **Recovered energy** — bar chart по интервалам regen (ось X — км поездки, если есть, иначе время); температуры и cell delta. **Только fullscreen:** crosshair + tooltip при наведении.
+- **Карта маршрута:** OpenStreetMap (z2–z19), слои route / kW (drive+regen) / speed / SOC, pan/zoom относительно центра viewport, tooltip на линии маршрута (время, SOC, скорость, мощность).
+- **Вкладка «Аналитика» в Истории:** полная аналитика в `VehicleAnalyticsPanels` на `/history?tab=analytics` — выбор периода, KPI-сводка с loading-состояниями, line/bar charts, phantom drain, расход vs температура, SOH, месячная сводка, route insights, стоимость/км, lifetime map и экспорт. Hover tooltips в полноэкранных графиках.
 - **Route insights:** кластеризация GPS-треков (`GET /api/vehicle/analytics?type=route-insights`), имена маршрутов и флаги парковок в `bydmate_route_labels` (`PUT /api/vehicle/route-labels`), карточки с картой и статистикой расхода vs температура.
 - Страница автомобиля: teaser со ссылкой на Историю; панели также на `/dev/vehicle` и доступны при stale live telemetry.
 - Поиск знаний: отдельная страница `/knowledge/search` с full-text поиском через `GET /api/knowledge/search`.
