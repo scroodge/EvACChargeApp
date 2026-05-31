@@ -437,23 +437,21 @@ export async function fetchRouteInsights({
       }));
 
     const med = median(consumptions);
-    const unlocked = cluster.trips.length >= MIN_ROUTE_TRIPS;
+    if (cluster.trips.length < MIN_ROUTE_TRIPS) continue;
 
     insights.push({
       routeId,
       label: cluster.label,
       name: routePreferences.get(routeId)?.name ?? null,
       tripCount: cluster.trips.length,
-      tripsNeeded: Math.max(0, MIN_ROUTE_TRIPS - cluster.trips.length),
-      unlocked,
+      tripsNeeded: 0,
+      unlocked: true,
       trackPoints: isRouteTrackDisplayable(cluster.trackPoints) ? cluster.trackPoints : [],
       medianConsumptionKwh100: med,
       minConsumptionKwh100: consumptions.length ? Math.min(...consumptions) : null,
       maxConsumptionKwh100: consumptions.length ? Math.max(...consumptions) : null,
       tempBuckets,
-      predictedConsumptionKwh100: unlocked
-        ? predictFromTemp(tempBuckets, currentOutsideTempC, med)
-        : null,
+      predictedConsumptionKwh100: predictFromTemp(tempBuckets, currentOutsideTempC, med),
       currentOutsideTempC,
     });
   }

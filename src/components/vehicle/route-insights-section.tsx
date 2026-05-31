@@ -76,6 +76,7 @@ function RouteInsightCard({
   const [draftName, setDraftName] = useState(route.name ?? "");
 
   const displayTitle = route.name?.trim() || route.label;
+  const hasUserName = Boolean(route.name?.trim());
   const showMap = expanded && isRouteTrackDisplayable(route.trackPoints);
 
   const saveMutation = useMutation({
@@ -161,11 +162,6 @@ function RouteInsightCard({
             >
               <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} aria-hidden />
             </button>
-            {!route.unlocked ? (
-              <span className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                {tx("vehicle.analytics.routeUnlock", { value: route.tripsNeeded })}
-              </span>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -178,46 +174,42 @@ function RouteInsightCard({
               className="h-44"
             />
           ) : null}
-          {route.unlocked ? (
-            <div className="grid gap-2">
-              <p className="text-sm tabular-nums">
-                {fmt(route.medianConsumptionKwh100, 1)} kWh/100 · {fmt(route.minConsumptionKwh100, 1)}–{fmt(route.maxConsumptionKwh100, 1)}
-              </p>
-              {route.predictedConsumptionKwh100 ? (
-                <p className="text-sm text-primary">
-                  {tx("vehicle.analytics.routePrediction", {
-                    low: fmt(route.predictedConsumptionKwh100.low, 1),
-                    high: fmt(route.predictedConsumptionKwh100.high, 1),
-                  })}
-                </p>
-              ) : null}
-              {route.tempBuckets.length >= 2 ? (
-                <TempConsumptionBarChart
-                  buckets={route.tempBuckets.map((bucket) => ({
-                    tempLabel: bucket.label,
-                    tempMid: bucket.tempC,
-                    tripCount: bucket.count,
-                    avgConsumptionKwh100: bucket.avgConsumptionKwh100,
-                  }))}
-                />
-              ) : null}
+          {!hasUserName ? (
+            <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
+              <p className="text-xs text-muted-foreground">{tx("vehicle.analytics.routeParkHint")}</p>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="mt-2"
+                disabled={saveMutation.isPending}
+                onClick={() => saveMutation.mutate({ isPark: true })}
+              >
+                {tx("vehicle.analytics.routeMarkPark")}
+              </Button>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {tx("vehicle.analytics.routeUnlock", { value: route.tripsNeeded })}
+          ) : null}
+          <div className="grid gap-2">
+            <p className="text-sm tabular-nums">
+              {fmt(route.medianConsumptionKwh100, 1)} kWh/100 · {fmt(route.minConsumptionKwh100, 1)}–{fmt(route.maxConsumptionKwh100, 1)}
             </p>
-          )}
-          <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
-            <p className="text-xs text-muted-foreground">{tx("vehicle.analytics.routeParkHint")}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2"
-              disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate({ isPark: true })}
-            >
-              {tx("vehicle.analytics.routeMarkPark")}
-            </Button>
+            {route.predictedConsumptionKwh100 ? (
+              <p className="text-sm text-primary">
+                {tx("vehicle.analytics.routePrediction", {
+                  low: fmt(route.predictedConsumptionKwh100.low, 1),
+                  high: fmt(route.predictedConsumptionKwh100.high, 1),
+                })}
+              </p>
+            ) : null}
+            {route.tempBuckets.length >= 2 ? (
+              <TempConsumptionBarChart
+                buckets={route.tempBuckets.map((bucket) => ({
+                  tempLabel: bucket.label,
+                  tempMid: bucket.tempC,
+                  tripCount: bucket.count,
+                  avgConsumptionKwh100: bucket.avgConsumptionKwh100,
+                }))}
+              />
+            ) : null}
           </div>
         </div>
       ) : null}
