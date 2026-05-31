@@ -3,7 +3,19 @@ export const MAX_TRIP_ENERGY_GAP_SECONDS = 180;
 export type PowerEnergyPoint = {
   device_time: string;
   power_kw?: number | null;
+  current_trip_distance_km?: number | null;
+  odometer_km?: number | null;
 };
+
+export type RegenRecoverySegment = {
+  time: number;
+  distanceKm: number | null;
+  regenKwh: number;
+  powerKw: number | null;
+};
+
+export const MIN_REGEN_RECOVERY_KWH = 0.0001;
+export const MAX_REGEN_RECOVERY_BARS = 72;
 
 export type TripEnergySummary = {
   regen_energy_kwh: number | null;
@@ -122,4 +134,112 @@ export function calculateCumulativeRegenPoints(
   }
 
   return cumulative;
+}
+
+function segmentDistanceKm(
+  point: PowerEnergyPoint,
+  startOdometerKm: number | null,
+) {
+  const tripDistance = finiteNumber(point.current_trip_distance_km);
+  if (tripDistance != null) return tripDistance;
+
+  const odometerKm = finiteNumber(point.odometer_km);
+  if (odometerKm != null && startOdometerKm != null) {
+    return Math.max(0, odometerKm - startOdometerKm);
+  }
+
+  return null;
+}
+
+export function calculateRegenRecoverySegments(
+  points: PowerEnergyPoint[],
+  maxGapSeconds = MAX_TRIP_ENERGY_GAP_SECONDS,
+) {
+  const segments: RegenRecoverySegment[] = [];
+  const startOdometerKm = finiteNumber(points[0]?.odometer_km);
+
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const currentTime = Date.parse(current.device_time);
+    if (!Number.isFinite(currentTime)) continue;
+
+    const dtSeconds = elapsedSeconds(previous.device_time, current.device_time);
+    const previousPower = finiteNumber(previous.power_kw);
+    const currentPower = finiteNumber(current.power_kw);
+    if (
+      dtSeconds == null ||
+      dtSeconds > maxGapSeconds ||
+      previousPower == null ||
+      currentPower == null
+    ) {
+      continue;
+    }
+
+    const regenKwh = intervalEnergyKwh(previousPower, currentPower, dtSeconds).regen;
+    if (regenKwh <= MIN_REGEN_RECOVERY_KWH) continue;
+
+    segments.push({
+      time: currentTime,
+      distanceKm: segmentDistanceKm(current, startOdometerKm),
+      regenKwh,
+      powerKw: currentPower,
+    });
+  }
+
+  return segments;
+}
+
+export function prepareRegenRecoveryBars(
+  segments: RegenRecoverySegment[],
+  maxBars = MAX_REGEN_RECOVERY_BARS,
+): {
+  xAxis: "distance" | "time";
+  segments: Array<{ x: number; regenKwh: number }>;
+  hasData: boolean;
+} {
+  if (segments.length === 0) {
+    return {
+      xAxis: "time" as const,
+      segments: [] as Array<{ x: number; regenKwh: number }>,
+      hasData: false,
+    };
+  }
+
+  const distanceCoverage = segments.filter((segment) => segment.distanceKm != null).length / segments.length;
+  const useDistance = distanceCoverage >= 0.5;
+  const xAxis = useDistance ? "distance" : "time";
+  const rawBars = segments.map((segment) => ({
+    x: useDistance ? segment.distanceKm! : segment.time,
+    regenKwh: segment.regenKwh,
+  }));
+
+  if (rawBars.length <= maxBars) {
+    return { xAxis, segments: rawBars, hasData: true };
+  }
+
+  const xs = rawBars.map((bar) => bar.x);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const span = Math.max(maxX - minX, useDistance ? 0.1 : 60_000);
+  const bins = Array.from({ length: maxBars }, () => 0);
+
+  for (const bar of rawBars) {
+    const ratio = (bar.x - minX) / span;
+    const binIndex = Math.min(maxBars - 1, Math.max(0, Math.floor(ratio * maxBars)));
+    bins[binIndex] += bar.regenKwh;
+  }
+
+  const binnedBars = bins
+    .map((regenKwh, index) => ({
+      x: minX + ((index + 0.5) * span) / maxBars,
+      regenKwh,
+    }))
+    .filter((bar) => bar.regenKwh > MIN_REGEN_RECOVERY_KWH);
+
+  return {
+    xAxis,
+    segments: binnedBars,
+    hasData: binnedBars.length > 0,
+  };
 }

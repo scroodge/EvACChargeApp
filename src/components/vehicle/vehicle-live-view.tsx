@@ -42,7 +42,7 @@ import { useCarsQuery } from "@/hooks/use-cars-query";
 import { useTickingClock } from "@/hooks/use-ticking-clock";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAppPath } from "@/lib/dev/dev-path";
-import { calculateCumulativeRegenPoints, calculateTripEnergy } from "@/lib/bydmate/trip-energy";
+import { calculateRegenRecoverySegments, calculateTripEnergy, prepareRegenRecoveryBars } from "@/lib/bydmate/trip-energy";
 import { isRouteTrackDisplayable } from "@/lib/bydmate/route-insights";
 import type { Locale, TranslationKey } from "@/lib/i18n";
 import type {
@@ -654,6 +654,8 @@ type ChartSeries = {
   label: string;
   color: string;
   points: ChartPoint[];
+  unit?: string;
+  valueDigits?: number;
 };
 
 type TelemetryChart = {
@@ -665,6 +667,15 @@ type TelemetryChart = {
   maxValue: number;
   minTime: number;
   maxTime: number;
+  hasData: boolean;
+};
+
+type RegenRecoveryChartModel = {
+  title: string;
+  unit: string;
+  valueDigits: number;
+  xAxis: "distance" | "time";
+  segments: Array<{ x: number; regenKwh: number }>;
   hasData: boolean;
 };
 
@@ -1450,23 +1461,6 @@ function addChartPoint(chart: TelemetryChart, seriesIndex: number, time: number,
   chart.hasData = true;
 }
 
-function addChartPointWithPower(
-  chart: TelemetryChart,
-  seriesIndex: number,
-  time: number,
-  value: number | null,
-  powerKw: number | null,
-) {
-  if (value == null || !Number.isFinite(time)) return;
-
-  chart.series[seriesIndex].points.push({ time, value, powerKw });
-  chart.minValue = chart.hasData ? Math.min(chart.minValue, value) : value;
-  chart.maxValue = chart.hasData ? Math.max(chart.maxValue, value) : value;
-  chart.minTime = chart.hasData ? Math.min(chart.minTime, time) : time;
-  chart.maxTime = chart.hasData ? Math.max(chart.maxTime, time) : time;
-  chart.hasData = true;
-}
-
 function addDeltaBySocPoint(points: DeltaBySocPoint[], time: number, soc: number | null, delta: number | null) {
   if (soc == null || delta == null || !Number.isFinite(time)) return;
   points.push({ soc, delta, time });
@@ -1533,15 +1527,22 @@ function prepareTelemetryHistory(
   const socChart = createChart(t("vehicle.charts.soc"), "%", [
     { label: "SOC", color: "var(--voltflow-cyan)", points: [] },
   ]);
-  const speedChart = createChart(t("vehicle.metrics.speed"), "km/h", [
-    { label: t("vehicle.metrics.speed"), color: "#7dd3fc", points: [] },
+  const speedPowerChart = createChart(t("vehicle.charts.speedPower"), "", [
+    {
+      label: t("vehicle.metrics.speed"),
+      color: "#7dd3fc",
+      points: [],
+      unit: "km/h",
+      valueDigits: 0,
+    },
+    {
+      label: t("vehicle.metrics.power"),
+      color: "#facc15",
+      points: [],
+      unit: "kW",
+      valueDigits: 1,
+    },
   ]);
-  const powerChart = createChart(t("vehicle.metrics.power"), "kW", [
-    { label: t("vehicle.metrics.power"), color: "#facc15", points: [] },
-  ]);
-  const regenChart = createChart(t("vehicle.charts.regen"), "kWh", [
-    { label: t("vehicle.trips.regen"), color: "#34d399", points: [] },
-  ], 2);
   const temperatureChart = createChart(t("vehicle.charts.temperatures"), "°C", [
     { label: t("vehicle.charts.battery"), color: "#22c55e", points: [] },
     { label: t("vehicle.charts.outside"), color: "#38bdf8", points: [] },
@@ -1567,8 +1568,8 @@ function prepareTelemetryHistory(
     const soc = validNumber(point.telemetry.soc);
     const cellDelta = cellDeltaValue(point);
     addChartPoint(socChart, 0, time, soc);
-    addChartPoint(speedChart, 0, time, validNumber(point.telemetry.speed_kmh));
-    addChartPoint(powerChart, 0, time, validNumber(point.telemetry.power_kw));
+    addChartPoint(speedPowerChart, 0, time, validNumber(point.telemetry.speed_kmh));
+    addChartPoint(speedPowerChart, 1, time, validNumber(point.telemetry.power_kw));
     addChartPoint(temperatureChart, 0, time, validTempNumber(point.telemetry.battery_temp_c));
     addChartPoint(temperatureChart, 1, time, validTempNumber(point.telemetry.outside_temp_c));
     addChartPoint(temperatureChart, 2, time, validTempNumber(point.telemetry.cabin_temp_c));
@@ -1579,22 +1580,48 @@ function prepareTelemetryHistory(
   }
 
   const hourlyRegen = points.some((point) => typeof point.regen_kwh_sum === "number");
+  let regenRecoverySegments;
   if (hourlyRegen) {
-    let cumulative = 0;
-    for (const point of points) {
-      cumulative += point.regen_kwh_sum ?? 0;
-      addChartPoint(regenChart, 0, pointTimeMs(point), cumulative);
-    }
+    const startOdometerKm = validNumber(points[0]?.telemetry?.odometer_km);
+    regenRecoverySegments = points
+      .map((point) => {
+        const regenKwh = point.regen_kwh_sum ?? 0;
+        if (regenKwh <= 0) return null;
+        const tripDistance = validNumber(point.telemetry?.current_trip_distance_km);
+        const odometerKm = validNumber(point.telemetry?.odometer_km);
+        const distanceKm =
+          tripDistance ??
+          (startOdometerKm != null && odometerKm != null ? Math.max(0, odometerKm - startOdometerKm) : null);
+        return {
+          time: pointTimeMs(point),
+          distanceKm,
+          regenKwh,
+          powerKw: validNumber(point.telemetry?.power_kw),
+        };
+      })
+      .filter((segment): segment is NonNullable<typeof segment> => segment != null);
   } else {
-    for (const point of calculateCumulativeRegenPoints(points.map((sample) => ({
-      device_time: sample.device_time,
-      power_kw: sample.telemetry?.power_kw,
-    })))) {
-      addChartPointWithPower(regenChart, 0, point.time, point.value, point.power_kw);
-    }
+    regenRecoverySegments = calculateRegenRecoverySegments(
+      points.map((sample) => ({
+        device_time: sample.device_time,
+        power_kw: sample.telemetry?.power_kw,
+        current_trip_distance_km: sample.telemetry?.current_trip_distance_km,
+        odometer_km: sample.telemetry?.odometer_km,
+      })),
+    );
   }
 
-  const charts = [socChart, speedChart, powerChart, regenChart, temperatureChart, ...(includeCellDelta ? [cellDeltaChart] : [])].map((chart) =>
+  const regenBars = prepareRegenRecoveryBars(regenRecoverySegments);
+  const regenRecoveryChart: RegenRecoveryChartModel = {
+    title: t("vehicle.charts.regen"),
+    unit: "kWh",
+    valueDigits: 2,
+    xAxis: regenBars.xAxis,
+    segments: regenBars.segments,
+    hasData: regenBars.hasData,
+  };
+
+  const charts = [socChart, speedPowerChart, temperatureChart, ...(includeCellDelta ? [cellDeltaChart] : [])].map((chart) =>
     finalizeChart(chart),
   );
 
@@ -1603,6 +1630,7 @@ function prepareTelemetryHistory(
     start,
     end,
     charts,
+    regenRecoveryChart,
     deltaBySoc: includeCellDelta ? prepareDeltaBySoc(deltaBySocPoints, "discharge") : { points: [], minSoc: 0, maxSoc: 100, minDelta: 0, maxDelta: 0, latest: null, socDirection: "discharge" as const },
   };
 }
@@ -1697,7 +1725,16 @@ export function TelemetryHistoryCharts({
           {showLineCharts && history.visiblePointCount > 0 ? (
             <>
               <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {history.charts.map((chart) => (
+                {history.charts.slice(0, 2).map((chart) => (
+                  <TelemetryLineChart
+                    key={chart.title}
+                    chart={chart}
+                  />
+                ))}
+                {history.regenRecoveryChart.hasData ? (
+                  <RegenRecoveryChart chart={history.regenRecoveryChart} />
+                ) : null}
+                {history.charts.slice(2).map((chart) => (
                   <TelemetryLineChart
                     key={chart.title}
                     chart={chart}
@@ -1720,23 +1757,237 @@ export function TelemetryHistoryCharts({
   );
 }
 
+function seriesUnit(item: ChartSeries, chartUnit: string) {
+  return item.unit ?? chartUnit;
+}
+
+function chartUsesDualAxis(series: ChartSeries[], chartUnit: string) {
+  const units = series.map((item) => seriesUnit(item, chartUnit));
+  return new Set(units).size > 1;
+}
+
+function buildSeriesScale(values: number[], valueDigits: number) {
+  if (values.length === 0) {
+    return {
+      minValue: 0,
+      maxValue: 1,
+      y: () => 60,
+      yTicks: [] as Array<{ label: string; value: number }>,
+    };
+  }
+
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valuePad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
+  const yMin = minValue - valuePad;
+  const yMax = maxValue + valuePad;
+  const y = (value: number) => {
+    if (yMax === yMin) return 60;
+    return 104 - ((value - yMin) / (yMax - yMin)) * 88;
+  };
+  const yTicks = [
+    { label: fmt(maxValue, valueDigits), value: maxValue },
+    { label: fmt((minValue + maxValue) / 2, valueDigits), value: (minValue + maxValue) / 2 },
+    { label: fmt(minValue, valueDigits), value: minValue },
+  ];
+
+  return { minValue, maxValue, y, yTicks };
+}
+
+function formatChartRange(
+  series: ChartSeries[],
+  chartUnit: string,
+  chartValueDigits: number,
+  tx: Translator,
+) {
+  if (!series.length) return tx("vehicle.charts.noValues");
+
+  return series
+    .map((item) => {
+      const values = item.points.map((point) => point.value);
+      if (values.length === 0) return null;
+      const digits = item.valueDigits ?? chartValueDigits;
+      const unit = seriesUnit(item, chartUnit);
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      return `${fmt(minValue, digits)}-${fmt(maxValue, digits)}${unit ? ` ${unit}` : ""}`;
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function formatRegenRecoveryXLabel(xAxis: "distance" | "time", value: number) {
+  if (xAxis === "distance") return `${fmt(value, 1)} km`;
+  return formatClock(value);
+}
+
+function RegenRecoveryChart({ chart }: { chart: RegenRecoveryChartModel }) {
+  const { t } = useTranslation();
+  const tx = t as Translator;
+  const [isOpen, setIsOpen] = useState(false);
+  const { title, unit, valueDigits, xAxis, segments, hasData } = chart;
+  const regenColor = "#34d399";
+  const totalRegen = segments.reduce((sum, segment) => sum + segment.regenKwh, 0);
+  const maxRegen = segments.length ? Math.max(...segments.map((segment) => segment.regenKwh)) : 1;
+  const minX = segments.length ? Math.min(...segments.map((segment) => segment.x)) : 0;
+  const maxX = segments.length ? Math.max(...segments.map((segment) => segment.x)) : 1;
+  const xPad =
+    xAxis === "distance"
+      ? Math.max((maxX - minX) * 0.04, 0.1)
+      : Math.max((maxX - minX) * 0.04, 60_000);
+  const plotMinX = minX - xPad;
+  const plotMaxX = maxX + xPad;
+  const yMin = 0;
+  const yMax = Math.max(maxRegen * 1.12, 0.01);
+
+  const xScale = (value: number) => {
+    if (plotMaxX === plotMinX) return 160;
+    return 34 + ((value - plotMinX) / (plotMaxX - plotMinX)) * 284;
+  };
+  const yScale = (value: number) => {
+    if (yMax === yMin) return 104;
+    return 104 - ((value - yMin) / (yMax - yMin)) * 88;
+  };
+
+  const xAxisLabel =
+    xAxis === "distance"
+      ? tx("vehicle.charts.regenAxisDistance" as TranslationKey)
+      : tx("vehicle.charts.regenAxisTime" as TranslationKey);
+  const rangeLabel = hasData
+    ? `${fmt(totalRegen, valueDigits)} ${unit} ${tx("vehicle.charts.regenTotal" as TranslationKey)} · ${xAxisLabel}`
+    : tx("vehicle.charts.noValues");
+
+  const xTicks = hasData
+    ? [
+        { x: minX, label: formatRegenRecoveryXLabel(xAxis, minX) },
+        { x: minX + (maxX - minX) / 2, label: formatRegenRecoveryXLabel(xAxis, minX + (maxX - minX) / 2) },
+        { x: maxX, label: formatRegenRecoveryXLabel(xAxis, maxX) },
+      ]
+    : [];
+  const yTicks = hasData
+    ? [
+        { label: fmt(yMax, valueDigits), value: yMax },
+        { label: fmt(yMax / 2, valueDigits), value: yMax / 2 },
+        { label: fmt(yMin, valueDigits), value: yMin },
+      ]
+    : [];
+  const barWidth = segments.length
+    ? Math.min(10, Math.max(3, (284 / Math.max(segments.length, 1)) * 0.7))
+    : 4;
+
+  const plot = (heightClass: string) => (
+    <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
+      <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
+      <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
+      {yTicks.map((tick, index) => (
+        <g key={`${title}-y-${index}`}>
+          <line x1="34" x2="318" y1={yScale(tick.value)} y2={yScale(tick.value)} stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
+          <text x="29" y={yScale(tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+            {tick.label}
+          </text>
+        </g>
+      ))}
+      {xTicks.map((tick, index) => (
+        <g key={`${title}-x-${index}`}>
+          <line x1={xScale(tick.x)} x2={xScale(tick.x)} y1="104" y2="109" stroke="currentColor" className="text-border" strokeWidth="1" />
+          <text x={xScale(tick.x)} y="124" textAnchor="middle" className="fill-muted-foreground text-[9px]">
+            {tick.label}
+          </text>
+        </g>
+      ))}
+      <text x="176" y="148" textAnchor="middle" className="fill-muted-foreground text-[9px]">
+        {xAxisLabel}
+      </text>
+      <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">
+        {unit}
+      </text>
+      {segments.map((segment, index) => {
+        const cx = xScale(segment.x);
+        const baseline = yScale(yMin);
+        const top = yScale(segment.regenKwh);
+        const height = Math.max(0, baseline - top);
+        const tooltip = `${formatRegenRecoveryXLabel(xAxis, segment.x)}\n${fmt(segment.regenKwh, valueDigits)} ${unit}`;
+        return (
+          <g key={`${segment.x}-${index}`}>
+            <rect
+              x={cx - barWidth / 2}
+              y={top}
+              width={barWidth}
+              height={height}
+              rx="2"
+              fill={regenColor}
+              fillOpacity="0.85"
+            >
+              <title>{tooltip}</title>
+            </rect>
+            {height >= 12 ? (
+              <text x={cx} y={top - 3} textAnchor="middle" className="fill-foreground text-[7px] font-medium">
+                {fmt(segment.regenKwh, valueDigits)}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </svg>
+  );
+
+  return (
+    <article className="rounded-2xl border border-border bg-white/[0.02] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-heading text-lg font-semibold tracking-tight">{title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
+        </div>
+        <div className="flex shrink-0 items-center">
+          <IconButton label={tx("vehicle.charts.fullscreen")} onClick={() => setIsOpen(true)}>
+            <Maximize2 className="size-4" aria-hidden />
+          </IconButton>
+        </div>
+      </div>
+
+      <div className="mt-4">{plot("h-44")}</div>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] gap-3 p-3 sm:max-w-[calc(100vw-2rem)]">
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <div className="px-1">
+            <h3 className="font-heading text-xl font-semibold tracking-tight">{title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
+          </div>
+          {plot("h-[60dvh]")}
+        </DialogContent>
+      </Dialog>
+    </article>
+  );
+}
+
 function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
   const { t } = useTranslation();
   const tx = t as Translator;
   const [isOpen, setIsOpen] = useState(false);
   const { title, unit, valueDigits, series, hasData, minValue, maxValue, minTime, maxTime } = chart;
+  const dualAxis = chartUsesDualAxis(series, unit);
   const valuePad = Math.max((maxValue - minValue) * 0.12, maxValue === minValue ? 1 : 0);
   const yMin = minValue - valuePad;
   const yMax = maxValue + valuePad;
+  const singleY = (value: number) => {
+    if (yMax === yMin) return 60;
+    return 104 - ((value - yMin) / (yMax - yMin)) * 88;
+  };
+  const seriesScales = series.map((item) =>
+    buildSeriesScale(
+      item.points.map((point) => point.value),
+      item.valueDigits ?? valueDigits,
+    ),
+  );
+  const rangeLabel = formatChartRange(series, unit, valueDigits, tx);
 
   const x = (time: number) => {
     if (maxTime === minTime) return 160;
     return 34 + ((time - minTime) / (maxTime - minTime)) * 284;
   };
-  const y = (value: number) => {
-    if (yMax === yMin) return 60;
-    return 104 - ((value - yMin) / (yMax - yMin)) * 88;
-  };
+  const y = (seriesIndex: number, value: number) =>
+    dualAxis ? seriesScales[seriesIndex].y(value) : singleY(value);
   const startTime = Number.isFinite(minTime) ? minTime : 0;
   const xTicks = hasData
     ? [
@@ -1748,7 +1999,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         { label: new Date(maxTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), time: maxTime },
       ]
     : [];
-  const yTicks = hasData
+  const singleYTicks = hasData
     ? [
         { label: fmt(maxValue, valueDigits), value: maxValue },
         { label: fmt((minValue + maxValue) / 2, valueDigits), value: (minValue + maxValue) / 2 },
@@ -1759,22 +2010,43 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
   const pointTitle = (item: ChartSeries, point: ChartPoint) => {
     const elapsedMin = Math.max(0, Math.round((point.time - startTime) / 60000));
     const clock = new Date(point.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const digits = item.valueDigits ?? valueDigits;
+    const pointUnit = seriesUnit(item, unit);
     const power = point.powerKw == null ? "" : `\n${tx("vehicle.metrics.power")}: ${fmt(point.powerKw, 1)} kW`;
-    return `${item.label}: ${fmt(point.value, valueDigits)} ${unit}\n${elapsedMin}m · ${clock}${power}`;
+    return `${item.label}: ${fmt(point.value, digits)}${pointUnit ? ` ${pointUnit}` : ""}\n${elapsedMin}m · ${clock}${power}`;
   };
 
   const plot = (heightClass: string) => (
     <svg className={`${heightClass} w-full overflow-visible`} viewBox="0 0 340 158" role="img" aria-label={tx("vehicle.charts.chartAria", { title })}>
       <line x1="34" x2="318" y1="104" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
       <line x1="34" x2="34" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" />
-      {yTicks.map((tick, index) => (
-        <g key={`${title}-y-${index}`}>
-          <line x1="34" x2="318" y1={y(tick.value)} y2={y(tick.value)} stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
-          <text x="29" y={y(tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
-            {tick.label}
-          </text>
-        </g>
-      ))}
+      {dualAxis ? <line x1="318" x2="318" y1="16" y2="104" stroke="currentColor" className="text-border" strokeWidth="1" /> : null}
+      {dualAxis
+        ? series.map((item, seriesIndex) =>
+            seriesScales[seriesIndex].yTicks.map((tick, index) => (
+              <g key={`${title}-y-${seriesIndex}-${index}`}>
+                <line x1="34" x2="318" y1={y(seriesIndex, tick.value)} y2={y(seriesIndex, tick.value)} stroke="currentColor" className="text-border/40" strokeWidth="1" strokeDasharray="4 6" />
+                {seriesIndex === 0 ? (
+                  <text x="29" y={y(seriesIndex, tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+                    {tick.label}
+                  </text>
+                ) : null}
+                {seriesIndex === series.length - 1 ? (
+                  <text x="323" y={y(seriesIndex, tick.value) + 3} textAnchor="start" className="fill-muted-foreground text-[9px]">
+                    {tick.label}
+                  </text>
+                ) : null}
+              </g>
+            )),
+          )
+        : singleYTicks.map((tick, index) => (
+            <g key={`${title}-y-${index}`}>
+              <line x1="34" x2="318" y1={y(0, tick.value)} y2={y(0, tick.value)} stroke="currentColor" className="text-border/60" strokeWidth="1" strokeDasharray="4 6" />
+              <text x="29" y={y(0, tick.value) + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">
+                {tick.label}
+              </text>
+            </g>
+          ))}
       {xTicks.map((tick, index) => (
         <g key={`${title}-x-${index}`}>
           <line x1={x(tick.time)} x2={x(tick.time)} y1="104" y2="109" stroke="currentColor" className="text-border" strokeWidth="1" />
@@ -1786,12 +2058,23 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
       <text x="176" y="148" textAnchor="middle" className="fill-muted-foreground text-[9px]">
         {tx("vehicle.charts.elapsed")}
       </text>
-      <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">
-        {unit}
-      </text>
-      {series.map((item) => {
+      {dualAxis ? (
+        <>
+          <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">
+            {seriesUnit(series[0], unit)}
+          </text>
+          <text x="334" y="60" textAnchor="middle" transform="rotate(90 334 60)" className="fill-muted-foreground text-[9px]">
+            {seriesUnit(series[series.length - 1], unit)}
+          </text>
+        </>
+      ) : (
+        <text x="6" y="60" textAnchor="middle" transform="rotate(-90 6 60)" className="fill-muted-foreground text-[9px]">
+          {unit}
+        </text>
+      )}
+      {series.map((item, seriesIndex) => {
         const d = item.points
-          .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(point.value).toFixed(2)}`)
+          .map((point, index) => `${index === 0 ? "M" : "L"} ${x(point.time).toFixed(2)} ${y(seriesIndex, point.value).toFixed(2)}`)
           .join(" ");
         const markers = item.points.length <= MAX_CHART_MARKERS ? item.points : [];
         return (
@@ -1803,7 +2086,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
               <circle
                 key={`${item.label}-hit-${point.time}-${index}`}
                 cx={x(point.time)}
-                cy={y(point.value)}
+                cy={y(seriesIndex, point.value)}
                 r="7"
                 fill="transparent"
               >
@@ -1811,7 +2094,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
               </circle>
             ))}
             {markers.map((point, index) => (
-              <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(point.value)} r="3.5" fill={item.color}>
+              <circle key={`${item.label}-${point.time}-${index}`} cx={x(point.time)} cy={y(seriesIndex, point.value)} r="3.5" fill={item.color}>
                 <title>{pointTitle(item, point)}</title>
               </circle>
             ))}
@@ -1827,8 +2110,18 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
         <div>
           <h3 className="font-heading text-lg font-semibold tracking-tight">{title}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {hasData ? `${fmt(minValue, valueDigits)}-${fmt(maxValue, valueDigits)} ${unit}` : tx("vehicle.charts.noValues")}
+            {hasData ? rangeLabel : tx("vehicle.charts.noValues")}
           </p>
+          {dualAxis ? (
+            <div className="mt-2 flex flex-wrap gap-3">
+              {series.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center">
           <IconButton label={tx("vehicle.charts.fullscreen")} onClick={() => setIsOpen(true)}>
@@ -1845,7 +2138,7 @@ function TelemetryLineChart({ chart }: { chart: TelemetryChart }) {
           <div className="px-1">
             <h3 className="font-heading text-xl font-semibold tracking-tight">{title}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {hasData ? `${fmt(minValue, valueDigits)}-${fmt(maxValue, valueDigits)} ${unit}` : tx("vehicle.charts.noValues")}
+              {hasData ? rangeLabel : tx("vehicle.charts.noValues")}
             </p>
           </div>
           {plot("h-[60dvh]")}
