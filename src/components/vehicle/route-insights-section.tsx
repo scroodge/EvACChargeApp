@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Pencil } from "lucide-react";
+import { ChevronDown, Loader2, Pencil } from "lucide-react";
 
 import { RouteMapPreview } from "@/components/vehicle/vehicle-live-view";
 import { TempConsumptionBarChart } from "@/components/vehicle/telemetry-analytics-charts";
@@ -15,6 +15,7 @@ import {
   isRouteTrackDisplayable,
   type ParkedRouteInsight,
   type RouteInsight,
+  type RouteInsightsResult,
 } from "@/lib/bydmate/route-insights";
 import { devFetch, isDevAppRoute } from "@/lib/dev/dev-fetch";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,26 @@ function invalidateRouteInsights(queryClient: ReturnType<typeof useQueryClient>,
   queryClient.invalidateQueries({ queryKey: ["vehicle-analytics", "route-insights", vehicleId] });
 }
 
+function patchRouteInsightInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  vehicleId: string,
+  routeId: string,
+  patch: Partial<Pick<RouteInsight, "name">>,
+) {
+  queryClient.setQueriesData<RouteInsightsResult>(
+    { queryKey: ["vehicle-analytics", "route-insights", vehicleId] },
+    (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        routes: current.routes.map((item) =>
+          item.routeId === routeId ? { ...item, ...patch } : item,
+        ),
+      };
+    },
+  );
+}
+
 function RouteInsightCard({
   route,
   vehicleId,
@@ -75,18 +96,36 @@ function RouteInsightCard({
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(route.name ?? "");
 
-  const displayTitle = route.name?.trim() || route.label;
-  const hasUserName = Boolean(route.name?.trim());
-  const showMap = expanded && isRouteTrackDisplayable(route.trackPoints);
-
   const saveMutation = useMutation({
     mutationFn: (payload: { name?: string; isPark?: boolean }) =>
       saveRoutePreference({ vehicleId, routeId: route.routeId, ...payload }),
-    onSuccess: () => {
-      invalidateRouteInsights(queryClient, vehicleId);
+    onMutate: (payload) => {
+      if (payload.name === undefined) return undefined;
+      const nextName = payload.name.trim() || null;
+      const previousName = route.name;
+      patchRouteInsightInCache(queryClient, vehicleId, route.routeId, { name: nextName });
       setIsEditing(false);
+      return { previousName };
+    },
+    onSuccess: (data, payload) => {
+      if (payload.name !== undefined) {
+        patchRouteInsightInCache(queryClient, vehicleId, route.routeId, { name: data.name });
+      }
+      invalidateRouteInsights(queryClient, vehicleId);
+    },
+    onError: (_error, payload, context) => {
+      if (payload.name !== undefined && context) {
+        patchRouteInsightInCache(queryClient, vehicleId, route.routeId, { name: context.previousName });
+        setDraftName(payload.name);
+        setIsEditing(true);
+      }
     },
   });
+
+  const displayTitle = route.name?.trim() || route.label;
+  const hasUserName = Boolean(route.name?.trim());
+  const isSavingName = saveMutation.isPending && saveMutation.variables?.name !== undefined;
+  const showMap = expanded && isRouteTrackDisplayable(route.trackPoints);
 
   const startEditing = () => {
     setDraftName(route.name ?? "");
@@ -117,7 +156,7 @@ function RouteInsightCard({
                   disabled={saveMutation.isPending}
                   onClick={() => saveMutation.mutate({ name: draftName })}
                 >
-                  {tx("vehicle.analytics.routeNameSave")}
+                  {saveMutation.isPending ? tx("common.saving") : tx("vehicle.analytics.routeNameSave")}
                 </Button>
                 <Button size="sm" variant="outline" onClick={cancelEditing}>
                   {tx("vehicle.analytics.routeNameCancel")}
@@ -135,7 +174,12 @@ function RouteInsightCard({
               aria-expanded={expanded}
             >
               <h3 className="font-heading text-base font-semibold tracking-tight">{displayTitle}</h3>
-              {route.name ? (
+              {isSavingName ? (
+                <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" aria-hidden />
+                  {tx("common.saving")}
+                </p>
+              ) : hasUserName ? (
                 <p className="mt-0.5 text-xs text-muted-foreground">{route.label}</p>
               ) : null}
               <p className="mt-1 text-xs text-muted-foreground">
@@ -257,6 +301,32 @@ function ParkedRouteCard({
   );
 }
 
+function RouteInsightsLoading({ tx }: { tx: Translator }) {
+  return (
+    <div
+      className="mt-4 grid gap-3"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/[0.02] p-4">
+        <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary" aria-hidden />
+        <div>
+          <p className="text-sm font-medium">{tx("vehicle.analytics.routeInsightsLoading")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{tx("vehicle.analytics.routeInsightsLoadingHint")}</p>
+        </div>
+      </div>
+      {[0, 1].map((index) => (
+        <div key={index} className="rounded-2xl border border-border bg-white/[0.02] p-4">
+          <Skeleton className="h-5 w-3/5 rounded-md" />
+          <Skeleton className="mt-2 h-3 w-2/5 rounded-md" />
+          <Skeleton className="mt-4 h-24 w-full rounded-xl" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function RouteInsightsSection({
   routes,
   parkedRoutes,
@@ -273,7 +343,7 @@ export function RouteInsightsSection({
   const [parkedOpen, setParkedOpen] = useState(parkedRoutes.length > 0);
 
   if (isLoading) {
-    return <Skeleton className="h-32 rounded-2xl" />;
+    return <RouteInsightsLoading tx={tx} />;
   }
 
   if (routes.length === 0 && parkedRoutes.length === 0) {

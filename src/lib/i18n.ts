@@ -46,14 +46,17 @@ export function formatCurrencyAmount(
   currency: Currency,
   value: number,
   locale: Locale,
+  options?: { minimumFractionDigits?: number; maximumFractionDigits?: number },
 ) {
   const localeCode = locale === "be" ? "be-BY" : locale === "ru" ? "ru-RU" : "en-US";
+  const minimumFractionDigits = options?.minimumFractionDigits ?? 2;
+  const maximumFractionDigits = options?.maximumFractionDigits ?? 2;
 
   return new Intl.NumberFormat(localeCode, {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits,
+    maximumFractionDigits,
   }).format(value);
 }
 
@@ -512,6 +515,8 @@ export const dictionaries = {
         routeInsightsTitle: "Route insights",
         routeInsightsSubtitle: "Repeat routes unlock after three trips on the same path.",
         routeInsightsEmpty: "Drive a few repeat routes to unlock consumption insights.",
+        routeInsightsLoading: "Analyzing repeat routes…",
+        routeInsightsLoadingHint: "Matching GPS tracks from recent trips.",
         routeTripCount: "{value} trips on this route",
         routeUnlock: "{value} more trips to unlock",
         routeNamePlaceholder: "Route name, e.g. Home → Work",
@@ -1094,6 +1099,8 @@ export const dictionaries = {
         routeInsightsTitle: "Інсайты маршрутаў",
         routeInsightsSubtitle: "Паўторныя маршруты адкрываюцца пасля трох паездак.",
         routeInsightsEmpty: "Падарожніча па паўторных маршрутах, каб адкрыць інсайты.",
+        routeInsightsLoading: "Аналіз паўторных маршрутаў…",
+        routeInsightsLoadingHint: "Збігаем GPS-трэкі апошніх паездак.",
         routeTripCount: "{value} паездак на гэтым маршруце",
         routeUnlock: "Яшчэ {value} паездак для разблакіроўкі",
         routeNamePlaceholder: "Назва маршруту, напр. Дом → Праца",
@@ -1675,6 +1682,8 @@ export const dictionaries = {
         routeInsightsTitle: "Инсайты маршрутов",
         routeInsightsSubtitle: "Повторные маршруты открываются после трёх поездок.",
         routeInsightsEmpty: "Поездите по повторным маршрутам, чтобы открыть инсайты.",
+        routeInsightsLoading: "Анализ повторных маршрутов…",
+        routeInsightsLoadingHint: "Сопоставляем GPS-треки недавних поездок.",
         routeTripCount: "{value} поездок на этом маршруте",
         routeUnlock: "Ещё {value} поездок для разблокировки",
         routeNamePlaceholder: "Название маршрута, напр. Дом → Работа",

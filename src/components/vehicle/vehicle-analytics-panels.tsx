@@ -20,8 +20,9 @@ import { useTranslation } from "@/hooks/use-translation";
 import { buildAnalyticsSummary, consumptionByOutsideTemp } from "@/lib/bydmate/telemetry-buckets";
 import { resolveTelemetryWindow, snapAnchorDateForRange, isoWeekValueFromDate, isoWeekValueToAnchorDate, monthValueFromDate, monthValueToAnchorDate, quarterValueFromDate, quarterValueToAnchorDate, yearValueFromDate, yearValueToAnchorDate, type TelemetryHistoryRange } from "@/lib/bydmate/telemetry-ranges";
 import type { RouteInsightsResult } from "@/lib/bydmate/route-insights";
+import { useAppPreferences } from "@/stores/use-app-preferences";
 import { devFetch, isDevAppRoute, withDevApiParams } from "@/lib/dev/dev-fetch";
-import type { Locale, TranslationKey } from "@/lib/i18n";
+import { formatCurrencyAmount, type Locale, type TranslationKey } from "@/lib/i18n";
 import type { BydmateTripRow, BydmateTripTrackPointRow } from "@/types/database";
 
 const HISTORY_RANGES: TelemetryHistoryRange[] = ["day", "week", "month", "quarter", "year"];
@@ -148,6 +149,15 @@ function AnalyticsRangeAnchorPicker({
 export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
   const { locale, t } = useTranslation();
   const tx = t as Translator;
+  const currency = useAppPreferences((state) => state.currency);
+
+  const formatMoney = (value: number | null | undefined, digits = 2) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+    return formatCurrencyAmount(currency, value, locale as Locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  };
   const [historyRange, setHistoryRange] = useState<TelemetryHistoryRange>("week");
   const [anchorDate, setAnchorDate] = useState(() =>
     snapAnchorDateForRange("week", new Date().toISOString().slice(0, 10)),
@@ -367,7 +377,7 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
             <AnalyticsStat label={t("vehicle.trips.distance") as string} value={`${fmt(monthlyQuery.data?.distanceKm, 0)} km`} />
             <AnalyticsStat label={t("vehicle.trips.regen") as string} value={`${fmt(monthlyQuery.data?.regenKwh, 2)} kWh`} />
             <AnalyticsStat label={t("vehicle.analytics.charged") as string} value={`${fmt(monthlyQuery.data?.chargedKwh, 1)} kWh`} />
-            <AnalyticsStat label={t("vehicle.analytics.cost") as string} value={fmt(monthlyQuery.data?.chargingCost, 2)} />
+            <AnalyticsStat label={t("vehicle.analytics.cost") as string} value={formatMoney(monthlyQuery.data?.chargingCost, 2)} />
             <AnalyticsStat
               label={t("vehicle.trips.consumption") as string}
               value={`${fmt(monthlyQuery.data?.avgConsumptionKwh100, 1)} kWh/100`}
@@ -424,8 +434,15 @@ export function VehicleAnalyticsPanels({ vehicleId }: { vehicleId: string }) {
         ) : (
           <div className="mt-4 grid grid-cols-2 gap-3">
             <AnalyticsStat label={t("vehicle.trips.distance") as string} value={`${fmt(costQuery.data?.distanceKm, 0)} km`} />
-            <AnalyticsStat label={t("vehicle.analytics.cost") as string} value={fmt(costQuery.data?.chargingCost, 2)} />
-            <AnalyticsStat label={t("vehicle.analytics.costPerKm") as string} value={fmt(costQuery.data?.costPerKm, 3)} />
+            <AnalyticsStat label={t("vehicle.analytics.cost") as string} value={formatMoney(costQuery.data?.chargingCost, 2)} />
+            <AnalyticsStat
+              label={t("vehicle.analytics.costPerKm") as string}
+              value={
+                typeof costQuery.data?.costPerKm === "number" && Number.isFinite(costQuery.data.costPerKm)
+                  ? `${formatMoney(costQuery.data.costPerKm, 3)}/km`
+                  : "—"
+              }
+            />
           </div>
         )}
       </section>
